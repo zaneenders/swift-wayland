@@ -57,8 +57,9 @@ extension SwiftWayland {
                 self.frame_buffer_fd = setupFrameBuffer()
                 // FIXME: there is an `unsafe` call here but the swift-format is merging it with `message`
                 for try await message in inbound {
-                    handleWaylandResponse(message)
+                    await handleWaylandResponse(message, outbound)
                 }
+                print("Close")
             }
             print("Goodbye")
         } catch {
@@ -66,26 +67,78 @@ extension SwiftWayland {
         }
     }
 
-    private func handleWaylandResponse(_ message: WaylandMessage) {
+    private mutating func handleWaylandResponse(
+        _ message: WaylandMessage,
+        _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
+    ) async {
         if message.object == self.wayland_display_object_id
             && message.opcode == WaylandOpCodes.wayland_wl_display_error_event.value
         {
-            print("wl_display: Error")
-        } else if message.object == self.wayland_current_object_id
+            print("wl_display: Error", message.length)
+            if let error_message = message.message {
+                print(error_message.getString(at: 0, length: Int(message.length - 8)))
+            }
+        } else if message.object == 2  // wl_registry
             && message.opcode == WaylandOpCodes.registry_event_global.value
         {
             guard var buffer = message.message,
                 let name = buffer.readInteger(endianness: .little, as: UInt32.self),
                 let interface_length = buffer.readInteger(endianness: .little, as: UInt32.self),
-                let msg = buffer.readString(length: Int(interface_length)),
+                let _interface_name = buffer.readString(length: roundup4(Int(interface_length))),
                 let verison = buffer.readInteger(endianness: .little, as: UInt32.self)
             else {
                 print("wl_registry:: Invalid event")
                 return
             }
-            print("wl_registry:", message.object, message.opcode, message.length, name, msg, verison)
-            // TODO: You left off here.
+            // Trim trailing null byte padding
+            let end_index = _interface_name.firstIndex(of: "\0") ?? _interface_name.endIndex
+            let interface_name = String(_interface_name[_interface_name.startIndex..<end_index])
+            do {
+                switch interface_name {
+                case "wl_seat", "wl_shm", "xdg_wm_base", "wl_compositor":
+                    print(
+                        "wl_registry:bind object: \(message.object), opcode: \(message.opcode) length: \(message.length), name: \(name), interface_name: \(interface_name), verison: \(verison)"
+                    )
+                    let id = try await self.bind(
+                        registry: message.object,
+                        name: name, interface_name: interface_name, verison: verison, outbound)
+                    print(id)
+                default:
+                    print(
+                        "wl_registry:unhandled", message.object, message.opcode, message.length, name, interface_name,
+                        verison)
+                }
+            } catch {
+                print(interface_name, error, type(of: error))
+            }
+        } else {
+            if let error_message = message.message {
+                print("Unhandled: \(message)", error_message.getString(at: 0, length: Int(message.length - 8)))
+            } else {
+                print("Unhandled: \(message)")
+            }
         }
+    }
+
+    private mutating func bind(
+        registry: UInt32, name: UInt32, interface_name: String, verison: UInt32,
+        _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
+    ) async throws -> UInt32 {
+        var contents = ByteBuffer()
+        let out = interface_name.getRounded()
+        contents.writeInteger(name, endianness: .little, as: UInt32.self)
+        contents.writeInteger(UInt32(out.count), endianness: .little, as: UInt32.self)
+        contents.writeString(out)
+        contents.writeInteger(verison, endianness: .little, as: UInt32.self)
+        wayland_current_object_id += 1
+        contents.writeInteger(wayland_current_object_id, endianness: .little, as: UInt32.self)
+        let guess = UInt16(8 + contents.readableBytes)
+        let message = WaylandMessage(
+            object: registry, length: guess,
+            opcode: WaylandOpCodes.wayland_wl_registry_bind_opcode.value,
+            message: contents)
+        try await outbound.write(message)
+        return wayland_current_object_id
     }
 
     private func onConnect(_ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>) async throws -> UInt32 {
@@ -108,6 +161,21 @@ extension SwiftWayland {
         ftruncate(shared_fd, pixels)
         mmap(nil, pixels, PROT_READ | PROT_WRITE, MAP_SHARED, shared_fd, 0)
         return shared_fd
+    }
+}
+
+func roundup4(_ value: Int) -> Int {
+    return (value + 3) & ~3
+}
+
+extension String {
+    func getRounded() -> String {
+        let padding = roundup4(self.count) - self.count
+        var copy = self
+        for _ in 0..<padding {
+            copy.append("\0")
+        }
+        return copy
     }
 }
 

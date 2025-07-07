@@ -20,11 +20,11 @@ final class WaylandMessageCoder: ByteToMessageDecoder, MessageToByteEncoder {
             return .needMoreData
         }
         let objectId = buffer.readInteger(endianness: .little, as: UInt32.self)!
-        let sizeAndOpcode = buffer.readInteger(endianness: .little, as: UInt32.self)!
-        let length = UInt16((sizeAndOpcode >> 16) & 0xFFFF)
-        let opcode = UInt16(sizeAndOpcode & 0xFFFF)
-        let message_bites_remaining: Int = Int(length)
+        let opcode = buffer.readInteger(endianness: .little, as: UInt16.self)!
+        let length = buffer.readInteger(endianness: .little, as: UInt16.self)!
+        let message_bites_remaining: Int = roundup4(Int(length)) - 8
         guard buffer.readableBytes >= message_bites_remaining else {
+            buffer.moveReaderIndex(to: buffer.readerIndex - 8)
             return .needMoreData
         }
         var message: ByteBuffer? = nil
@@ -38,7 +38,8 @@ final class WaylandMessageCoder: ByteToMessageDecoder, MessageToByteEncoder {
 
     func encode(data: WaylandMessage, out: inout ByteBuffer) throws {
         out.writeInteger(data.object, endianness: .little, as: UInt32.self)
-        out.writeInteger((UInt32(data.length) << 16) | UInt32(data.opcode), endianness: .little, as: UInt32.self)
+        out.writeInteger(data.opcode, endianness: .little, as: UInt16.self)
+        out.writeInteger(data.length, endianness: .little, as: UInt16.self)
         if var message = data.message {
             out.writeBuffer(&message)
         }
