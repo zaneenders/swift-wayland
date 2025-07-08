@@ -5,12 +5,7 @@ import NIOPosix
 @main
 struct SwiftWayland {
 
-    let wayland_display_object_id: UInt32 = 1
-    var wayland_current_object_id: UInt32 = 1
-    var frame_buffer_fd: Int32!
-
-    var height: Int = 800
-    var width: Int = 600
+    var state: State = State()
 
     public static func main() async {
         var wayland = Self()
@@ -53,11 +48,14 @@ extension SwiftWayland {
             try await bootstrap.executeThenClose {
                 inbound,
                 outbound in
-                self.wayland_current_object_id = try await onConnect(outbound)
-                self.frame_buffer_fd = setupFrameBuffer()
+                self.state.wayland_wl_registry_id = try await onConnect(outbound)
+                self.state.frame_buffer_fd = setupFrameBuffer()
                 // FIXME: there is an `unsafe` call here but the swift-format is merging it with `message`
                 for try await message in inbound {
                     await handleWaylandResponse(message, outbound)
+                    if self.state.bindComplete {
+                        print("Bind State Complete")
+                    }
                 }
                 print("Close")
             }
@@ -71,14 +69,14 @@ extension SwiftWayland {
         _ message: WaylandMessage,
         _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
     ) async {
-        if message.object == self.wayland_display_object_id
+        if message.object == self.state.wayland_display_object_id
             && message.opcode == WaylandOpCodes.wayland_wl_display_error_event.value
         {
             print("wl_display: Error", message.length)
             if let error_message = message.message {
                 print(error_message.getString(at: 0, length: Int(message.length - 8)))
             }
-        } else if message.object == 2  // wl_registry
+        } else if message.object == self.state.wayland_wl_registry_id
             && message.opcode == WaylandOpCodes.registry_event_global.value
         {
             guard var buffer = message.message,
@@ -102,15 +100,22 @@ extension SwiftWayland {
                     let id = try await self.bind(
                         registry: message.object,
                         name: name, interface_name: interface_name, verison: verison, outbound)
-                    print(id)
+                    self.state.update(interface_name, id)
                 default:
+                    /*
                     print(
                         "wl_registry:unhandled", message.object, message.opcode, message.length, name, interface_name,
                         verison)
+                    */
+                    ()
                 }
             } catch {
                 print(interface_name, error, type(of: error))
             }
+        } else if message.object == self.state.wl_xdg_wm_base_object_id
+            && message.opcode == WaylandOpCodes.wayland_xdg_wm_base_event_ping.value
+        {
+            print("TODO: send pong")
         } else {
             if let error_message = message.message {
                 print("Unhandled: \(message)", error_message.getString(at: 0, length: Int(message.length - 8)))
@@ -130,34 +135,35 @@ extension SwiftWayland {
         contents.writeInteger(UInt32(out.count), endianness: .little, as: UInt32.self)
         contents.writeString(out)
         contents.writeInteger(verison, endianness: .little, as: UInt32.self)
-        wayland_current_object_id += 1
-        contents.writeInteger(wayland_current_object_id, endianness: .little, as: UInt32.self)
+        self.state.wayland_current_object_id += 1
+        contents.writeInteger(self.state.wayland_current_object_id, endianness: .little, as: UInt32.self)
         let guess = UInt16(8 + contents.readableBytes)
         let message = WaylandMessage(
             object: registry, length: guess,
             opcode: WaylandOpCodes.wayland_wl_registry_bind_opcode.value,
             message: contents)
         try await outbound.write(message)
-        return wayland_current_object_id
+        return self.state.wayland_current_object_id
     }
 
-    private func onConnect(_ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>) async throws -> UInt32 {
+    private mutating func onConnect(_ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>) async throws -> UInt32 {
         var contents = ByteBuffer()
-        contents.writeInteger(wayland_current_object_id + 1, endianness: .little, as: UInt32.self)
+        self.state.wayland_current_object_id += 1
+        contents.writeInteger(self.state.wayland_current_object_id, endianness: .little, as: UInt32.self)
         let message = WaylandMessage(
-            object: wayland_display_object_id,
+            object: self.state.wayland_display_object_id,
             length: UInt16(8 + contents.readableBytes),
             opcode: WaylandOpCodes.get_registry.value,
             message: contents)
         try await outbound.write(message)
-        return self.wayland_current_object_id + 1
+        return self.state.wayland_current_object_id
     }
 
     private func setupFrameBuffer() -> FD {
         let shared_name = UUID().uuidString
         let shared_fd = unsafe shm_open(shared_name, O_RDWR | O_EXCL | O_CREAT, 0600)
         unsafe shm_unlink(shared_name)
-        let pixels = height * width * 4
+        let pixels = self.state.height * self.state.width * 4
         ftruncate(shared_fd, pixels)
         mmap(nil, pixels, PROT_READ | PROT_WRITE, MAP_SHARED, shared_fd, 0)
         return shared_fd
@@ -180,3 +186,42 @@ extension String {
 }
 
 typealias FD = Int32
+
+extension SwiftWayland {
+    struct State {
+        let wayland_display_object_id: UInt32 = 1
+        var wayland_wl_registry_id: UInt32? = nil
+        var wayland_current_object_id: UInt32 = 1
+        var frame_buffer_fd: Int32!
+
+        var wl_seat_object_id: UInt32? = nil
+        var wl_shm_object_id: UInt32? = nil
+        var wl_xdg_wm_base_object_id: UInt32? = nil
+        var wl_compositor_object_id: UInt32? = nil
+        var wl_surface_object_id: UInt32? = nil
+
+        var height: Int = 800
+        var width: Int = 600
+
+        mutating func update(_ interface_name: String, _ object: UInt32) {
+            switch interface_name {
+            case "wl_seat":
+                self.wl_seat_object_id = object
+            case "wl_shm":
+                self.wl_shm_object_id = object
+            case "xdg_wm_base":
+                self.wl_xdg_wm_base_object_id = object
+            case "wl_compositor":
+                self.wl_compositor_object_id = object
+            default:
+                ()
+            }
+
+        }
+
+        var bindComplete: Bool {
+            self.wl_surface_object_id == nil && self.wl_compositor_object_id != nil && self.wl_shm_object_id != nil
+                && self.wl_xdg_wm_base_object_id != nil
+        }
+    }
+}
