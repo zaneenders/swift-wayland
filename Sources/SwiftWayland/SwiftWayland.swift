@@ -55,6 +55,10 @@ extension SwiftWayland {
                     await handleWaylandResponse(message, outbound)
                     if self.state.bindComplete {
                         print("Bind State Complete")
+                        try await setupSurface(outbound)
+                        try await getXDGSurface(outbound)
+                        try await xdgGetTopSurface(outbound)
+                        try await surfaceCommit(outbound)
                     }
                 }
                 print("Close")
@@ -63,6 +67,54 @@ extension SwiftWayland {
         } catch {
             print(error)
         }
+    }
+    private mutating func surfaceCommit(
+        _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
+    ) async throws {
+        let message = WaylandMessage(
+            object: self.state.wl_surface_object_id!, length: 8,
+            opcode: WaylandOpCodes.wayland_wl_surface_commit_opcode.value, message: nil)
+        try await outbound.write(message)
+    }
+
+    private mutating func xdgGetTopSurface(
+        _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
+    ) async throws {
+        var contents = ByteBuffer()
+        self.state.wayland_current_object_id += 1
+        self.state.xdg_top_surface_id = self.state.wayland_current_object_id
+        contents.writeInteger(self.state.xdg_top_surface_id!, endianness: .little, as: UInt32.self)
+        let message = WaylandMessage(
+            object: self.state.xdg_surface_object_id!, length: UInt16(8 + contents.readableBytes),
+            opcode: WaylandOpCodes.wayland_xdg_surface_get_toplevel_opcode.value, message: contents)
+        try await outbound.write(message)
+    }
+
+    private mutating func getXDGSurface(
+        _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
+    ) async throws {
+        self.state.wayland_current_object_id += 1
+        var contents = ByteBuffer()
+        self.state.xdg_surface_object_id = self.state.wayland_current_object_id
+        contents.writeInteger(self.state.wayland_current_object_id, endianness: .little, as: UInt32.self)
+        contents.writeInteger(self.state.wl_surface_object_id!, endianness: .little, as: UInt32.self)
+        let message = WaylandMessage(
+            object: self.state.wl_xdg_wm_base_object_id!, length: UInt16(8 + contents.readableBytes),
+            opcode: WaylandOpCodes.wayland_xdg_wm_base_get_xdg_surface_opcode.value, message: contents)
+        try await outbound.write(message)
+    }
+
+    private mutating func setupSurface(
+        _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
+    ) async throws {
+        self.state.wayland_current_object_id += 1
+        var contents = ByteBuffer()
+        self.state.wl_surface_object_id = self.state.wayland_current_object_id
+        contents.writeInteger(self.state.wayland_current_object_id, endianness: .little, as: UInt32.self)
+        let message = WaylandMessage(
+            object: self.state.wl_compositor_object_id!, length: UInt16(8 + contents.readableBytes),
+            opcode: WaylandOpCodes.wayland_wl_compositor_create_surface_opcode.value, message: contents)
+        try await outbound.write(message)
     }
 
     private mutating func handleWaylandResponse(
@@ -199,6 +251,8 @@ extension SwiftWayland {
         var wl_xdg_wm_base_object_id: UInt32? = nil
         var wl_compositor_object_id: UInt32? = nil
         var wl_surface_object_id: UInt32? = nil
+        var xdg_surface_object_id: UInt32? = nil
+        var xdg_top_surface_id: UInt32? = nil
 
         var height: Int = 800
         var width: Int = 600
