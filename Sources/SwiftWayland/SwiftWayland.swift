@@ -168,6 +168,17 @@ extension SwiftWayland {
             && message.opcode == WaylandOpCodes.wayland_xdg_wm_base_event_ping.value
         {
             print("TODO: send pong")
+        } else if message.object == self.state.xdg_surface_object_id
+            && message.opcode == WaylandOpCodes.wayland_xdg_surface_event_configure.value
+        {
+            var copy = message.message!
+            let value = copy.readInteger(as: UInt32.self)!
+            do {
+                try await xdgSurfaceEvent(outbound, value)
+                try await renderFrame(outbound)
+            } catch {
+                print(error)
+            }
         } else {
             if let error_message = message.message {
                 print("Unhandled: \(message)", error_message.getString(at: 0, length: Int(message.length - 8)))
@@ -175,6 +186,47 @@ extension SwiftWayland {
                 print("Unhandled: \(message)")
             }
         }
+    }
+
+    private mutating func renderFrame(
+        _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
+    ) async throws {
+        print(#function)
+        try await createPool(outbound)
+
+        print("Render!!!")
+    }
+
+    private mutating func createPool(
+        _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
+    ) async throws {
+        assert(self.state.shm_pool_data_pointer != nil)
+        var contents = ByteBuffer()
+        self.state.wayland_current_object_id += 1
+        contents.writeInteger(self.state.wayland_current_object_id, endianness: .little, as: UInt32.self)
+        contents.writeInteger(UInt32(self.state.pixels), endianness: .little, as: UInt32.self)
+        // TODO: send FD using cmsghdr and sendmsg
+        contents.writeInteger(self.state.frame_buffer_fd!, endianness: .little, as: Int32.self)
+        let message = WaylandMessage(
+            object: self.state.wl_shm_object_id!,
+            length: UInt16(8 + contents.readableBytes),
+            opcode: WaylandOpCodes.wayland_wl_shm_create_pool_opcode.value,
+            message: contents)
+        try await outbound.write(message)
+    }
+
+    private mutating func xdgSurfaceEvent(
+        _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>, _ value: UInt32
+    ) async throws {
+        print("TODO: STATE Change")
+        var contents = ByteBuffer()
+        contents.writeInteger(value, endianness: .little, as: UInt32.self)
+        let message = WaylandMessage(
+            object: self.state.xdg_surface_object_id!,
+            length: UInt16(8 + contents.readableBytes),
+            opcode: WaylandOpCodes.wayland_xdg_surface_ack_configure_opcode.value,
+            message: contents)
+        try await outbound.write(message)
     }
 
     private mutating func bind(
@@ -211,13 +263,14 @@ extension SwiftWayland {
         return self.state.wayland_current_object_id
     }
 
-    private func setupFrameBuffer() -> FD {
+    private mutating func setupFrameBuffer() -> FD {
         let shared_name = UUID().uuidString
         let shared_fd = unsafe shm_open(shared_name, O_RDWR | O_EXCL | O_CREAT, 0600)
         unsafe shm_unlink(shared_name)
-        let pixels = self.state.height * self.state.width * 4
-        ftruncate(shared_fd, pixels)
-        mmap(nil, pixels, PROT_READ | PROT_WRITE, MAP_SHARED, shared_fd, 0)
+        ftruncate(shared_fd, self.state.pixels)
+        self.state.shm_pool_data_pointer = mmap(
+            nil, self.state.pixels, PROT_READ | PROT_WRITE, MAP_SHARED, shared_fd, 0)
+        assert(self.state.shm_pool_data_pointer != nil)
         return shared_fd
     }
 }
@@ -238,44 +291,3 @@ extension String {
 }
 
 typealias FD = Int32
-
-extension SwiftWayland {
-    struct State {
-        let wayland_display_object_id: UInt32 = 1
-        var wayland_wl_registry_id: UInt32? = nil
-        var wayland_current_object_id: UInt32 = 1
-        var frame_buffer_fd: Int32!
-
-        var wl_seat_object_id: UInt32? = nil
-        var wl_shm_object_id: UInt32? = nil
-        var wl_xdg_wm_base_object_id: UInt32? = nil
-        var wl_compositor_object_id: UInt32? = nil
-        var wl_surface_object_id: UInt32? = nil
-        var xdg_surface_object_id: UInt32? = nil
-        var xdg_top_surface_id: UInt32? = nil
-
-        var height: Int = 800
-        var width: Int = 600
-
-        mutating func update(_ interface_name: String, _ object: UInt32) {
-            switch interface_name {
-            case "wl_seat":
-                self.wl_seat_object_id = object
-            case "wl_shm":
-                self.wl_shm_object_id = object
-            case "xdg_wm_base":
-                self.wl_xdg_wm_base_object_id = object
-            case "wl_compositor":
-                self.wl_compositor_object_id = object
-            default:
-                ()
-            }
-
-        }
-
-        var bindComplete: Bool {
-            self.wl_surface_object_id == nil && self.wl_compositor_object_id != nil && self.wl_shm_object_id != nil
-                && self.wl_xdg_wm_base_object_id != nil
-        }
-    }
-}

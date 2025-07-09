@@ -9,6 +9,9 @@ enum WaylandOpCodes {
     case wayland_xdg_wm_base_get_xdg_surface_opcode
     case wayland_xdg_surface_get_toplevel_opcode
     case wayland_wl_surface_commit_opcode
+    case wayland_xdg_surface_event_configure
+    case wayland_xdg_surface_ack_configure_opcode
+    case wayland_wl_shm_create_pool_opcode
 
     var value: UInt16 {
         switch self {
@@ -21,6 +24,9 @@ enum WaylandOpCodes {
         case .wayland_xdg_wm_base_get_xdg_surface_opcode: 2
         case .wayland_xdg_surface_get_toplevel_opcode: 1
         case .wayland_wl_surface_commit_opcode: 6
+        case .wayland_xdg_surface_event_configure: 0
+        case .wayland_xdg_surface_ack_configure_opcode: 4
+        case .wayland_wl_shm_create_pool_opcode: 0
         }
     }
 }
