@@ -33,8 +33,8 @@ extension SwiftWayland {
                 .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
                 .connect(to: addr) { channel in
                     channel.eventLoop.makeCompletedFuture {
-                        try channel.pipeline.syncOperations.addHandler(ByteToMessageHandler(WaylandMessageCoder()))
-                        try channel.pipeline.syncOperations.addHandler(MessageToByteHandler(WaylandMessageCoder()))
+                        try channel.pipeline.syncOperations.addHandler(ByteToMessageHandler(WaylandMessageDecoder()))
+                        try channel.pipeline.syncOperations.addHandler(WaylandMessageEncoder())
                         return try NIOAsyncChannel(
                             wrappingChannelSynchronously: channel,
                             configuration: NIOAsyncChannel.Configuration(
@@ -72,8 +72,8 @@ extension SwiftWayland {
         _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
     ) async throws {
         let message = WaylandMessage(
-            object: self.state.wl_surface_object_id!, length: 8,
-            opcode: WaylandOpCodes.wayland_wl_surface_commit_opcode.value, message: nil)
+            object: self.state.wl_surface_object_id!,
+            opcode: WaylandOpCodes.wayland_wl_surface_commit_opcode.value)
         try await outbound.write(message)
     }
 
@@ -85,7 +85,7 @@ extension SwiftWayland {
         self.state.xdg_top_surface_id = self.state.wayland_current_object_id
         contents.writeInteger(self.state.xdg_top_surface_id!, endianness: .little, as: UInt32.self)
         let message = WaylandMessage(
-            object: self.state.xdg_surface_object_id!, length: UInt16(8 + contents.readableBytes),
+            object: self.state.xdg_surface_object_id!,
             opcode: WaylandOpCodes.wayland_xdg_surface_get_toplevel_opcode.value, message: contents)
         try await outbound.write(message)
     }
@@ -99,7 +99,7 @@ extension SwiftWayland {
         contents.writeInteger(self.state.wayland_current_object_id, endianness: .little, as: UInt32.self)
         contents.writeInteger(self.state.wl_surface_object_id!, endianness: .little, as: UInt32.self)
         let message = WaylandMessage(
-            object: self.state.wl_xdg_wm_base_object_id!, length: UInt16(8 + contents.readableBytes),
+            object: self.state.wl_xdg_wm_base_object_id!,
             opcode: WaylandOpCodes.wayland_xdg_wm_base_get_xdg_surface_opcode.value, message: contents)
         try await outbound.write(message)
     }
@@ -112,7 +112,7 @@ extension SwiftWayland {
         self.state.wl_surface_object_id = self.state.wayland_current_object_id
         contents.writeInteger(self.state.wayland_current_object_id, endianness: .little, as: UInt32.self)
         let message = WaylandMessage(
-            object: self.state.wl_compositor_object_id!, length: UInt16(8 + contents.readableBytes),
+            object: self.state.wl_compositor_object_id!,
             opcode: WaylandOpCodes.wayland_wl_compositor_create_surface_opcode.value, message: contents)
         try await outbound.write(message)
     }
@@ -206,12 +206,11 @@ extension SwiftWayland {
         contents.writeInteger(self.state.wayland_current_object_id, endianness: .little, as: UInt32.self)
         contents.writeInteger(UInt32(self.state.pixels), endianness: .little, as: UInt32.self)
         // TODO: send FD using cmsghdr and sendmsg
-        contents.writeInteger(self.state.frame_buffer_fd!, endianness: .little, as: Int32.self)
         let message = WaylandMessage(
             object: self.state.wl_shm_object_id!,
-            length: UInt16(8 + contents.readableBytes),
             opcode: WaylandOpCodes.wayland_wl_shm_create_pool_opcode.value,
-            message: contents)
+            message: contents,
+            fd: Int(self.state.frame_buffer_fd!))
         try await outbound.write(message)
     }
 
@@ -223,7 +222,6 @@ extension SwiftWayland {
         contents.writeInteger(value, endianness: .little, as: UInt32.self)
         let message = WaylandMessage(
             object: self.state.xdg_surface_object_id!,
-            length: UInt16(8 + contents.readableBytes),
             opcode: WaylandOpCodes.wayland_xdg_surface_ack_configure_opcode.value,
             message: contents)
         try await outbound.write(message)
@@ -241,9 +239,8 @@ extension SwiftWayland {
         contents.writeInteger(verison, endianness: .little, as: UInt32.self)
         self.state.wayland_current_object_id += 1
         contents.writeInteger(self.state.wayland_current_object_id, endianness: .little, as: UInt32.self)
-        let guess = UInt16(8 + contents.readableBytes)
         let message = WaylandMessage(
-            object: registry, length: guess,
+            object: registry,
             opcode: WaylandOpCodes.wayland_wl_registry_bind_opcode.value,
             message: contents)
         try await outbound.write(message)
@@ -256,7 +253,6 @@ extension SwiftWayland {
         contents.writeInteger(self.state.wayland_current_object_id, endianness: .little, as: UInt32.self)
         let message = WaylandMessage(
             object: self.state.wayland_display_object_id,
-            length: UInt16(8 + contents.readableBytes),
             opcode: WaylandOpCodes.get_registry.value,
             message: contents)
         try await outbound.write(message)
