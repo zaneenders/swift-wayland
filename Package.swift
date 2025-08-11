@@ -4,7 +4,6 @@ import PackageDescription
 let package = Package(
     name: "swift-wayland",
     dependencies: [
-        // .package(path: "../swift-nio")
         .package(
             url: "https://github.com/zaneenders/swift-nio.git",
             branch: "zane-add-cmsghdr")

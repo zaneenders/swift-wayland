@@ -154,11 +154,9 @@ extension SwiftWayland {
                         name: name, interface_name: interface_name, verison: verison, outbound)
                     self.state.update(interface_name, id)
                 default:
-                    /*
                     print(
                         "wl_registry:unhandled", message.object, message.opcode, message.length, name, interface_name,
                         verison)
-                    */
                     ()
                 }
             } catch {
@@ -199,7 +197,7 @@ extension SwiftWayland {
         for i in 0..<self.state.height * self.state.width {
             typedPixels[i] = 0x21b9ff
         }
-        try await wayland_wl_surface_attach(outbound)
+        try await wayland_wl_surface_attach(id, outbound)
         try await wayland_wl_surface_damage_buffer(outbound)
         try await wayland_wl_surface_commit(outbound)
         //  store_old_id(state->old_wl_buffers, &state->old_wl_buffers_len, wl_buffer);
@@ -246,12 +244,13 @@ extension SwiftWayland {
         try await outbound.write(msg)
     }
 
-    private mutating func wayland_wl_surface_attach(_ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>)
+    private mutating func wayland_wl_surface_attach(
+        _ buffer: UInt32, _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
+    )
         async throws
     {
         var contents = ByteBuffer()
-        let wl_buffer: UInt32 = self.state.wl_surface_object_id!
-        contents.writeInteger(wl_buffer, endianness: .little, as: UInt32.self)
+        contents.writeInteger(buffer, endianness: .little, as: UInt32.self)
         contents.writeInteger(0, endianness: .little, as: UInt32.self)
         contents.writeInteger(0, endianness: .little, as: UInt32.self)
         let wayland_wl_surface_attach_opcode: UInt16 = 1
