@@ -40,7 +40,6 @@ final class WaylandMessageDecoder: ByteToMessageDecoder {
         context: ChannelHandlerContext,
         buffer: inout ByteBuffer
     ) throws -> DecodingState {
-        print(#function)
         guard buffer.readableBytes >= 8 else {
             return .needMoreData
         }

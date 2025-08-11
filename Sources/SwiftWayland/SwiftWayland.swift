@@ -191,27 +191,120 @@ extension SwiftWayland {
     private mutating func renderFrame(
         _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
     ) async throws {
-        print(#function)
-        try await createPool(outbound)
+        let pool_id = try await createPool(outbound)
+        self.state.pool_id = pool_id
+        let id = try await poolCreateBuffer(outbound)
 
-        print("Render!!!")
+        let typedPixels = self.state.shm_pool_data_pointer.assumingMemoryBound(to: UInt32.self)
+        for i in 0..<self.state.height * self.state.width {
+            typedPixels[i] = 0x21b9ff
+        }
+        try await wayland_wl_surface_attach(outbound)
+        try await wayland_wl_surface_damage_buffer(outbound)
+        try await wayland_wl_surface_commit(outbound)
+        //  store_old_id(state->old_wl_buffers, &state->old_wl_buffers_len, wl_buffer);
+        try await wayland_wl_destroy_buffer(id, outbound)
+        print("Render!!! \(id)")
+    }
+
+    private mutating func wayland_wl_destroy_buffer(
+        _ buffer: UInt32, _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
+    )
+        async throws
+    {
+        let wayland_wl_buffer_destroy_opcode: UInt16 = 0
+        let msg = WaylandMessage(
+            object: buffer,
+            opcode: wayland_wl_buffer_destroy_opcode)
+        try await outbound.write(msg)
+    }
+
+    private mutating func wayland_wl_surface_commit(_ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>)
+        async throws
+    {
+        let wayland_wl_surface_commit_opcode: UInt16 = 6
+        let msg = WaylandMessage(
+            object: self.state.wl_surface_object_id!,
+            opcode: wayland_wl_surface_commit_opcode)
+        try await outbound.write(msg)
+    }
+
+    private mutating func wayland_wl_surface_damage_buffer(_ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>)
+        async throws
+    {
+        // wayland_wl_surface_damage_buffer(fd, state -> wl_surface, 0, 0, INT32_MAX, INT32_MAX)
+        var contents = ByteBuffer()
+        contents.writeInteger(0, endianness: .little, as: UInt32.self)
+        contents.writeInteger(0, endianness: .little, as: UInt32.self)
+        contents.writeInteger(UInt32(Int32.max), endianness: .little, as: UInt32.self)
+        contents.writeInteger(UInt32(Int32.max), endianness: .little, as: UInt32.self)
+        let wayland_wl_surface_damage_buffer_opcode: UInt16 = 9
+        let msg = WaylandMessage(
+            object: self.state.wl_surface_object_id!,
+            opcode: wayland_wl_surface_damage_buffer_opcode,
+            message: contents)
+        try await outbound.write(msg)
+    }
+
+    private mutating func wayland_wl_surface_attach(_ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>)
+        async throws
+    {
+        var contents = ByteBuffer()
+        let wl_buffer: UInt32 = self.state.wl_surface_object_id!
+        contents.writeInteger(wl_buffer, endianness: .little, as: UInt32.self)
+        contents.writeInteger(0, endianness: .little, as: UInt32.self)
+        contents.writeInteger(0, endianness: .little, as: UInt32.self)
+        let wayland_wl_surface_attach_opcode: UInt16 = 1
+        let msg = WaylandMessage(
+            object: self.state.wl_surface_object_id!,
+            opcode: wayland_wl_surface_attach_opcode,
+            message: contents)
+        try await outbound.write(msg)
+    }
+
+    private mutating func poolCreateBuffer(_ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>) async throws
+        -> UInt32
+    {
+        var contents = ByteBuffer()
+        self.state.wayland_current_object_id += 1
+        let id = self.state.wayland_current_object_id
+        contents.writeInteger(id, endianness: .little, as: UInt32.self)
+        let offset: UInt32 = 0
+        contents.writeInteger(offset, endianness: .little, as: UInt32.self)
+        let width: UInt32 = UInt32(self.state.width)
+        contents.writeInteger(width, endianness: .little, as: UInt32.self)
+        let height: UInt32 = UInt32(self.state.height)
+        contents.writeInteger(height, endianness: .little, as: UInt32.self)
+        let stride: UInt32 = 4 * width
+        contents.writeInteger(stride, endianness: .little, as: UInt32.self)
+        let wayland_format_xrgb8888: UInt32 = 1
+        contents.writeInteger(wayland_format_xrgb8888, endianness: .little, as: UInt32.self)
+
+        let wayland_wl_shm_pool_create_buffer_opcode: UInt16 = 0
+        let msg = WaylandMessage(
+            object: self.state.pool_id!,
+            opcode: wayland_wl_shm_pool_create_buffer_opcode,
+            message: contents)
+        try await outbound.write(msg)
+        return id
     }
 
     private mutating func createPool(
         _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
-    ) async throws {
+    ) async throws -> UInt32 {
         assert(self.state.shm_pool_data_pointer != nil)
         var contents = ByteBuffer()
         self.state.wayland_current_object_id += 1
-        contents.writeInteger(self.state.wayland_current_object_id, endianness: .little, as: UInt32.self)
+        let pool_id = self.state.wayland_current_object_id
+        contents.writeInteger(pool_id, endianness: .little, as: UInt32.self)
         contents.writeInteger(UInt32(self.state.pixels), endianness: .little, as: UInt32.self)
-        // TODO: send FD using cmsghdr and sendmsg
         let message = WaylandMessage(
             object: self.state.wl_shm_object_id!,
             opcode: WaylandOpCodes.wayland_wl_shm_create_pool_opcode.value,
             message: contents,
             fd: Int(self.state.frame_buffer_fd!))
         try await outbound.write(message)
+        return pool_id
     }
 
     private mutating func xdgSurfaceEvent(
