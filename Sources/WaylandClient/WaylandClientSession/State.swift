@@ -1,9 +1,11 @@
 extension WaylandClientSession {
 
     struct State {
+
+        private var wayland_current_object_id: UInt32 = 1
+
         let wayland_display_object_id: UInt32 = 1
         var wayland_wl_registry_id: UInt32? = nil
-        var wayland_current_object_id: UInt32 = 1
         var frame_buffer_fd: Int32!
 
         var wl_seat_object_id: UInt32? = nil
@@ -24,6 +26,11 @@ extension WaylandClientSession {
             self.height * self.width * 4
         }
 
+        mutating func nextId() -> UInt32 {
+            self.wayland_current_object_id += 1
+            return self.wayland_current_object_id
+        }
+
         mutating func update(_ interface_name: String, _ object: UInt32) {
             switch interface_name {
             case "wl_seat":
@@ -38,6 +45,10 @@ extension WaylandClientSession {
                 ()
             }
 
+        }
+
+        var surfaceComplete: Bool {
+            self.xdg_top_surface_id != nil && self.xdg_surface_object_id != nil && self.wl_surface_object_id != nil
         }
 
         var bindComplete: Bool {
