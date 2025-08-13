@@ -2,7 +2,7 @@ import Foundation
 import NIOCore
 import NIOPosix
 
-struct WaylandClientSession {
+struct WaylandClientSession: ~Copyable {
     private let outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
     private var state: State = State()
 
@@ -33,14 +33,6 @@ extension WaylandClientSession {
             message: contents)
         try await outbound.write(message)
     }
-
-    private func createSharedFrameBuffer(pixels: Int) -> (FD, UnsafeMutableRawPointer?) {
-        let shared_name = UUID().uuidString
-        let shared_fd = unsafe shm_open(shared_name, O_RDWR | O_EXCL | O_CREAT, 0600)
-        unsafe shm_unlink(shared_name)
-        let pointer = shared_fd.resizeBuffer(size: pixels)
-        return (shared_fd, pointer)
-    }
 }
 
 // MARK: Message
@@ -64,14 +56,16 @@ extension WaylandClientSession {
             switch message.opcode {
             case 0:
                 let id = self.state.xdg_top_surface_id!
-                print("xdg_top_surface_id[\(id)]: maybe resize")
                 guard var contents = message.message else {
+                    print("xdg_top_surface_id[\(id)]: failed")
                     return
                 }
                 guard let width = contents.readInteger(endianness: .little, as: UInt32.self) else {
+                    print("xdg_top_surface_id[\(id)]: failed, width")
                     return
                 }
                 guard let height = contents.readInteger(endianness: .little, as: UInt32.self) else {
+                    print("xdg_top_surface_id[\(id)]: failed, height")
                     return
                 }
                 self.state.width = Int(width)
@@ -125,26 +119,23 @@ extension WaylandClientSession {
 
     private mutating func renderFrame(height: Int, width: Int) async throws {
         let pixels = height * width * 4
-        let (fd, pointer) = createSharedFrameBuffer(pixels: pixels)
-        defer {
-            // TODO: cleanup
-            // pointer!.deallocate()
-            // close(fd)
+        let pool_id: UInt32
+        if self.state.frame_counter.isMultiple(of: 2) {
+            self.state.front.resize(pixels: pixels)
+            self.state.front.draw(height: height, width: width)
+            pool_id = try await createPool(fd: Int(self.state.front.fd), pixels: UInt32(pixels))
+        } else {
+            self.state.back.resize(pixels: pixels)
+            self.state.back.draw(height: height, width: width)
+            pool_id = try await createPool(fd: Int(self.state.back.fd), pixels: UInt32(pixels))
         }
-        let pool_id = try await createPool(fd: Int(fd), pixels: UInt32(pixels))
         let buffer_id = try await poolCreateBuffer(pool_id)
-        let typedPixels = pointer!.assumingMemoryBound(to: UInt32.self)
-        for i in 0..<height * width {
-            if i.isMultiple(of: 5) {
-                typedPixels[i] = 0xffffff
-            } else {
-                typedPixels[i] = 0x21b9ff
-            }
-        }
         try await wayland_wl_surface_attach(buffer_id)
         try await wayland_wl_surface_damage_buffer()
         try await wayland_wl_surface_commit()
         try await release_buffer(buffer_id)
+        print("Frame count: \(self.state.frame_counter)")
+        self.state.frame_counter += 1
     }
 
     private mutating func displayObjectEvent(_ message: WaylandMessage) {

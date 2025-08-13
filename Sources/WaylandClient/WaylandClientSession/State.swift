@@ -1,12 +1,11 @@
 extension WaylandClientSession {
 
-    struct State {
+    struct State: ~Copyable {
 
         private var wayland_current_object_id: UInt32 = 1
 
         let wayland_display_object_id: UInt32 = 1
         var wayland_wl_registry_id: UInt32? = nil
-        var frame_buffer_fd: Int32!
 
         var wl_seat_object_id: UInt32? = nil
         var wl_shm_object_id: UInt32? = nil
@@ -16,10 +15,17 @@ extension WaylandClientSession {
         var xdg_surface_object_id: UInt32? = nil
         var xdg_top_surface_id: UInt32? = nil
 
-        var shm_pool_data_pointer: UnsafeMutableRawPointer!
-
         var height: Int = 800
         var width: Int = 600
+        var front: Canvas
+        var back: Canvas
+
+        init() {
+            self.front = Canvas(pixels: self.height * self.width * 4)
+            self.back = Canvas(pixels: self.height * self.width * 4)
+        }
+
+        var frame_counter = 0
 
         var pixels: Int {
             self.height * self.width * 4
@@ -43,7 +49,6 @@ extension WaylandClientSession {
             default:
                 ()
             }
-
         }
 
         var surfaceComplete: Bool {
