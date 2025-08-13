@@ -17,7 +17,6 @@ extension WaylandClientSession {
         var xdg_top_surface_id: UInt32? = nil
 
         var shm_pool_data_pointer: UnsafeMutableRawPointer!
-        var pool_id: UInt32? = nil
 
         var height: Int = 800
         var width: Int = 600
