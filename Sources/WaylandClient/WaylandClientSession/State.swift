@@ -1,4 +1,5 @@
-extension SwiftWayland {
+extension WaylandClientSession {
+
     struct State {
         let wayland_display_object_id: UInt32 = 1
         var wayland_wl_registry_id: UInt32? = nil

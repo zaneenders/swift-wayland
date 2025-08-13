@@ -10,7 +10,6 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "SwiftWayland",
             dependencies: [
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
