@@ -80,7 +80,6 @@ extension WaylandClientSession {
                 var copy = message.message!
                 let value = copy.readInteger(as: UInt32.self)!
                 do {
-                    try await xdgSurfaceEvent(value)
                     try await renderFrame(height: self.state.height, width: self.state.width)
                 } catch {
                     print(error)
@@ -100,7 +99,6 @@ extension WaylandClientSession {
 
         // State transtions
         if !self.state.surfaceComplete && self.state.bindComplete {
-            print("Bind State Complete")
             do {
                 self.state.wl_surface_object_id = self.state.nextId()
                 try await setupSurface(id: self.state.wl_surface_object_id!)
@@ -109,6 +107,11 @@ extension WaylandClientSession {
                 self.state.xdg_top_surface_id = self.state.nextId()
                 try await xdgGetTopSurface(id: self.state.xdg_top_surface_id!)
                 try await surfaceCommit()
+                try await xdgSurfaceEvent(self.state.xdg_top_surface_id!)
+                print("Bind State Complete")
+                let pool_id = try await createPool(
+                    fd: Int(self.state.shared_canvas.fd), pixels: UInt32(self.state.pixels * 2))
+                self.state.setPool(pool_id)
             } catch {
                 print(error)
                 throw WaylandSetupError.unableToSetupSurface
@@ -119,15 +122,13 @@ extension WaylandClientSession {
 
     private mutating func renderFrame(height: Int, width: Int) async throws {
         let pixels = height * width * 4
-        let pool_id: UInt32
         self.state.shared_canvas.resize(pixels: pixels * 2)
         if self.state.frame_counter.isMultiple(of: 2) {
             self.state.shared_canvas.draw(.front, height: height, width: width)
         } else {
             self.state.shared_canvas.draw(.back, height: height, width: width)
         }
-        pool_id = try await createPool(fd: Int(self.state.shared_canvas.fd), pixels: UInt32(pixels))
-        let buffer_id = try await poolCreateBuffer(pool_id)
+        let buffer_id = try await poolCreateBuffer(self.state.pool_id!)
         try await wayland_wl_surface_attach(buffer_id)
         try await wayland_wl_surface_damage_buffer()
         try await wayland_wl_surface_commit()
@@ -337,7 +338,6 @@ extension WaylandClientSession {
     }
 
     private mutating func xdgSurfaceEvent(_ value: UInt32) async throws {
-        print("TODO: STATE Change")
         var contents = ByteBuffer()
         contents.writeInteger(value, endianness: .little, as: UInt32.self)
         let message = WaylandMessage(

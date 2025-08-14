@@ -23,6 +23,11 @@ extension WaylandClientSession {
             self.shared_canvas = Canvas(pixels: self.height * self.width * 4 * 2)
         }
 
+        private(set) var pool_id: UInt32? = nil
+        mutating func setPool(_ pool_id: UInt32) {
+            self.pool_id = pool_id
+        }
+
         var frame_counter = 0
 
         var pixels: Int {

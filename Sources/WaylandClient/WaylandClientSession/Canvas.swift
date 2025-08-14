@@ -14,17 +14,21 @@ struct Canvas: ~Copyable {
         self.buffer = pointer!
     }
 
-    func draw(_ side: Buffer, height: Int, width: Int) {
-        let low: Int
-        let high: Int
+    func getHighLow(_ side: Buffer, height: Int, width: Int) -> (Int, Int) {
         switch side {
         case .front:
-            low = 0
-            high = height * width
+            let low = 0
+            let high = height * width
+            return (high, low)
         case .back:
-            low = (height * width) + 1
-            high = (height * width) * 2
+            let low = (height * width) + 1
+            let high = (height * width) * 2
+            return (high, low)
         }
+    }
+
+    func draw(_ side: Buffer, height: Int, width: Int) {
+        let (high, low) = getHighLow(side, height: height, width: width)
         let typedPixels = buffer.assumingMemoryBound(to: UInt32.self)
         for i in low..<high {
             if i.isMultiple(of: 5) {
@@ -44,7 +48,7 @@ struct Canvas: ~Copyable {
     }
 
     mutating func resize(pixels: Int) {
-        self.buffer = fd.resizeBuffer(size: pixels * 2, pointer: self.buffer)!
+        self.buffer = fd.resizeBuffer(size: pixels, pointer: self.buffer)!
     }
 
     deinit {
