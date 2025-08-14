@@ -17,12 +17,10 @@ extension WaylandClientSession {
 
         var height: Int = 800
         var width: Int = 600
-        var front: Canvas
-        var back: Canvas
+        var shared_canvas: Canvas
 
         init() {
-            self.front = Canvas(pixels: self.height * self.width * 4)
-            self.back = Canvas(pixels: self.height * self.width * 4)
+            self.shared_canvas = Canvas(pixels: self.height * self.width * 4 * 2)
         }
 
         var frame_counter = 0

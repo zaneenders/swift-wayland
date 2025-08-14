@@ -120,15 +120,13 @@ extension WaylandClientSession {
     private mutating func renderFrame(height: Int, width: Int) async throws {
         let pixels = height * width * 4
         let pool_id: UInt32
+        self.state.shared_canvas.resize(pixels: pixels * 2)
         if self.state.frame_counter.isMultiple(of: 2) {
-            self.state.front.resize(pixels: pixels)
-            self.state.front.draw(height: height, width: width)
-            pool_id = try await createPool(fd: Int(self.state.front.fd), pixels: UInt32(pixels))
+            self.state.shared_canvas.draw(.front, height: height, width: width)
         } else {
-            self.state.back.resize(pixels: pixels)
-            self.state.back.draw(height: height, width: width)
-            pool_id = try await createPool(fd: Int(self.state.back.fd), pixels: UInt32(pixels))
+            self.state.shared_canvas.draw(.back, height: height, width: width)
         }
+        pool_id = try await createPool(fd: Int(self.state.shared_canvas.fd), pixels: UInt32(pixels))
         let buffer_id = try await poolCreateBuffer(pool_id)
         try await wayland_wl_surface_attach(buffer_id)
         try await wayland_wl_surface_damage_buffer()
