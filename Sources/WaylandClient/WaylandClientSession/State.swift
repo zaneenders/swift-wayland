@@ -18,6 +18,8 @@ extension WaylandClientSession {
         var height: Int = 800
         var width: Int = 600
         var shared_canvas: Canvas
+        var watch: [UInt32: UInt32] = [:]
+        var size_did_change: Bool = false
 
         init() {
             self.shared_canvas = Canvas(pixels: self.height * self.width * 4 * 2)
@@ -27,8 +29,11 @@ extension WaylandClientSession {
         mutating func setPool(_ pool_id: UInt32) {
             self.pool_id = pool_id
         }
-
-        var frame_counter = 0
+        private(set) var buffer_id: UInt32? = nil
+        mutating func set(_ buffer: UInt32) {
+            self.buffer_id = buffer
+        }
+        var frame_counter: UInt128 = 0
 
         var pixels: Int {
             self.height * self.width * 4

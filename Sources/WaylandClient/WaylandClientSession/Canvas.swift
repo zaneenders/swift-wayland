@@ -3,10 +3,6 @@ import Foundation
 struct Canvas: ~Copyable {
     let fd: FD
     private var buffer: UnsafeMutableRawPointer
-    enum Buffer {
-        case front
-        case back
-    }
 
     init(pixels: Int) {
         let (fd, pointer) = Self.createSharedFrameBuffer(pixels: pixels)
@@ -14,28 +10,10 @@ struct Canvas: ~Copyable {
         self.buffer = pointer!
     }
 
-    func getHighLow(_ side: Buffer, height: Int, width: Int) -> (Int, Int) {
-        switch side {
-        case .front:
-            let low = 0
-            let high = height * width
-            return (high, low)
-        case .back:
-            let low = (height * width) + 1
-            let high = (height * width) * 2
-            return (high, low)
-        }
-    }
-
-    func draw(_ side: Buffer, height: Int, width: Int) {
-        let (high, low) = getHighLow(side, height: height, width: width)
+    func draw(_ count: UInt128, height: Int, width: Int) {
         let typedPixels = buffer.assumingMemoryBound(to: UInt32.self)
-        for i in low..<high {
-            if i.isMultiple(of: 5) {
-                typedPixels[i] = 0xffffff
-            } else {
-                typedPixels[i] = 0x21b9ff
-            }
+        for i in 0..<height * width {
+            typedPixels[i] = 0x21b9ff
         }
     }
 
