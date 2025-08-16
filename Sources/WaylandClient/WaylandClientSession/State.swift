@@ -15,26 +15,27 @@ extension WaylandClientSession {
         var xdg_surface_object_id: UInt32? = nil
         var xdg_top_surface_id: UInt32? = nil
 
-        var height: Int = 800
-        var width: Int = 600
+        var _height: Int = 800
+        var _width: Int = 600
         var shared_canvas: Canvas
         var watch: [UInt32: UInt32] = [:]
-        var size_did_change: Bool = false
-        var renderer_running: Bool = false
 
         let screen_height: UInt32 = 1600
         let screen_width: UInt32 = 2560
         var screen_size: UInt32 {
             screen_width * screen_height
         }
+        var pixel_scale: UInt32 {
+            4 * 2  // rgb8888 * scale
+        }
         var screen_bytes: UInt32 {
-            screen_size * 4  // rgb8888
+            screen_size * pixel_scale
         }
 
         var used: Set<UInt32> = []
 
         init() {
-            self.shared_canvas = Canvas(bytes: Int(screen_width * screen_height * 4 * 2))
+            self.shared_canvas = Canvas(bytes: Int(screen_width * screen_height * 4 * 2 * 2))
         }
 
         private(set) var pool_id: UInt32? = nil
@@ -52,11 +53,9 @@ extension WaylandClientSession {
             self.front_buffer_id = buffer
         }
 
-        var frame_counter: UInt128 = 0
+        var lastFrame = ContinuousClock.now.advanced(by: .milliseconds(-100))
 
-        var pixels: Int {
-            self.height * self.width * 4
-        }
+        var frame_counter: UInt128 = 0
 
         mutating func nextId() -> UInt32 {
             self.wayland_current_object_id += 1

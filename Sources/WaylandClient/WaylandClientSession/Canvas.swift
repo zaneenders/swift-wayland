@@ -4,35 +4,21 @@ import Synchronization
 struct Canvas: ~Copyable {
     let fd: FD
     let lock: Mutex<UnsafeMutableRawPointer>
+    let size: Int
 
     init(bytes: Int) {
         let (fd, pointer) = Self.createSharedFrameBuffer(bytes: bytes)
         self.fd = fd
         self.lock = Mutex(pointer!)
+        self.size = bytes
     }
 
-    mutating func draw(_ count: UInt128, height: Int, width: Int) {
-        let squareSize = 50
-        let squareSpeed = 25
-
-        let xPos = Int((count * UInt128(squareSpeed)) % UInt128(width - squareSize))
-        let yPos = (height - squareSize) / 2
-
+    mutating func draw(_ count: UInt128, width: Int, height: Int, scale: Int) {
+        print(#function, width, height)
         lock.withLock { buffer in
             let typedPixels = buffer.assumingMemoryBound(to: UInt32.self)
-
-            // we should clear the screen height and width here
-            for i in 0..<height * width {
-                typedPixels[i] = 0x000000
-            }
-
-            for y in yPos..<yPos + squareSize {
-                for x in xPos..<xPos + squareSize {
-                    if x >= 0 && x < width && y >= 0 && y < height {
-                        let index = y * width + x
-                        typedPixels[index] = 0x21b9ff
-                    }
-                }
+            for i in 0..<(width * height * scale) {
+                typedPixels[i] = 0x00_FF_FF
             }
         }
     }
