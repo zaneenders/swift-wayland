@@ -20,19 +20,38 @@ extension WaylandClientSession {
         var shared_canvas: Canvas
         var watch: [UInt32: UInt32] = [:]
         var size_did_change: Bool = false
+        var renderer_running: Bool = false
+
+        let screen_height: UInt32 = 1600
+        let screen_width: UInt32 = 2560
+        var screen_size: UInt32 {
+            screen_width * screen_height
+        }
+        var screen_bytes: UInt32 {
+            screen_size * 4  // rgb8888
+        }
+
+        var used: Set<UInt32> = []
 
         init() {
-            self.shared_canvas = Canvas(pixels: self.height * self.width * 4 * 2)
+            self.shared_canvas = Canvas(bytes: Int(screen_width * screen_height * 4 * 2))
         }
 
         private(set) var pool_id: UInt32? = nil
         mutating func setPool(_ pool_id: UInt32) {
             self.pool_id = pool_id
         }
-        private(set) var buffer_id: UInt32? = nil
-        mutating func set(_ buffer: UInt32) {
-            self.buffer_id = buffer
+
+        private(set) var back_buffer_id: UInt32? = nil
+        mutating func set(back buffer: UInt32) {
+            self.back_buffer_id = buffer
         }
+
+        private(set) var front_buffer_id: UInt32? = nil
+        mutating func set(front buffer: UInt32) {
+            self.front_buffer_id = buffer
+        }
+
         var frame_counter: UInt128 = 0
 
         var pixels: Int {
