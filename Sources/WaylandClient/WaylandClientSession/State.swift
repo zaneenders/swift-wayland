@@ -16,10 +16,9 @@ extension WaylandClientSession {
         var xdg_surface_object_id: UInt32? = nil
         var xdg_top_surface_id: UInt32? = nil
 
-        var _height: Int = 800
-        var _width: Int = 600
+        var _height: Int = 1600
+        var _width: Int = 2560
         var shared_canvas: Canvas
-        var watch: [UInt32: UInt32] = [:]
 
         let screen_height: UInt32 = 1600
         let screen_width: UInt32 = 2560
@@ -32,8 +31,6 @@ extension WaylandClientSession {
         var screen_bytes: UInt32 {
             screen_size * pixel_scale
         }
-
-        var used: Set<UInt32> = []
 
         let bytes = Int(2560 * 1600 * 4 * 2 * 2)
 
