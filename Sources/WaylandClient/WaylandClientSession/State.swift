@@ -11,6 +11,7 @@ extension WaylandClientSession {
         var wl_shm_object_id: UInt32? = nil
         var wl_xdg_wm_base_object_id: UInt32? = nil
         var wl_compositor_object_id: UInt32? = nil
+        var wl_output_object_id: UInt32? = nil
         var wl_surface_object_id: UInt32? = nil
         var xdg_surface_object_id: UInt32? = nil
         var xdg_top_surface_id: UInt32? = nil
@@ -26,7 +27,7 @@ extension WaylandClientSession {
             screen_width * screen_height
         }
         var pixel_scale: UInt32 {
-            4 * 2  // rgb8888 * scale
+            4 * 2  // xrgb8888 * scale
         }
         var screen_bytes: UInt32 {
             screen_size * pixel_scale
@@ -34,8 +35,13 @@ extension WaylandClientSession {
 
         var used: Set<UInt32> = []
 
+        let bytes = Int(2560 * 1600 * 4 * 2 * 2)
+
         init() {
-            self.shared_canvas = Canvas(bytes: Int(screen_width * screen_height * 4 * 2 * 2))
+            // Round up to nearest power of two
+            let l = bytes.bitWidth - (bytes &- 1).leadingZeroBitCount
+            let size = 1 << l
+            self.shared_canvas = Canvas(bytes: size)
         }
 
         private(set) var pool_id: UInt32? = nil
@@ -72,6 +78,8 @@ extension WaylandClientSession {
                 self.wl_xdg_wm_base_object_id = object
             case "wl_compositor":
                 self.wl_compositor_object_id = object
+            case "wl_output":
+                self.wl_output_object_id = object
             default:
                 ()
             }

@@ -86,6 +86,31 @@ extension WaylandClientSession {
             default:
                 print("Unknown: xdg_surface_object_id: \(message.opcode), \(message.message != nil)")
             }
+        case self.state.wl_output_object_id:
+            print("output: ", message.opcode, message.message)
+            switch message.opcode {
+            case 1:
+                guard var contents = message.message else {
+                    print("faliled to read message for \(1)")
+                    return
+                }
+                let a = contents.readInteger(endianness: .little, as: UInt32.self)
+                let b = contents.readInteger(endianness: .little, as: UInt32.self)
+                let c = contents.readInteger(endianness: .little, as: UInt32.self)
+                let d = contents.readInteger(endianness: .little, as: UInt32.self)
+                print("output mode: ", a, b, c, d)
+            case 2:
+                print("output recieved")
+            case 3:
+                guard var contents = message.message else {
+                    print("faliled to read message for \(1)")
+                    return
+                }
+                let scale = contents.readInteger(endianness: .little, as: UInt32.self)
+                print("output scale: ", scale)
+            default:
+                print("skipped message for \(message.opcode), \(message.message)")
+            }
         default:
             if self.state.used.contains(message.object) && message.opcode == 0 {
                 print("Destroying: \(message.object)")
@@ -128,9 +153,12 @@ extension WaylandClientSession {
                 try await xdgSurfaceEvent(self.state.xdg_top_surface_id!)
                 print("Bind State Complete")
 
+                let pool_size = self.state.shared_canvas.size
+                let half = self.state.shared_canvas.half
+
                 let pool_id = try await createPool(
                     fd: Int(self.state.shared_canvas.fd),
-                    buffer_size: UInt32(self.state.shared_canvas.size))
+                    buffer_size: UInt32(pool_size))
                 self.state.setPool(pool_id)
 
                 let front = try await poolCreateBuffer(
@@ -139,6 +167,13 @@ extension WaylandClientSession {
                     width: UInt32(self.state.screen_width),
                     height: UInt32(self.state.screen_height))
                 self.state.set(front: front)
+
+                let back = try await poolCreateBuffer(
+                    self.state.pool_id!,
+                    offset: UInt32(half),
+                    width: UInt32(self.state.screen_width),
+                    height: UInt32(self.state.screen_height))
+                self.state.set(back: back)
             } catch {
                 print(error)
                 throw WaylandSetupError.unableToSetupSurface
@@ -154,21 +189,34 @@ extension WaylandClientSession {
             print("Frame skipped")
             return
         }
-        if let id = self.state.front_buffer_id {
-            let width = self.state._width
-            let height = self.state._height
-            self.state.shared_canvas.draw(
-                self.state.frame_counter, width: width, height: height, scale: Int(self.state.pixel_scale))
-            try await _render(id, width: UInt32(width), height: UInt32(height))
-            self.state.frame_counter += 1
-            self.state.lastFrame = ContinuousClock.now
-            print("Frame count: \(self.state.frame_counter), width:\(self.state._width), height:\(self.state._height)")
+        let width = self.state._width
+        let height = self.state._height
+        let color = 0x00_FF_FF + UInt32(self.state.frame_counter) / 2
+
+        if self.state.frame_counter.isMultiple(of: 2) {
+            if let id = self.state.front_buffer_id {
+                self.state.shared_canvas.draw(
+                    .front, color, width: width, height: height, scale: Int(self.state.pixel_scale))
+                try await _render(id, width: UInt32(width), height: UInt32(height))
+                self.state.frame_counter += 1
+                self.state.lastFrame = ContinuousClock.now
+            }
+        } else {
+            if let bid = self.state.back_buffer_id {
+                self.state.shared_canvas.draw(
+                    .back, color, width: width, height: height, scale: Int(self.state.pixel_scale))
+                try await _render(bid, width: UInt32(width), height: UInt32(height))
+                self.state.frame_counter += 1
+                self.state.lastFrame = ContinuousClock.now
+            }
         }
+        print(
+            "Frame count: \(self.state.frame_counter), width:\(self.state._width), height:\(self.state._height)"
+        )
     }
 
     func _render(_ buffer_id: UInt32, width: UInt32, height: UInt32) async throws {
         try await wayland_wl_surface_attach(buffer_id)
-
         try await wayland_wl_surface_damage_buffer(width: width, height: height)
         try await wayland_wl_surface_commit()
 
@@ -216,7 +264,7 @@ extension WaylandClientSession {
             let interface_name = String(_interface_name[_interface_name.startIndex..<end_index])
             do {
                 switch interface_name {
-                case "wl_seat", "wl_shm", "xdg_wm_base", "wl_compositor":
+                case "wl_seat", "wl_shm", "xdg_wm_base", "wl_compositor", "wl_output":
                     print(
                         "wl_registry:bind object: \(message.object), opcode: \(message.opcode) length: \(message.length), name: \(name), interface_name: \(interface_name), verison: \(verison)"
                     )
@@ -265,7 +313,6 @@ extension WaylandClientSession {
         async throws
     {
         var contents = ByteBuffer()
-        print(#function, width, height)
         contents.writeInteger(0, endianness: .little, as: UInt32.self)
         contents.writeInteger(0, endianness: .little, as: UInt32.self)
         contents.writeInteger(width, endianness: .little, as: UInt32.self)
@@ -274,6 +321,17 @@ extension WaylandClientSession {
         let msg = WaylandMessage(
             object: self.state.wl_surface_object_id!,
             opcode: wayland_wl_surface_damage_buffer_opcode,
+            message: contents)
+        try await outbound.write(msg)
+    }
+
+    private func wayland_wl_surface_set_buffer_scale2() async throws {
+        var contents = ByteBuffer()
+        contents.writeInteger(2, endianness: .little, as: UInt32.self)
+        let wayland_wl_surface_frame_opcode: UInt16 = 8
+        let msg = WaylandMessage(
+            object: self.state.wl_surface_object_id!,
+            opcode: wayland_wl_surface_frame_opcode,
             message: contents)
         try await outbound.write(msg)
     }
