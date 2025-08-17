@@ -40,6 +40,9 @@ extension WaylandClientSession {
             let size = 1 << l
             self.shared_canvas = Canvas(bytes: size)
         }
+        var released: Set<UInt32> = []
+
+        var callbacks: [UInt32: UInt32] = [:]
 
         private(set) var pool_id: UInt32? = nil
         mutating func setPool(_ pool_id: UInt32) {
@@ -51,6 +54,7 @@ extension WaylandClientSession {
             self.back_buffer_id = buffer
         }
 
+        var frame_callback_id: UInt32? = nil
         private(set) var front_buffer_id: UInt32? = nil
         mutating func set(front buffer: UInt32) {
             self.front_buffer_id = buffer

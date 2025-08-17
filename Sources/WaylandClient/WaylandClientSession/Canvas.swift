@@ -3,6 +3,11 @@ import Synchronization
 
 typealias FD = Int32
 
+enum Side {
+    case front
+    case back
+}
+
 struct Canvas: ~Copyable {
     let fd: FD
     private let fp: UnsafeMutablePointer<UInt32>
@@ -19,14 +24,9 @@ struct Canvas: ~Copyable {
         self.size = bytes
     }
 
-    enum Side {
-        case front
-        case back
-    }
-
-    mutating func draw(_ side: Side, _ color: UInt32, width: Int, height: Int, scale: Int) {
+    mutating func draw(_ side: Side, width: Int, height: Int, scale: Int) {
+        let color: UInt32 = 0xFF_00_FF_FF
         let frame_byte_count = width * height * scale
-        print(#function, size, side, width, height, scale, frame_byte_count, frame_byte_count * 2, size, size / 2)
         switch side {
         case .front:
             for i in 0..<frame_byte_count {
@@ -45,8 +45,6 @@ struct Canvas: ~Copyable {
         unsafe shm_unlink(shared_name)
         ftruncate(shared_fd, bytes)
         let half = (bytes / 2)
-        assert(half + half == bytes)
-        print(#function, half)
         let front_ptr = mmap(nil, half, PROT_READ | PROT_WRITE, MAP_SHARED, shared_fd, 0)!
         let back_ptr = mmap(nil, half, PROT_READ | PROT_WRITE, MAP_SHARED, shared_fd, half)!
         return (shared_fd, front_ptr, half, back_ptr)
