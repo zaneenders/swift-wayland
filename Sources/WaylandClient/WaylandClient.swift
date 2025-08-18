@@ -14,7 +14,11 @@ enum WaylandClient {
 extension WaylandClient {
     private static func connect() async {
         let logger = {
-            var _logger = Logger(label: "connect")
+            var _logger = Logger(
+                label: "connect",
+                factory: { label in
+                    SessionLogHandler(logLevel: .trace)
+                })
             _logger.logLevel = .trace
             return _logger
         }()

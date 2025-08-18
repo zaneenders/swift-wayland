@@ -11,7 +11,11 @@ struct WaylandClientSession: ~Copyable {
     internal init(
         _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
     ) {
-        var logger = Logger(label: "zane")
+        var logger = Logger(
+            label: "session",
+            factory: { label in
+                SessionLogHandler(logLevel: .trace)
+            })
         logger.logLevel = .trace
         self.logger = logger
         self.outbound = outbound
@@ -59,7 +63,7 @@ extension WaylandClientSession {
                     logger.error("Invalid sync integer: \(String(describing: message.message))")
                     return
                 }
-                logger.trace("Callback[\(id)] finished.")
+                logger.trace("Callback[\(id)] finished.", metadata: [LoggingMetadataTag.render.description: ""])
             default:
                 logger.trace(
                     "wayland_display_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))"
@@ -197,14 +201,16 @@ extension WaylandClientSession {
         case self.state.front_buffer_id, self.state.back_buffer_id:
             switch message.opcode {
             case 0:
-                logger.trace("Buffer \(message.object) released.")
+                logger.trace(
+                    "Buffer \(message.object) released.", metadata: [LoggingMetadataTag.render.description: ""])
             default:
                 logger.trace("unhandled buffer opcode: \(message.opcode)")
             }
         case self.state.frame_callback_id:
             switch message.opcode {
             case 0:
-                logger.trace("Callback[\(message.object)], next frame.")
+                logger.trace(
+                    "Callback[\(message.object)], next frame.", metadata: [LoggingMetadataTag.render.description: ""])
                 try await renderNextFrame()
             default:
                 logger.trace("Unhandled callback opcode: \(message.opcode)")
@@ -272,7 +278,7 @@ extension WaylandClientSession {
     internal mutating func renderNextFrame() async throws {
         let prev = self.state.lastFrame.duration(to: ContinuousClock.now)
         self.state.lastFrame = ContinuousClock.now
-        logger.trace("Frame time: \(prev)")
+        logger.trace("Frame time: \(prev)", metadata: [LoggingMetadataTag.render.description: ""])
         let width = self.state._width
         let height = self.state._height
 
@@ -289,7 +295,9 @@ extension WaylandClientSession {
 
         try await wayland_wl_surface_frame()
         try await wayland_wl_surface_commit()
-        logger.trace("[\(self.state.side!)]Draw time: \(drawTime), width: \(width), height: \(height)")
+        logger.trace(
+            "[\(self.state.side!)]Draw time: \(drawTime), width: \(width), height: \(height)",
+            metadata: [LoggingMetadataTag.render.description: ""])
         switch self.state.side! {
         case .front:
             self.state.side = .back
