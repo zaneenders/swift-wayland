@@ -14,27 +14,31 @@ struct Canvas: ~Copyable {
     private let bp: UnsafeMutablePointer<UInt32>
     let half: Int
     let size: Int
+    let scale: Int
 
-    init(bytes: Int) {
+    init(bytes: Int, scale: Int) {
+        self.scale = scale
         let (fd, fp, half, bp) = Self.createSharedFrameBuffer(bytes: bytes)
         self.fd = fd
         self.half = half
-        self.fp = fp.bindMemory(to: UInt32.self, capacity: half)
-        self.bp = bp.bindMemory(to: UInt32.self, capacity: half)
+        self.fp = fp.bindMemory(to: UInt32.self, capacity: half / 4)
+        self.bp = bp.bindMemory(to: UInt32.self, capacity: half / 4)
         self.size = bytes
     }
 
-    mutating func draw(_ side: Side, width: Int, height: Int, scale: Int) {
-        let color: UInt32 = 0xFF_00_FF_FF
-        let frame_byte_count = width * height * scale
+    mutating func draw(_ side: Side, width: Int, height: Int) {
+        let buffer: UnsafeMutablePointer<UInt32>
         switch side {
         case .front:
-            for i in 0..<frame_byte_count {
-                fp[i] = color
-            }
+            buffer = fp
         case .back:
-            for i in 0..<frame_byte_count {
-                bp[i] = color
+            buffer = bp
+        }
+
+        for x in 0..<width * scale {
+            for y in 0..<height * scale {
+                let i = (y * width * scale) + x
+                buffer[i] = 0xFF_00_FF_FF
             }
         }
     }
@@ -51,8 +55,8 @@ struct Canvas: ~Copyable {
     }
 
     deinit {
-        fp.deallocate()
-        bp.deallocate()
+        munmap(fp, half / 4)
+        munmap(bp, half / 4)
         close(fd)
     }
 }

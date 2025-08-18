@@ -16,33 +16,28 @@ extension WaylandClientSession {
         var xdg_surface_object_id: UInt32? = nil
         var xdg_top_surface_id: UInt32? = nil
 
-        var _height: Int = 1600
-        var _width: Int = 2560
+        var _height: Int = 800
+        var _width: Int = 1280
         var shared_canvas: Canvas
 
-        let screen_height: UInt32 = 1600
-        let screen_width: UInt32 = 2560
-        var screen_size: UInt32 {
-            screen_width * screen_height
-        }
-        var pixel_scale: UInt32 {
-            4 * 2  // xrgb8888 * scale
-        }
-        var screen_bytes: UInt32 {
-            screen_size * pixel_scale
-        }
+        let screen_height: UInt32 = 800
+        let screen_width: UInt32 = 1280
 
-        let bytes = Int(2560 * 1600 * 4 * 2 * 2)
+        let scale: UInt32 = 2
+        let stride: UInt32 = 4
+
+        let bufferWidth: UInt32
+        let bufferHeight: UInt32
+        let bufferBytes: UInt32
+        let poolSize: UInt32
 
         init() {
-            // Round up to nearest power of two
-            let l = bytes.bitWidth - (bytes &- 1).leadingZeroBitCount
-            let size = 1 << l
-            self.shared_canvas = Canvas(bytes: size)
+            self.bufferWidth = screen_width * scale
+            self.bufferHeight = screen_height * scale
+            self.bufferBytes = bufferWidth * bufferHeight * stride
+            self.poolSize = bufferBytes * 2
+            self.shared_canvas = Canvas(bytes: Int(self.poolSize), scale: Int(scale))
         }
-        var released: Set<UInt32> = []
-
-        var callbacks: [UInt32: UInt32] = [:]
 
         private(set) var pool_id: UInt32? = nil
         mutating func setPool(_ pool_id: UInt32) {
