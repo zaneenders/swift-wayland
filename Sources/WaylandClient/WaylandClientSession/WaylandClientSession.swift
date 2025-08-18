@@ -154,10 +154,32 @@ extension WaylandClientSession {
                     print("xdg_top_surface_id[\(id)]: failed, height")
                     return
                 }
+
+                let prevFront = self.state.front_buffer_id
+                let prevBack = self.state.back_buffer_id
+
+                let front = try await poolCreateBuffer(
+                    self.state.pool_id!,
+                    offset: 0,
+                    width: width * self.state.scale,
+                    height: height * self.state.scale)
+                self.state.set(front: front)
+
+                let back = try await poolCreateBuffer(
+                    self.state.pool_id!,
+                    offset: self.state.bufferBytes,
+                    width: width * self.state.scale,
+                    height: height * self.state.scale)
+                self.state.set(back: back)
+
                 let w = Int(width)
                 let h = Int(height)
                 self.state._width = w
                 self.state._height = h
+
+                try await wayland_wl_destroy_buffer(prevFront!)
+                try await wayland_wl_destroy_buffer(prevBack!)
+
                 print("xdg_top_surface_id[\(id)]: width: \(width), height: \(height)")
             default:
                 print("xdg_top_surface_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
@@ -239,7 +261,7 @@ extension WaylandClientSession {
     internal func renderNextFrame() async throws {
         let prev = self.state.lastFrame.duration(to: ContinuousClock.now)
         self.state.lastFrame = ContinuousClock.now
-        print("Elapsed: \(prev)")
+        print("Frame time: \(prev)")
         let width = self.state._width
         let height = self.state._height
 
@@ -249,13 +271,14 @@ extension WaylandClientSession {
         let start = ContinuousClock.now
         self.state.shared_canvas.draw(side, width: width, height: height)
         let end = ContinuousClock.now
-        print("time: \(start.duration(to: end))")
+        let drawTime = start.duration(to: end)
+        print("Draw time: \(drawTime), \(drawTime < prev), \(side)")
 
         try await wayland_wl_surface_attach(bufferId)
         try await wayland_wl_surface_damage_buffer(width: UInt32(width), height: UInt32(height))
 
-        try await wayland_wl_surface_commit()
         try await wayland_wl_surface_frame()
+        try await wayland_wl_surface_commit()
 
         self.state.frame_counter += 1
         print(

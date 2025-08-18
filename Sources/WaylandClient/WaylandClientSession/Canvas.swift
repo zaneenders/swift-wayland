@@ -38,7 +38,13 @@ struct Canvas: ~Copyable {
         for x in 0..<width * scale {
             for y in 0..<height * scale {
                 let i = (y * width * scale) + x
-                buffer[i] = 0xFF_00_FF_FF
+                if y > 20 && y < 200 && x > 20 && x < 200 {
+                    buffer[i] = 0xFF_FF_00_00
+                } else if y > 400 && y < 420 && x > 400 && x < 420 {
+                    buffer[i] = 0xFF_FF_00_00
+                } else {
+                    buffer[i] = 0xFF_00_FF_FF
+                }
             }
         }
     }
