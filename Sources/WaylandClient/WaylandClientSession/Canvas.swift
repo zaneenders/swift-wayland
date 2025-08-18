@@ -30,7 +30,6 @@ struct Canvas: ~Copyable {
         for _ in 0..<25 {
             let dx = Int.random(in: 0...200)
             let dy = Int.random(in: 0...200)
-            print(dx, dy)
             enties.append((dx, dy))
         }
     }

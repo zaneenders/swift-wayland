@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 import NIOCore
 import NIOPosix
 
@@ -12,9 +13,15 @@ enum WaylandClient {
 // MARK: connect
 extension WaylandClient {
     private static func connect() async {
+        let logger = {
+            var _logger = Logger(label: "connect")
+            _logger.logLevel = .trace
+            return _logger
+        }()
+
         do {
             guard let path = ProcessInfo.processInfo.environment["XDG_RUNTIME_DIR"] else {
-                print("Environment varable XDG_RUNTIME_DIR not found.")
+                logger.error("Environment varable XDG_RUNTIME_DIR not found.")
                 throw WaylandSetupError.xdg_runtime_dir
             }
             var display = "wayland-0"
@@ -22,7 +29,7 @@ extension WaylandClient {
                 display = _display
             }
             let wayland_socket_path = "\(path)/\(display)"
-            print("Connecting to: \(wayland_socket_path)")
+            logger.notice("Connecting to: \(wayland_socket_path)")
             let addr = try SocketAddress(unixDomainSocketPath: wayland_socket_path)
 
             let bootstrap = try await ClientBootstrap(group: .singletonMultiThreadedEventLoopGroup)
@@ -50,11 +57,11 @@ extension WaylandClient {
                 for try await message in inbound {
                     try await session.handle(message: message)
                 }
-                print("Close")
+                logger.notice("Close")
             }
-            print("Goodbye")
+            logger.notice("Goodbye")
         } catch {
-            print(error)
+            logger.critical("\(error)")
         }
     }
 }

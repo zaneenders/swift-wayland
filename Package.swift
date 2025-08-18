@@ -7,6 +7,7 @@ let package = Package(
         .package(
             url: "https://github.com/zaneenders/swift-nio.git",
             branch: "zane-add-cmsghdr")
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.4"),
     ],
     targets: [
         .executableTarget(
@@ -14,6 +15,7 @@ let package = Package(
             dependencies: [
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "Logging", package: "swift-log"),
             ],
             swiftSettings: [
                 .enableExperimentalFeature("Span"),

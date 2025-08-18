@@ -1,14 +1,19 @@
 import Foundation
+import Logging
 import NIOCore
 import NIOPosix
 
 struct WaylandClientSession: ~Copyable {
     private let outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
+    private let logger: Logger
     private var state: State = State()
 
     internal init(
         _ outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
     ) {
+        var logger = Logger(label: "zane")
+        logger.logLevel = .trace
+        self.logger = logger
         self.outbound = outbound
     }
 }
@@ -46,49 +51,51 @@ extension WaylandClientSession {
             case WaylandOpCodes.error.value:
                 var contents = message.message!
                 let errorMessage = contents.readString(length: roundup4(contents.readableBytes))
-                print("Fatal wl_display error: \(String(describing: errorMessage)). Terminating.")
+                logger.error("Fatal wl_display error: \(String(describing: errorMessage)). Terminating.")
                 return
             case 1:
                 var contents = message.message!
                 guard let id = contents.readInteger(endianness: .little, as: UInt32.self) else {
-                    print("Invalid sync integer: \(String(describing: message.message))")
+                    logger.error("Invalid sync integer: \(String(describing: message.message))")
                     return
                 }
-                print("Callback[\(id)] finished.")
+                logger.trace("Callback[\(id)] finished.")
             default:
-                print(
+                logger.trace(
                     "wayland_display_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))"
                 )
             }
         case self.state.wayland_wl_registry_id:
             try await registryEvent(message)
         case self.state.wl_seat_object_id:
-            print("wl_seat_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
+            logger.trace(
+                "wl_seat_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
         case self.state.wl_shm_object_id:
-            print("wl_shm_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
+            logger.trace(
+                "wl_shm_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
         case self.state.wl_xdg_wm_base_object_id:
             switch message.opcode {
             case WaylandOpCodes.wayland_xdg_wm_base_event_ping.value:
                 var copy = message.message!
                 guard let serial = copy.readInteger(endianness: .little, as: UInt32.self) else {
-                    print("xdg_wm_base ping: missing serial")
+                    logger.error("xdg_wm_base ping: missing serial")
                     return
                 }
-                print("Sending pong for serial: \(serial)")
+                logger.trace("Sending pong for serial: \(serial)")
                 try await xdgPing(serial: serial)
             default:
-                print(
+                logger.trace(
                     "wl_xdg_wm_base_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))"
                 )
             }
         case self.state.wl_compositor_object_id:
-            print(
+            logger.trace(
                 "wl_compositor_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
         case self.state.wl_output_object_id:
             switch message.opcode {
             case 1:
                 guard var contents = message.message else {
-                    print("faliled to read message for \(1)")
+                    logger.trace("faliled to read message for \(1)")
                     return
                 }
                 guard let a = contents.readInteger(endianness: .little, as: UInt32.self),
@@ -96,46 +103,47 @@ extension WaylandClientSession {
                     let c = contents.readInteger(endianness: .little, as: UInt32.self),
                     let d = contents.readInteger(endianness: .little, as: UInt32.self)
                 else {
-                    print("unable to decode mode.")
+                    logger.error("unable to decode mode.")
                     return
                 }
-                print("output mode: ", a, b, c, d)
+                logger.trace("output mode: \(a) \(b) \(c) \(d)")
             case 2:
-                print("output recieved")
+                logger.trace("output recieved")
             case 3:
                 guard var contents = message.message else {
-                    print("faliled to read message for \(1)")
+                    logger.error("faliled to read message for \(1)")
                     return
                 }
                 guard let scale = contents.readInteger(endianness: .little, as: UInt32.self) else {
-                    print("unable to extrat scale")
+                    logger.error("unable to extrat scale")
                     return
                 }
-                print("output scale: \(scale)")
+                logger.trace("output scale: \(scale)")
             default:
-                print(
+                logger.trace(
                     "wl_output_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
             }
         case self.state.wl_surface_object_id:
-            print("wl_surface_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
+            logger.trace(
+                "wl_surface_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
         case self.state.xdg_surface_object_id:
             switch message.opcode {
             case WaylandOpCodes.wayland_xdg_surface_event_configure.value:
-                print("xdg_surface configure event received. Sending ack.")
+                logger.trace("xdg_surface configure event received. Sending ack.")
                 var copy = message.message!
                 guard let serial = copy.readInteger(endianness: .little, as: UInt32.self) else {
-                    print("xdg_surface configure: missing serial")
+                    logger.error("xdg_surface configure: missing serial")
                     return
                 }
                 try await xdgSurfaceEvent(serial)
 
                 if self.state.side == nil {
-                    print("First frame")
+                    logger.trace("First frame!")
                     self.state.side = .front
                     try await renderNextFrame()
                 }
             default:
-                print(
+                logger.trace(
                     "xdg_surface_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))"
                 )
             }
@@ -144,15 +152,15 @@ extension WaylandClientSession {
             case 0:
                 let id = self.state.xdg_top_surface_id!
                 guard var contents = message.message else {
-                    print("xdg_top_surface_id[\(id)]: failed")
+                    logger.error("xdg_top_surface_id[\(id)]: failed")
                     return
                 }
                 guard let width = contents.readInteger(endianness: .little, as: UInt32.self) else {
-                    print("xdg_top_surface_id[\(id)]: failed, width")
+                    logger.error("xdg_top_surface_id[\(id)]: failed, width")
                     return
                 }
                 guard let height = contents.readInteger(endianness: .little, as: UInt32.self) else {
-                    print("xdg_top_surface_id[\(id)]: failed, height")
+                    logger.error("xdg_top_surface_id[\(id)]: failed, height")
                     return
                 }
 
@@ -181,38 +189,40 @@ extension WaylandClientSession {
                 try await wayland_wl_destroy_buffer(prevFront!)
                 try await wayland_wl_destroy_buffer(prevBack!)
 
-                print("xdg_top_surface_id[\(id)]: width: \(width), height: \(height)")
+                logger.trace("xdg_top_surface_id[\(id)]: width: \(width), height: \(height)")
             default:
-                print("xdg_top_surface_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
+                logger.trace(
+                    "xdg_top_surface_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
             }
         case self.state.front_buffer_id, self.state.back_buffer_id:
             switch message.opcode {
             case 0:
-                print("Buffer \(message.object) released.")
+                logger.trace("Buffer \(message.object) released.")
             default:
-                print("unhandled buffer opcode: \(message.opcode)")
+                logger.trace("unhandled buffer opcode: \(message.opcode)")
             }
         case self.state.frame_callback_id:
             switch message.opcode {
             case 0:
-                print("Callback[\(message.object)], next frame.")
+                logger.trace("Callback[\(message.object)], next frame.")
                 try await renderNextFrame()
             default:
-                print("Unhandled callback opcode: \(message.opcode)")
+                logger.trace("Unhandled callback opcode: \(message.opcode)")
             }
         default:
             guard var copy = message.message else {
-                print("unhandled: Object: \(message.object), opcode: \(message.opcode), length: \(message.length)")
+                logger.trace(
+                    "unhandled: Object: \(message.object), opcode: \(message.opcode), length: \(message.length)")
                 return
             }
             var c2 = copy
             let c3 = copy
-            let out = """
+            logger.trace(
+                """
                 unhandled: Object: \(message.object), opcode: \(message.opcode), 
                 UInt32: \(String(describing: copy.readInteger(endianness: .little, as: UInt32.self))) \(String(describing: c2.readInteger(endianness: .big, as: UInt32.self)))"
                 String: \(c3.description)
-                """
-            print(out)
+                """)
         }
 
         // State transtions
@@ -238,21 +248,21 @@ extension WaylandClientSession {
         case WlSurfaceOpCodes.enter.rawValue:
             var copy = message.message!
             guard let outputId = copy.readInteger(endianness: .little, as: UInt32.self) else {
-                print("wl_surface.enter event: missing output ID")
+                logger.error("wl_surface.enter event: missing output ID")
                 return
             }
-            print("wl_surface.enter event received for output ID: \(outputId)")
+            logger.trace("wl_surface.enter event received for output ID: \(outputId)")
         case WlSurfaceOpCodes.leave.rawValue:
             // This is a wl_surface.leave event.
             // The message payload is a wl_output ID.
             var copy = message.message!
             guard let outputId = copy.readInteger(endianness: .little, as: UInt32.self) else {
-                print("wl_surface.leave event: missing output ID")
+                logger.error("wl_surface.leave event: missing output ID")
                 return
             }
-            print("wl_surface.leave event received for output ID: \(outputId)")
+            logger.trace("wl_surface.leave event received for output ID: \(outputId)")
         default:
-            print("unhandled wl_surface opcode: \(message.opcode)")
+            logger.trace("unhandled wl_surface opcode: \(message.opcode)")
         }
     }
 }
@@ -262,7 +272,7 @@ extension WaylandClientSession {
     internal mutating func renderNextFrame() async throws {
         let prev = self.state.lastFrame.duration(to: ContinuousClock.now)
         self.state.lastFrame = ContinuousClock.now
-        print("Frame time: \(prev)")
+        logger.trace("Frame time: \(prev)")
         let width = self.state._width
         let height = self.state._height
 
@@ -279,7 +289,7 @@ extension WaylandClientSession {
 
         try await wayland_wl_surface_frame()
         try await wayland_wl_surface_commit()
-        print("[\(self.state.side!)]Draw time: \(drawTime), width: \(width), height: \(height)")
+        logger.trace("[\(self.state.side!)]Draw time: \(drawTime), width: \(width), height: \(height)")
         switch self.state.side! {
         case .front:
             self.state.side = .back
@@ -320,7 +330,7 @@ extension WaylandClientSession {
             try await xdgGetTopSurface(id: self.state.xdg_top_surface_id!)
             try await surfaceCommit()
 
-            print("Bind State Complete")
+            logger.notice("Bind State Complete")
 
             let bWidth = self.state.screen_width
             let bHeight = self.state.screen_height
@@ -346,10 +356,10 @@ extension WaylandClientSession {
                 height: bHeight)
             self.state.set(back: back)
         } catch {
-            print(error)
+            logger.critical("\(error)")
             throw WaylandSetupError.unableToSetupSurface
         }
-        print("Surface setup Complete")
+        logger.notice("Surface setup Complete")
     }
 
     mutating func registryEvent(_ message: WaylandMessage) async throws {
@@ -364,7 +374,7 @@ extension WaylandClientSession {
                 let _interface_name = buffer.readString(length: roundup4(Int(interface_length))),
                 let verison = buffer.readInteger(endianness: .little, as: UInt32.self)
             else {
-                print("wl_registry:: Invalid event")
+                logger.error("wl_registry:: Invalid event")
                 return
             }
             // Trim trailing null byte padding
@@ -373,7 +383,7 @@ extension WaylandClientSession {
             do {
                 switch interface_name {
                 case "wl_seat", "wl_shm", "xdg_wm_base", "wl_compositor", "wl_output":
-                    print(
+                    logger.trace(
                         "wl_registry:bind object: \(message.object), opcode: \(message.opcode) length: \(message.length), name: \(name), interface_name: \(interface_name), verison: \(verison)"
                     )
                     let id = self.state.nextId()
@@ -382,16 +392,16 @@ extension WaylandClientSession {
                         interface_name: interface_name, verison: verison)
                     self.state.update(interface_name, id)
                 default:
-                    print(
-                        "wl_registry:unhandled", message.object, message.opcode, message.length, name,
-                        interface_name,
-                        verison)
+                    logger.trace(
+                        "wl_registry:unhandled: \(message.object), \(message.opcode) \(message.length) \(name) \(interface_name) \(verison)"
+                    )
                 }
             } catch {
-                print(interface_name, error, type(of: error))
+                logger.trace("\(interface_name) \(error) ,\(type(of: error))")
             }
         default:
-            print("wayland_wl_registry_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
+            logger.trace(
+                "wayland_wl_registry_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
         }
     }
 
@@ -503,7 +513,6 @@ extension WaylandClientSession {
             object: self.state.xdg_surface_object_id!,
             opcode: WaylandOpCodes.wayland_xdg_surface_get_toplevel_opcode.value, message: contents)
         try await outbound.write(message)
-        print("Top level surface id = \(self.state.xdg_top_surface_id!)")
     }
 
     private func getXDGSurface(id: UInt32) async throws {
