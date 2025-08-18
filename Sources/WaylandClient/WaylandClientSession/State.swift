@@ -30,6 +30,7 @@ extension WaylandClientSession {
         let bufferHeight: UInt32
         let bufferBytes: UInt32
         let poolSize: UInt32
+        var side: Side? = nil
 
         init() {
             self.bufferWidth = screen_width * scale
@@ -57,9 +58,8 @@ extension WaylandClientSession {
 
         var lastFrame = ContinuousClock.now.advanced(by: .milliseconds(-100))
 
-        var frame_counter: UInt128 = 0
-
         mutating func nextId() -> UInt32 {
+            // TODO: solve wrap around
             self.wayland_current_object_id += 1
             return self.wayland_current_object_id
         }

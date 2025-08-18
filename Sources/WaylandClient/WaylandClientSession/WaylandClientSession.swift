@@ -2,7 +2,7 @@ import Foundation
 import NIOCore
 import NIOPosix
 
-actor WaylandClientSession {
+struct WaylandClientSession: ~Copyable {
     private let outbound: NIOAsyncChannelOutboundWriter<WaylandMessage>
     private var state: State = State()
 
@@ -18,7 +18,7 @@ extension WaylandClientSession {
 
     /// Called before messages are recieved.
     /// Setus up iniital state and connection phase
-    internal func setupPhase() async throws {
+    internal mutating func setupPhase() async throws {
         self.state.wayland_wl_registry_id = self.state.nextId()
         try await setupRegistry(id: self.state.wayland_wl_registry_id!)
     }
@@ -39,7 +39,7 @@ extension WaylandClientSession {
 extension WaylandClientSession {
 
     /// Responsible for handling each message
-    internal func handle(message: WaylandMessage) async throws {
+    internal mutating func handle(message: WaylandMessage) async throws {
         switch message.object {
         case self.state.wayland_display_object_id:
             switch message.opcode {
@@ -129,8 +129,9 @@ extension WaylandClientSession {
                 }
                 try await xdgSurfaceEvent(serial)
 
-                if self.state.frame_counter == 0 {
+                if self.state.side == nil {
                     print("First frame")
+                    self.state.side = .front
                     try await renderNextFrame()
                 }
             default:
@@ -258,35 +259,36 @@ extension WaylandClientSession {
 
 extension WaylandClientSession {
 
-    internal func renderNextFrame() async throws {
+    internal mutating func renderNextFrame() async throws {
         let prev = self.state.lastFrame.duration(to: ContinuousClock.now)
         self.state.lastFrame = ContinuousClock.now
         print("Frame time: \(prev)")
         let width = self.state._width
         let height = self.state._height
 
-        let side: Side = self.state.frame_counter % 2 == 0 ? .front : .back
-        let bufferId: UInt32 = (side == .front) ? self.state.front_buffer_id! : self.state.back_buffer_id!
+        let bufferId: UInt32 = (self.state.side == .front) ? self.state.front_buffer_id! : self.state.back_buffer_id!
 
         let start = ContinuousClock.now
-        self.state.shared_canvas.draw(side, width: width, height: height)
+        self.state.shared_canvas.update(width: width, height: height)
+        self.state.shared_canvas.draw(self.state.side!, width: width, height: height)
         let end = ContinuousClock.now
         let drawTime = start.duration(to: end)
-        print("Draw time: \(drawTime), \(drawTime < prev), \(side)")
 
         try await wayland_wl_surface_attach(bufferId)
         try await wayland_wl_surface_damage_buffer(width: UInt32(width), height: UInt32(height))
 
         try await wayland_wl_surface_frame()
         try await wayland_wl_surface_commit()
-
-        self.state.frame_counter += 1
-        print(
-            "Frame count: \(self.state.frame_counter), width:\(width), height:\(height)"
-        )
+        print("[\(self.state.side!)]Draw time: \(drawTime), width: \(width), height: \(height)")
+        switch self.state.side! {
+        case .front:
+            self.state.side = .back
+        case .back:
+            self.state.side = .front
+        }
     }
 
-    private func wayland_wl_surface_frame() async throws {
+    private mutating func wayland_wl_surface_frame() async throws {
         let callbackId = self.state.nextId()
         self.state.frame_callback_id = callbackId
 
@@ -302,13 +304,13 @@ extension WaylandClientSession {
         try await outbound.write(msg)
     }
 
-    private func wayland_wl_destroy_callback(id: UInt32) async throws {
+    private mutating func wayland_wl_destroy_callback(id: UInt32) async throws {
         let msg = WaylandMessage(object: id, opcode: 0)
         try await outbound.write(msg)
         self.state.frame_callback_id = nil
     }
 
-    func setupSurfacePoolAndBuffer() async throws {
+    mutating func setupSurfacePoolAndBuffer() async throws {
         do {
             self.state.wl_surface_object_id = self.state.nextId()
             try await setupSurface(id: self.state.wl_surface_object_id!)
@@ -350,7 +352,7 @@ extension WaylandClientSession {
         print("Surface setup Complete")
     }
 
-    func registryEvent(_ message: WaylandMessage) async throws {
+    mutating func registryEvent(_ message: WaylandMessage) async throws {
         guard message.object == self.state.wayland_wl_registry_id else {
             return
         }
@@ -448,7 +450,7 @@ extension WaylandClientSession {
         try await outbound.write(msg)
     }
 
-    private func poolCreateBuffer(
+    private mutating func poolCreateBuffer(
         _ pool_id: UInt32, offset: UInt32, width: UInt32, height: UInt32
     ) async throws
         -> UInt32
@@ -473,7 +475,7 @@ extension WaylandClientSession {
         return bufferId
     }
 
-    private func createPool(fd: Int, buffer_size: UInt32) async throws -> UInt32 {
+    private mutating func createPool(fd: Int, buffer_size: UInt32) async throws -> UInt32 {
         var contents = ByteBuffer()
         let pool_id = self.state.nextId()
         contents.writeInteger(pool_id, endianness: .little, as: UInt32.self)
