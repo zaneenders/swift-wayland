@@ -111,7 +111,18 @@ extension WaylandClientSession {
                             logger.error("Unable to decode input: \(String(describing: message.message))")
                             return
                         }
-                        logger.trace("Input: \(message.opcode), \(serialNumber) \(timeStamp) \(keycode) \(state)")
+                        switch keycode {
+                        case 36:  // j
+                            self.state.shared_canvas.move(.down, state == 1)
+                        case 37:  // k
+                            self.state.shared_canvas.move(.right, state == 1)
+                        case 33:  // f
+                            self.state.shared_canvas.move(.up, state == 1)
+                        case 32:  // d
+                            self.state.shared_canvas.move(.left, state == 1)
+                        default:
+                            logger.trace("Input: \(message.opcode), \(serialNumber) \(timeStamp) \(keycode) \(state)")
+                        }
                     case 4:  // modifier keys
                         var contents = message.message!
                         guard let serialNumber = contents.readInteger(endianness: .little, as: UInt32.self),

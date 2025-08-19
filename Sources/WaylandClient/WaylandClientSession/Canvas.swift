@@ -9,6 +9,7 @@ enum Side {
 }
 
 struct Canvas: ~Copyable {
+
     let fd: FD
     private let fp: UnsafeMutablePointer<UInt32>
     private let bp: UnsafeMutablePointer<UInt32>
@@ -17,6 +18,13 @@ struct Canvas: ~Copyable {
     private let scale: Int
 
     private var enties: [(Int, Int)]
+
+    private var gx: Int
+    private var gy: Int
+    private var movingLeft: Bool = false
+    private var movingRight: Bool = false
+    private var movingUp: Bool = false
+    private var movingDown: Bool = false
 
     init(bytes: Int, scale: Int) {
         self.scale = scale
@@ -32,9 +40,44 @@ struct Canvas: ~Copyable {
             let dy = Int.random(in: 0...200)
             enties.append((dx, dy))
         }
+        self.gx = 20
+        self.gy = 20
+    }
+
+    enum Direction {
+        case up
+        case down
+        case left
+        case right
+    }
+
+    mutating func move(_ dir: Direction, _ state: Bool) {
+        switch dir {
+        case .up:
+            self.movingUp = state
+        case .down:
+            self.movingDown = state
+        case .left:
+            self.movingLeft = state
+        case .right:
+            self.movingRight = state
+        }
     }
 
     mutating func update(width: Int, height: Int) {
+        let rate = 10
+        if movingUp {
+            self.gy -= rate
+        }
+        if movingDown {
+            self.gy += rate
+        }
+        if movingLeft {
+            self.gx -= rate
+        }
+        if movingRight {
+            self.gx += rate
+        }
         var new: [(Int, Int)] = []
         for (x, y) in enties {
             let dx = Int.random(in: -50...50)
@@ -84,7 +127,7 @@ struct Canvas: ~Copyable {
                     }
                 }
                 if !foundEntity {
-                    if y > 20 && y < 200 && x > 20 && x < 200 {
+                    if y > gy && y < (gy + 200) && x > gx && x < (gx + 200) {
                         buffer[i] = 0xFF_00_FF_00
                     } else {
                         buffer[i] = 0xFF_00_FF_FF
