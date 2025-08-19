@@ -4,3 +4,7 @@ enum WaylandSetupError: Error {
     case connect
     case unableToSetupSurface
 }
+
+enum WaylandShutdownError: Error {
+    case shutdown
+}

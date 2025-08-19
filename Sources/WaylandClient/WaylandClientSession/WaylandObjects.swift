@@ -15,12 +15,16 @@ enum NamedObjects: Hashable {
     enum Wayland: Hashable {
         case display
         case registry
-        case seat
+        case seat(Seat)
         case shm  // shared memory
         case xdg_wm_base
         case compositor
         case output
         case surface
+    }
+    enum Seat: Hashable {
+        case object
+        case keyboard
     }
 }
 

@@ -75,9 +75,60 @@ extension WaylandClientSession {
                 }
             case .wayland(.registry):
                 try await registryEvent(message)
-            case .wayland(.seat):
-                logger.trace(
-                    "wl_seat_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
+            case .wayland(.seat(let seat)):
+                switch seat {
+                case .object:
+                    switch message.opcode {
+                    case 0:
+                        var contents = message.message!
+                        guard let mask = contents.readInteger(endianness: .little, as: UInt32.self) else {
+                            logger.error("Unable to decode capablities mask")
+                            return
+                        }
+                        let pointer = (mask & 1) > 0
+                        let keyboard = (mask & 2) > 0
+                        if keyboard {
+                            try await setupKeyboard()
+                        }
+                        let touch = (mask & 4) > 0
+                        logger.trace(
+                            "wl_seat_object_id[\(message.object)]: \(message.opcode), mask: \(String(mask, radix: 2)), pointer: \(pointer) keyboard: \(keyboard), touch: \(touch)"
+                        )
+                    default:
+                        logger.trace(
+                            "wl_seat_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))"
+                        )
+                    }
+                case .keyboard:
+                    switch message.opcode {
+                    case 3:
+                        var contents = message.message!
+                        guard let serialNumber = contents.readInteger(endianness: .little, as: UInt32.self),
+                            let timeStamp = contents.readInteger(endianness: .little, as: UInt32.self),
+                            let keycode = contents.readInteger(endianness: .little, as: UInt32.self),
+                            let state = contents.readInteger(endianness: .little, as: UInt32.self)
+                        else {
+                            logger.error("Unable to decode input: \(String(describing: message.message))")
+                            return
+                        }
+                        logger.trace("Input: \(message.opcode), \(serialNumber) \(timeStamp) \(keycode) \(state)")
+                    case 4:  // modifier keys
+                        var contents = message.message!
+                        guard let serialNumber = contents.readInteger(endianness: .little, as: UInt32.self),
+                            let depressed = contents.readInteger(endianness: .little, as: UInt32.self),
+                            let latched = contents.readInteger(endianness: .little, as: UInt32.self),
+                            let locked = contents.readInteger(endianness: .little, as: UInt32.self),
+                            let group = contents.readInteger(endianness: .little, as: UInt32.self)
+                        else {
+                            logger.error("Unable to decode input: \(String(describing: message.message))")
+                            return
+                        }
+                        logger.trace(
+                            "Input: \(message.opcode), \(serialNumber) \(depressed) \(latched) \(locked) \(group)")
+                    default:
+                        logger.trace("Input: \(message.opcode), \(String(describing: message.message))")
+                    }
+                }
             case .wayland(.shm):
                 logger.trace(
                     "wl_shm_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
@@ -202,6 +253,9 @@ extension WaylandClientSession {
                     try await wayland_wl_destroy_buffer(prevBack)
 
                     logger.trace("xdg_top_surface_id[\(id)]: width: \(width), height: \(height)")
+                case 1:
+                    logger.trace("Closing down")
+                    throw WaylandShutdownError.shutdown
                 default:
                     logger.trace(
                         "xdg_top_surface_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))"
@@ -430,6 +484,25 @@ extension WaylandClientSession {
             logger.trace(
                 "wayland_wl_registry_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
         }
+    }
+
+    private mutating func setupKeyboard() async throws {
+        let keyboardId = self.state.nextId()
+        self.state.objects[.wayland(.seat(.keyboard))] = keyboardId
+        let seat = self.state.objects[.wayland(.seat(.object))]!
+        let contents = {
+            var _contents = ByteBuffer()
+            _contents.writeInteger(keyboardId, endianness: .little, as: UInt32.self)
+            return _contents
+        }()
+
+        let wayland_wl_seat_get_keyboard_opcode: UInt16 = 1
+        let message = WaylandMessage(
+            object: seat,
+            opcode: wayland_wl_seat_get_keyboard_opcode,
+            message: contents
+        )
+        try await outbound.write(message)
     }
 
     private func wayland_wl_destroy_buffer(

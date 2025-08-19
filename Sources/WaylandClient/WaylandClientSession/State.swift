@@ -39,7 +39,7 @@ extension WaylandClientSession {
         mutating func update(_ interface_name: String, _ object: UInt32) {
             switch interface_name {
             case "wl_seat":
-                self.objects[.wayland(.seat)] = object
+                self.objects[.wayland(.seat(.object))] = object
             case "wl_shm":
                 self.objects[.wayland(.shm)] = object
             case "xdg_wm_base":
