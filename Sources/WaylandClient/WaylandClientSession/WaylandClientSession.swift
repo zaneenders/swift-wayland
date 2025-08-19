@@ -174,31 +174,32 @@ extension WaylandClientSession {
                         logger.error("xdg_top_surface_id[\(id)]: failed, height")
                         return
                     }
+                    let pool_id = self.state.objects[.pool]!
 
-                    let prevFront = self.state.front_buffer_id
-                    let prevBack = self.state.back_buffer_id
+                    let prevFront = self.state.objects[.frontBuffer]!
+                    let prevBack = self.state.objects[.backBuffer]!
 
                     let front = try await poolCreateBuffer(
-                        self.state.pool_id!,
+                        pool_id,
                         offset: 0,
                         width: width * self.state.scale,
                         height: height * self.state.scale)
-                    self.state.set(front: front)
+                    self.state.objects[.frontBuffer] = front
 
                     let back = try await poolCreateBuffer(
-                        self.state.pool_id!,
+                        pool_id,
                         offset: self.state.bufferBytes,
                         width: width * self.state.scale,
                         height: height * self.state.scale)
-                    self.state.set(back: back)
+                    self.state.objects[.backBuffer] = back
 
                     let w = Int(width)
                     let h = Int(height)
                     self.state._width = w
                     self.state._height = h
 
-                    try await wayland_wl_destroy_buffer(prevFront!)
-                    try await wayland_wl_destroy_buffer(prevBack!)
+                    try await wayland_wl_destroy_buffer(prevFront)
+                    try await wayland_wl_destroy_buffer(prevBack)
 
                     logger.trace("xdg_top_surface_id[\(id)]: width: \(width), height: \(height)")
                 default:
@@ -206,12 +207,7 @@ extension WaylandClientSession {
                         "xdg_top_surface_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))"
                     )
                 }
-            default:
-                fatalError("remove default: \(object)")
-            }
-        } else {
-            switch message.object {
-            case self.state.front_buffer_id, self.state.back_buffer_id:
+            case .frontBuffer, .backBuffer:
                 switch message.opcode {
                 case 0:
                     logger.trace(
@@ -219,7 +215,13 @@ extension WaylandClientSession {
                 default:
                     logger.trace("unhandled buffer opcode: \(message.opcode)")
                 }
-            case self.state.frame_callback_id:
+            case .pool:
+                logger.trace(
+                    "poolId[\(message.object)]: \(message.opcode) \(String(describing: message.message))"
+                )
+            case .other(let name):
+                fatalError("object named: \(name) not handeld")
+            case .frameCallback:
                 switch message.opcode {
                 case 0:
                     logger.trace(
@@ -229,21 +231,21 @@ extension WaylandClientSession {
                 default:
                     logger.trace("Unhandled callback opcode: \(message.opcode)")
                 }
-            default:
-                guard var copy = message.message else {
-                    logger.trace(
-                        "unhandled: Object: \(message.object), opcode: \(message.opcode), length: \(message.length)")
-                    return
-                }
-                var c2 = copy
-                let c3 = copy
-                logger.trace(
-                    """
-                    unhandled: Object: \(message.object), opcode: \(message.opcode), 
-                    UInt32: \(String(describing: copy.readInteger(endianness: .little, as: UInt32.self))) \(String(describing: c2.readInteger(endianness: .big, as: UInt32.self)))"
-                    String: \(c3.description)
-                    """)
             }
+        } else {
+            guard var copy = message.message else {
+                logger.trace(
+                    "unhandled: Object: \(message.object), opcode: \(message.opcode), length: \(message.length)")
+                return
+            }
+            var c2 = copy
+            let c3 = copy
+            logger.trace(
+                """
+                unhandled: Object: \(message.object), opcode: \(message.opcode), 
+                UInt32: \(String(describing: copy.readInteger(endianness: .little, as: UInt32.self))) \(String(describing: c2.readInteger(endianness: .big, as: UInt32.self)))"
+                String: \(c3.description)
+                """)
 
         }
         // State transtions
@@ -297,7 +299,8 @@ extension WaylandClientSession {
         let width = self.state._width
         let height = self.state._height
 
-        let bufferId: UInt32 = (self.state.side == .front) ? self.state.front_buffer_id! : self.state.back_buffer_id!
+        let bufferId: UInt32 =
+            (self.state.side == .front) ? self.state.objects[.frontBuffer]! : self.state.objects[.backBuffer]!
 
         let start = ContinuousClock.now
         self.state.shared_canvas.update(width: width, height: height)
@@ -323,7 +326,7 @@ extension WaylandClientSession {
 
     private mutating func wayland_wl_surface_frame() async throws {
         let callbackId = self.state.nextId()
-        self.state.frame_callback_id = callbackId
+        self.state.objects[.frameCallback] = callbackId
 
         var contents = ByteBuffer()
         contents.writeInteger(callbackId, endianness: .little, as: UInt32.self)
@@ -341,7 +344,7 @@ extension WaylandClientSession {
     private mutating func wayland_wl_destroy_callback(id: UInt32) async throws {
         let msg = WaylandMessage(object: id, opcode: 0)
         try await outbound.write(msg)
-        self.state.frame_callback_id = nil
+        self.state.objects.removeValue(forKey: .frameCallback)
     }
 
     mutating func setupSurfacePoolAndBuffer() async throws {
@@ -364,21 +367,21 @@ extension WaylandClientSession {
             let pool_id = try await createPool(
                 fd: Int(self.state.shared_canvas.fd),
                 buffer_size: UInt32(pool_size))
-            self.state.setPool(pool_id)
+            self.state.objects[.pool] = pool_id
 
             let front = try await poolCreateBuffer(
-                self.state.pool_id!,
+                pool_id,
                 offset: 0,
                 width: bWidth,
                 height: bHeight)
-            self.state.set(front: front)
+            self.state.objects[.frontBuffer] = front
 
             let back = try await poolCreateBuffer(
-                self.state.pool_id!,
+                pool_id,
                 offset: half,
                 width: bWidth,
                 height: bHeight)
-            self.state.set(back: back)
+            self.state.objects[.backBuffer] = back
         } catch {
             logger.critical("\(error)")
             throw WaylandSetupError.unableToSetupSurface

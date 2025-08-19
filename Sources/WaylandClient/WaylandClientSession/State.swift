@@ -19,6 +19,7 @@ extension WaylandClientSession {
         let bufferBytes: UInt32
         let poolSize: UInt32
         var side: Side? = nil
+        var lastFrame = ContinuousClock.now.advanced(by: .milliseconds(-100))
 
         init() {
             self.objects[1] = .wayland(.display)
@@ -28,24 +29,6 @@ extension WaylandClientSession {
             self.poolSize = bufferBytes * 2
             self.shared_canvas = Canvas(bytes: Int(self.poolSize), scale: Int(scale))
         }
-
-        private(set) var pool_id: UInt32? = nil
-        mutating func setPool(_ pool_id: UInt32) {
-            self.pool_id = pool_id
-        }
-
-        private(set) var back_buffer_id: UInt32? = nil
-        mutating func set(back buffer: UInt32) {
-            self.back_buffer_id = buffer
-        }
-
-        var frame_callback_id: UInt32? = nil
-        private(set) var front_buffer_id: UInt32? = nil
-        mutating func set(front buffer: UInt32) {
-            self.front_buffer_id = buffer
-        }
-
-        var lastFrame = ContinuousClock.now.advanced(by: .milliseconds(-100))
 
         mutating func nextId() -> UInt32 {
             // TODO: solve wrap around
