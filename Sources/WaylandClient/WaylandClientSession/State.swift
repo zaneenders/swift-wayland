@@ -1,24 +1,12 @@
 extension WaylandClientSession {
 
     struct State: ~Copyable {
-
         private var wayland_current_object_id: UInt32 = 1
-
-        let wayland_display_object_id: UInt32 = 1
-        var wayland_wl_registry_id: UInt32? = nil
-
-        var wl_seat_object_id: UInt32? = nil
-        var wl_shm_object_id: UInt32? = nil
-        var wl_xdg_wm_base_object_id: UInt32? = nil
-        var wl_compositor_object_id: UInt32? = nil
-        var wl_output_object_id: UInt32? = nil
-        var wl_surface_object_id: UInt32? = nil
-        var xdg_surface_object_id: UInt32? = nil
-        var xdg_top_surface_id: UInt32? = nil
+        var objects = WaylandObjects()
+        var shared_canvas: Canvas
 
         var _height: Int = 800
         var _width: Int = 1280
-        var shared_canvas: Canvas
 
         let screen_height: UInt32 = 800
         let screen_width: UInt32 = 1280
@@ -33,6 +21,7 @@ extension WaylandClientSession {
         var side: Side? = nil
 
         init() {
+            self.objects[1] = .wayland(.display)
             self.bufferWidth = screen_width * scale
             self.bufferHeight = screen_height * scale
             self.bufferBytes = bufferWidth * bufferHeight * stride
@@ -67,27 +56,31 @@ extension WaylandClientSession {
         mutating func update(_ interface_name: String, _ object: UInt32) {
             switch interface_name {
             case "wl_seat":
-                self.wl_seat_object_id = object
+                self.objects[.wayland(.seat)] = object
             case "wl_shm":
-                self.wl_shm_object_id = object
+                self.objects[.wayland(.shm)] = object
             case "xdg_wm_base":
-                self.wl_xdg_wm_base_object_id = object
+                self.objects[.wayland(.xdg_wm_base)] = object
             case "wl_compositor":
-                self.wl_compositor_object_id = object
+                self.objects[.wayland(.compositor)] = object
             case "wl_output":
-                self.wl_output_object_id = object
+                self.objects[.wayland(.output)] = object
             default:
                 ()
             }
         }
 
         var surfaceComplete: Bool {
-            self.xdg_top_surface_id != nil && self.xdg_surface_object_id != nil && self.wl_surface_object_id != nil
+            self.objects[.xdg(.top_surface)] != nil
+                && self.objects[.xdg(.surface)] != nil
+                && self.objects[.wayland(.surface)] != nil
         }
 
         var bindComplete: Bool {
-            self.wl_surface_object_id == nil && self.wl_compositor_object_id != nil && self.wl_shm_object_id != nil
-                && self.wl_xdg_wm_base_object_id != nil
+            self.objects[.wayland(.surface)] == nil
+                && self.objects[.wayland(.compositor)] != nil
+                && self.objects[.wayland(.shm)] != nil
+                && self.objects[.wayland(.xdg_wm_base)] != nil
         }
     }
 }
