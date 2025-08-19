@@ -38,9 +38,10 @@ extension WaylandClientSession {
         var contents = ByteBuffer()
         contents.writeInteger(id, endianness: .little, as: UInt32.self)
         let id = self.state.objects[.wayland(.display)]!
+        let get_registry: UInt16 = 1
         let message = WaylandMessage(
             object: id,
-            opcode: WaylandOpCodes.get_registry.value,
+            opcode: get_registry,
             message: contents)
         try await outbound.write(message)
     }
@@ -55,7 +56,7 @@ extension WaylandClientSession {
             switch object {
             case .wayland(.display):
                 switch message.opcode {
-                case WaylandOpCodes.error.value:
+                case 0:  // error
                     var contents = message.message!
                     let errorMessage = contents.readString(length: roundup4(contents.readableBytes))
                     logger.error("Fatal wl_display error: \(String(describing: errorMessage)). Terminating.")
@@ -82,7 +83,7 @@ extension WaylandClientSession {
                     "wl_shm_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
             case .wayland(.xdg_wm_base):
                 switch message.opcode {
-                case WaylandOpCodes.wayland_xdg_wm_base_event_ping.value:
+                case 0:  // ping
                     var copy = message.message!
                     guard let serial = copy.readInteger(endianness: .little, as: UInt32.self) else {
                         logger.error("xdg_wm_base ping: missing serial")
@@ -138,7 +139,7 @@ extension WaylandClientSession {
                     "wl_surface_object_id[\(message.object)]: \(message.opcode) \(String(describing: message.message))")
             case .xdg(.surface):
                 switch message.opcode {
-                case WaylandOpCodes.wayland_xdg_surface_event_configure.value:
+                case 0:
                     logger.trace("xdg_surface configure event received. Sending ack.")
                     var copy = message.message!
                     guard let serial = copy.readInteger(endianness: .little, as: UInt32.self) else {
@@ -256,9 +257,10 @@ extension WaylandClientSession {
         var contents = ByteBuffer()
         contents.writeInteger(serial, endianness: .little, as: UInt32.self)
         let id = self.state.objects[.wayland(.xdg_wm_base)]!
+        let wayland_xdg_wm_base_event_pong: UInt16 = 2
         let message = WaylandMessage(
             object: id,
-            opcode: WaylandOpCodes.wayland_xdg_wm_base_event_pong.value,
+            opcode: wayland_xdg_wm_base_event_pong,
             message: contents
         )
         try await outbound.write(message)
@@ -266,16 +268,14 @@ extension WaylandClientSession {
 
     private func handleWlSurfaceEvent(_ message: WaylandMessage) async throws {
         switch message.opcode {
-        case WlSurfaceOpCodes.enter.rawValue:
+        case 5:  // enter
             var copy = message.message!
             guard let outputId = copy.readInteger(endianness: .little, as: UInt32.self) else {
                 logger.error("wl_surface.enter event: missing output ID")
                 return
             }
             logger.trace("wl_surface.enter event received for output ID: \(outputId)")
-        case WlSurfaceOpCodes.leave.rawValue:
-            // This is a wl_surface.leave event.
-            // The message payload is a wl_output ID.
+        case 6:  // leave
             var copy = message.message!
             guard let outputId = copy.readInteger(endianness: .little, as: UInt32.self) else {
                 logger.error("wl_surface.leave event: missing output ID")
@@ -391,7 +391,7 @@ extension WaylandClientSession {
             return
         }
         switch message.opcode {
-        case WaylandOpCodes.registry_event_global.value:
+        case 0:
             guard var buffer = message.message,
                 let name = buffer.readInteger(endianness: .little, as: UInt32.self),
                 let interface_length = buffer.readInteger(endianness: .little, as: UInt32.self),
@@ -518,9 +518,10 @@ extension WaylandClientSession {
         contents.writeInteger(pool_id, endianness: .little, as: UInt32.self)
         contents.writeInteger(buffer_size, endianness: .little, as: UInt32.self)
         let id = self.state.objects[.wayland(.shm)]!
+        let wayland_wl_shm_create_pool_opcode: UInt16 = 0
         let message = WaylandMessage(
             object: id,
-            opcode: WaylandOpCodes.wayland_wl_shm_create_pool_opcode.value,
+            opcode: wayland_wl_shm_create_pool_opcode,
             message: contents,
             fd: fd)
         try await outbound.write(message)
@@ -529,9 +530,10 @@ extension WaylandClientSession {
 
     private func surfaceCommit() async throws {
         let id = self.state.objects[.wayland(.surface)]!
+        let wayland_wl_surface_commit_opcode: UInt16 = 6
         let message = WaylandMessage(
             object: id,
-            opcode: WaylandOpCodes.wayland_wl_surface_commit_opcode.value)
+            opcode: wayland_wl_surface_commit_opcode)
         try await outbound.write(message)
     }
 
@@ -539,9 +541,10 @@ extension WaylandClientSession {
         var contents = ByteBuffer()
         contents.writeInteger(self.state.objects[.xdg(.top_surface)]!, endianness: .little, as: UInt32.self)
         let id = self.state.objects[.xdg(.surface)]!
+        let wayland_xdg_surface_get_toplevel_opcode: UInt16 = 1
         let message = WaylandMessage(
             object: id,
-            opcode: WaylandOpCodes.wayland_xdg_surface_get_toplevel_opcode.value, message: contents)
+            opcode: wayland_xdg_surface_get_toplevel_opcode, message: contents)
         try await outbound.write(message)
     }
 
@@ -551,9 +554,10 @@ extension WaylandClientSession {
         let surfaceID = self.state.objects[.wayland(.surface)]!
         contents.writeInteger(surfaceID, endianness: .little, as: UInt32.self)
         let xdgId = self.state.objects[.wayland(.xdg_wm_base)]!
+        let wayland_xdg_wm_base_get_xdg_surface_opcode: UInt16 = 2
         let message = WaylandMessage(
             object: xdgId,
-            opcode: WaylandOpCodes.wayland_xdg_wm_base_get_xdg_surface_opcode.value, message: contents)
+            opcode: wayland_xdg_wm_base_get_xdg_surface_opcode, message: contents)
         try await outbound.write(message)
     }
 
@@ -561,9 +565,11 @@ extension WaylandClientSession {
         var contents = ByteBuffer()
         contents.writeInteger(id, endianness: .little, as: UInt32.self)
         let id = self.state.objects[.wayland(.compositor)]!
+        let wl_compositor_create_surface_opcode: UInt16 = 0
         let message = WaylandMessage(
             object: id,
-            opcode: WaylandOpCodes.wayland_wl_compositor_create_surface_opcode.value, message: contents)
+            opcode: wl_compositor_create_surface_opcode,
+            message: contents)
         try await outbound.write(message)
     }
 
@@ -571,9 +577,10 @@ extension WaylandClientSession {
         var contents = ByteBuffer()
         contents.writeInteger(value, endianness: .little, as: UInt32.self)
         let id = self.state.objects[.xdg(.surface)]!
+        let wayland_xdg_surface_ack_configure_opcode: UInt16 = 4
         let message = WaylandMessage(
             object: id,
-            opcode: WaylandOpCodes.wayland_xdg_surface_ack_configure_opcode.value,
+            opcode: wayland_xdg_surface_ack_configure_opcode,
             message: contents)
         try await outbound.write(message)
     }
@@ -588,9 +595,10 @@ extension WaylandClientSession {
         contents.writeString(out)
         contents.writeInteger(verison, endianness: .little, as: UInt32.self)
         contents.writeInteger(id, endianness: .little, as: UInt32.self)
+        let wl_registry_bind_opcode: UInt16 = 0
         let message = WaylandMessage(
             object: registry,
-            opcode: WaylandOpCodes.wayland_wl_registry_bind_opcode.value,
+            opcode: wl_registry_bind_opcode,
             message: contents)
         try await outbound.write(message)
     }
