@@ -1,18 +1,23 @@
 # Swift Wayland Client
 
-This is [Wayland](https://wayland-book.com/introduction.html) client app using 
-[Swift NIO](https://github.com/apple/swift-nio) and 
-[wayland from scratch](https://gaultier.github.io/blog/wayland_from_scratch.html)
- as a reference.
+A minimal graphics client using Wayland.
 
-## Run
+Currently I am using `wayland-client` to get this up and running but ideally 
+this will be down without this dependency.
+
+## Setup
+
+Install dependencies
 
 ```console
-swift run --swift-sdk aarch64-swift-linux-musl -c release
-# or
-swift run --swift-sdk x86_64-swift-linux-musl -c release
+sudo dnf install wayland-protocols-devel
 ```
 
-Requires Swift 6.2 and compatible with static Linux SDK. See 
-[install swift](https://www.swift.org/install/linux/) for help setting up 
-swift.
+## Dev
+
+Generate xdg-shell files from `protocols/xdg-shell.xml`
+
+```console
+wayland-scanner client-header < xdg-shell.xml > xdg-shell-client-protocol.h
+wayland-scanner private-code < xdg-shell.xml > xdg-shell-protocol.c
+```

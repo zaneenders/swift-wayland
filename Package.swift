@@ -1,27 +1,14 @@
 // swift-tools-version: 6.2
+
 import PackageDescription
 
 let package = Package(
     name: "swift-wayland",
-    dependencies: [
-        .package(
-            url: "https://github.com/zaneenders/swift-nio.git",
-            branch: "zane-add-cmsghdr")
-        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.4"),
-    ],
     targets: [
         .executableTarget(
-            name: "WaylandClient",
-            dependencies: [
-                .product(name: "NIOCore", package: "swift-nio"),
-                .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "Logging", package: "swift-log"),
-            ],
-            swiftSettings: [
-                .enableExperimentalFeature("Span"),
-                .enableExperimentalFeature("ValueGenerics"),
-                .enableExperimentalFeature("LifetimeDependence"),
-                // .strictMemorySafety(), // TODO formatting bug
+            name: "SwiftWayland",
+            linkerSettings: [
+                .linkedLibrary("wayland-client")
             ]
         )
     ]
