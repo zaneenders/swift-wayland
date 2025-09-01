@@ -8,7 +8,10 @@ let package = Package(
         .executableTarget(
             name: "SwiftWayland",
             linkerSettings: [
-                .linkedLibrary("wayland-client")
+                .linkedLibrary("wayland-client"),
+                .linkedLibrary("wayland-egl"),
+                .linkedLibrary("EGL"),
+                .linkedLibrary("GLESv2"),
             ]
         )
     ]
