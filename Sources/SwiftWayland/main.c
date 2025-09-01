@@ -1,4 +1,3 @@
-
 #include "xdg-shell-client-protocol.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -16,14 +15,20 @@
 
 struct client_state {
   struct wl_display *wl_display;
+  struct wl_registry *wl_registry;
   struct wl_compositor *wl_compositor;
   struct wl_surface *wl_surface;
   struct wl_shm *wl_shm;
   struct xdg_wm_base *xdg_wm_base;
   struct xdg_surface *xdg_surface;
   struct xdg_toplevel *xdg_toplevel;
+
+  struct wl_seat *seat;
+  struct wl_pointer *pointer;
+  struct wl_keyboard *keyboard;
   int width, height;
   bool closed;
+
   EGLDisplay egl_display;
   EGLContext egl_context;
   EGLSurface egl_surface;
@@ -178,6 +183,154 @@ static bool init_gl(struct client_state *state) {
   return true;
 }
 
+static void pointer_enter(void *data, struct wl_pointer *pointer,
+                          uint32_t serial, struct wl_surface *surface,
+                          wl_fixed_t sx, wl_fixed_t sy) {
+  printf("Pointer entered at %f,%f\n", wl_fixed_to_double(sx),
+         wl_fixed_to_double(sy));
+}
+
+static void pointer_leave(void *data, struct wl_pointer *pointer,
+                          uint32_t serial, struct wl_surface *surface) {
+  printf("Pointer left surface\n");
+}
+
+static void pointer_motion(void *data, struct wl_pointer *pointer,
+                           uint32_t time, wl_fixed_t sx, wl_fixed_t sy) {
+  printf("Pointer motion: %f,%f\n", wl_fixed_to_double(sx),
+         wl_fixed_to_double(sy));
+}
+
+static void pointer_button(void *data, struct wl_pointer *pointer,
+                           uint32_t serial, uint32_t time, uint32_t button,
+                           uint32_t state_w) {
+  printf("Button %u %s\n", button,
+         state_w == WL_POINTER_BUTTON_STATE_PRESSED ? "pressed" : "released");
+}
+
+static void pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time,
+                         uint32_t axis, wl_fixed_t value) {
+  printf("Scroll %d: %f\n", axis, wl_fixed_to_double(value));
+}
+
+static void pointer_frame(void *data, struct wl_pointer *pointer) {
+  // Called after a group of axis/button/motion events
+  // You can use this to process batched input
+  // For now, just stub it:
+  // printf("Pointer frame\n");
+}
+
+static void pointer_axis_source(void *data, struct wl_pointer *pointer,
+                                uint32_t axis_source) {
+  // axis_source = WL_POINTER_AXIS_SOURCE_WHEEL / FINGER / CONTINUOUS /
+  // WHEEL_TILT
+}
+
+static void pointer_axis_stop(void *data, struct wl_pointer *pointer,
+                              uint32_t time, uint32_t axis) {
+  // End of scrolling
+}
+
+static void pointer_axis_discrete(void *data, struct wl_pointer *pointer,
+
+                                  uint32_t axis, int32_t discrete) {
+  // For wheel events that are discrete steps
+}
+
+static const struct wl_pointer_listener pointer_listener = {
+    .enter = pointer_enter,
+    .leave = pointer_leave,
+    .motion = pointer_motion,
+    .button = pointer_button,
+    .axis = pointer_axis,
+    .frame = pointer_frame,
+    .axis_source = pointer_axis_source,
+    .axis_stop = pointer_axis_stop,
+    .axis_discrete = pointer_axis_discrete,
+};
+
+static void keyboard_keymap(void *data, struct wl_keyboard *keyboard,
+                            uint32_t format, int fd, uint32_t size) {
+  printf("%p", data);
+}
+
+static void keyboard_enter(void *data, struct wl_keyboard *keyboard,
+                           uint32_t serial, struct wl_surface *surface,
+                           struct wl_array *keys) {
+  printf("Keyboard focus entered\n");
+}
+
+static void keyboard_leave(void *data, struct wl_keyboard *keyboard,
+                           uint32_t serial, struct wl_surface *surface) {
+  printf("Keyboard focus left\n");
+}
+
+static void keyboard_key(void *data, struct wl_keyboard *keyboard,
+                         uint32_t serial, uint32_t time, uint32_t key,
+                         uint32_t state_w) {
+  printf("Key %u %s\n", key,
+         state_w == WL_KEYBOARD_KEY_STATE_PRESSED ? "down" : "up");
+  if (state_w == WL_KEYBOARD_KEY_STATE_PRESSED) {
+    printf("%i", key);
+  }
+}
+
+static void keyboard_modifiers(void *data, struct wl_keyboard *keyboard,
+                               uint32_t serial, uint32_t depressed,
+                               uint32_t latched, uint32_t locked,
+                               uint32_t group) {
+  // update xkb_state here
+}
+
+static void keyboard_repeat_info(void *data, struct wl_keyboard *keyboard,
+                                 int32_t rate, int32_t delay) {
+  printf("Keyboard repeat info: rate=%d, delay=%d\n", rate, delay);
+}
+
+static const struct wl_keyboard_listener keyboard_listener = {
+    .keymap = keyboard_keymap,
+    .enter = keyboard_enter,
+    .leave = keyboard_leave,
+    .key = keyboard_key,
+    .modifiers = keyboard_modifiers,
+    .repeat_info = keyboard_repeat_info,
+};
+
+static void seat_handle_capabilities(void *data, struct wl_seat *seat,
+                                     uint32_t caps) {
+  struct client_state *state = data;
+
+  if (caps & WL_SEAT_CAPABILITY_POINTER) {
+    if (!state->pointer) {
+      state->pointer = wl_seat_get_pointer(seat);
+      wl_pointer_add_listener(state->pointer, &pointer_listener, state);
+    }
+  } else if (state->pointer) {
+    wl_pointer_destroy(state->pointer);
+    state->pointer = NULL;
+  }
+
+  if (caps & WL_SEAT_CAPABILITY_KEYBOARD) {
+    if (!state->keyboard) {
+      state->keyboard = wl_seat_get_keyboard(seat);
+      wl_keyboard_add_listener(state->keyboard, &keyboard_listener, state);
+    }
+  } else if (state->keyboard) {
+    wl_keyboard_destroy(state->keyboard);
+    state->keyboard = NULL;
+  }
+}
+
+static void seat_handle_name(void *data, struct wl_seat *seat,
+                             const char *name) {
+  printf("Seat name: %s\n", name);
+}
+
+static const struct wl_seat_listener seat_listener = {
+    .capabilities = seat_handle_capabilities,
+    .name = seat_handle_name,
+};
+
 static void xdg_wm_base_ping(void *data, struct xdg_wm_base *xdg_wm_base,
                              uint32_t serial) {
   xdg_wm_base_pong(xdg_wm_base, serial);
@@ -321,6 +474,9 @@ static void registry_handle_global(void *data, struct wl_registry *registry,
   } else if (strcmp(interface, "xdg_wm_base") == 0) {
     state->xdg_wm_base =
         wl_registry_bind(registry, name, &xdg_wm_base_interface, version);
+  } else if (strcmp(interface, wl_seat_interface.name) == 0) {
+    state->seat = wl_registry_bind(registry, name, &wl_seat_interface, 7);
+    wl_seat_add_listener(state->seat, &seat_listener, state);
   }
 }
 
@@ -408,7 +564,6 @@ int main(int argc, char *argv[]) {
   eglDestroyContext(state.egl_display, state.egl_context);
   eglTerminate(state.egl_display);
   wl_surface_destroy(state.wl_surface);
-  //  wl_registry_destroy(state.registry);
   wl_display_disconnect(state.wl_display);
   return 0;
 }
