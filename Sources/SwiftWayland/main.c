@@ -62,15 +62,37 @@ static GLuint compile_shader(GLenum type, const char *src) {
   return shader;
 }
 
-static void init_shaders() {
-  const char *vs_src =
-      "attribute vec2 pos; void main() { gl_Position = vec4(pos, 0.0, 1.0); }";
-  const char *fs_src =
-      "precision mediump float; uniform float u_anim; void main() { "
-      "gl_FragColor = vec4(u_anim, 0.3, 1.0-u_anim, 1.0); }";
+static char *load_file(const char *path) {
+  FILE *f = fopen(path, "rb");
+  if (!f) {
+    fprintf(stderr, "Failed to open %s\n", path);
+    return NULL;
+  }
+  fseek(f, 0, SEEK_END);
+  long len = ftell(f);
+  rewind(f);
 
-  GLuint vs = compile_shader(GL_VERTEX_SHADER, vs_src);
-  GLuint fs = compile_shader(GL_FRAGMENT_SHADER, fs_src);
+  char *buf = malloc(len + 1);
+  if (!buf) {
+    fprintf(stderr, "Out of memory reading %s\n", path);
+    fclose(f);
+    return NULL;
+  }
+
+  fread(buf, 1, len, f);
+  buf[len] = '\0'; // Null-terminate
+  fclose(f);
+  return buf;
+}
+
+static GLuint compile_shader_from(GLenum type, const char *path) {
+  char *src = load_file(path);
+  return compile_shader(type, src);
+}
+
+static void init_shaders() {
+  GLuint vs = compile_shader_from(GL_VERTEX_SHADER, "shaders/vertex.glsl");
+  GLuint fs = compile_shader_from(GL_FRAGMENT_SHADER, "shaders/fragment.glsl");
 
   program = glCreateProgram();
   glAttachShader(program, vs);
@@ -135,6 +157,7 @@ static void draw_frame(double ms) {
   glUniform1f(loc, anim_value);
 
   GLint apos = glGetAttribLocation(program, "pos");
+
   glEnableVertexAttribArray(apos);
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glVertexAttribPointer(apos, 2, GL_FLOAT, GL_FALSE, 0, 0);
@@ -294,7 +317,7 @@ static void init_egl(struct wl_surface *wl_surface) {
     exit(1);
   }
 
-  EGLint ctx_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
+  EGLint ctx_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
   egl_context =
       eglCreateContext(egl_display, config, EGL_NO_CONTEXT, ctx_attribs);
   if (egl_context == EGL_NO_CONTEXT) {
