@@ -38,65 +38,48 @@ static int win_h = 480;
 static bool running = true;
 static bool configured = false;
 
-static GLuint textTex = 0;
-static int text_w_px = 0;
-static int text_h_px = 0;
 static float pixel_scale = 12.0f;
+// Normalzed Device Cordinates (NDC)
+static float ndc_scale = 2.0f;
 
-static void make_text_bitmap_Scribe(unsigned char **out, int *w, int *h) {
-  // 5x7 monospace glyphs for only the letters we need: S, c, r, i, b, e
-  // Each row is 5 chars '0'/'1'; 7 rows per glyph; 1 column spacing between
-  // glyphs.
+#define GLYPH_W 5
+#define GLYPH_H 7
+#define GLYPH_SPACING 1
+#define FIRST_CHAR 32
+#define LAST_CHAR 126
+#define NUM_CHARS (LAST_CHAR - FIRST_CHAR + 1)
 
-  // Uppercase S (5x7)
-  static const char *G_S[7] = {"01110", "10001", "10000", "01110",
-                               "00001", "10001", "01110"};
-  // Lowercase c
-  static const char *G_c[7] = {"00000", "00000", "01110", "10000",
-                               "10000", "10001", "01110"};
-  // Lowercase r
-  static const char *G_r[7] = {"00000", "00000", "10110", "11001",
-                               "10000", "10000", "10000"};
-  // Lowercase i
-  static const char *G_i[7] = {"00100", "00000", "01100", "00100",
-                               "00100", "00100", "01110"};
-  // Lowercase b
-  static const char *G_b[7] = {"10000", "10000", "11110", "10001",
-                               "10001", "10001", "11110"};
-  // Lowercase e
-  static const char *G_e[7] = {"00000", "00000", "01110", "10001",
-                               "11111", "10000", "01110"};
+static GLuint fontTexture = 0;
+static int atlas_w, atlas_h;
 
-  const char **glyphs[6] = {G_S, G_c, G_r, G_i, G_b, G_e};
-  const int gw = 5, gh = 7, space = 1; // 1 column spacing between glyphs
-  const int n = 6;
+struct Glyph {
+  const char *rows[GLYPH_H];
+};
 
-  *w = n * gw + (n - 1) * space;
-  *h = gh;
-  unsigned char *img = (unsigned char *)calloc((text_w_px) * (text_h_px), 1);
+static struct Glyph font5x7[128];
 
-  int xoff = 0;
-  for (int g = 0; g < n; ++g) {
-    for (int y = 0; y < gh; ++y) {
-      for (int x = 0; x < gw; ++x) {
-        char bit = glyphs[g][y][x];
-        img[y * (*w) + (xoff + x)] = (bit == '1') ? 255 : 0;
+static void create_font_atlas() {
+  atlas_w = NUM_CHARS * (GLYPH_W + GLYPH_SPACING);
+  atlas_h = GLYPH_H;
+  unsigned char *img = calloc(atlas_w * atlas_h, 1);
+
+  for (int c = FIRST_CHAR; c <= LAST_CHAR; ++c) {
+    struct Glyph *g = &font5x7[c];
+    int xoff = (c - FIRST_CHAR) * (GLYPH_W + GLYPH_SPACING);
+    for (int y = 0; y < GLYPH_H; ++y) {
+      for (int x = 0; x < GLYPH_W; ++x) {
+        if (g->rows[0]) { // defined glyph?
+          char bit = g->rows[y][x];
+          img[y * atlas_w + xoff + x] = (bit == '1') ? 255 : 0;
+        }
       }
     }
-    xoff += gw + ((g < n - 1) ? space : 0);
   }
-  *out = img;
-}
 
-static void create_text_texture(void) {
-  unsigned char *img = NULL;
-  make_text_bitmap_Scribe(&img, &text_w_px, &text_h_px);
-
-  glGenTextures(1, &textTex);
-  glBindTexture(GL_TEXTURE_2D, textTex);
-
+  glGenTextures(1, &fontTexture);
+  glBindTexture(GL_TEXTURE_2D, fontTexture);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, text_w_px, text_h_px, 0, GL_RED,
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, atlas_w, atlas_h, 0, GL_RED,
                GL_UNSIGNED_BYTE, img);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -106,37 +89,75 @@ static void create_text_texture(void) {
   free(img);
 }
 
-static void update_text_quad(void) {
-  // desired on-screen size in pixels
-  float w_px = text_w_px * pixel_scale;
-  float h_px = text_h_px * pixel_scale;
+static void get_glyph_uv(char c, float *u0, float *v0, float *u1, float *v1) {
+  if (c < FIRST_CHAR || c > LAST_CHAR)
+    c = ' ';
+  int idx = c - FIRST_CHAR;
+  int xoff = idx * (GLYPH_W + GLYPH_SPACING);
+  *u0 = (float)xoff / atlas_w;
+  *u1 = (float)(xoff + GLYPH_W) / atlas_w;
+  *v0 = 0.0f;
+  *v1 = (float)GLYPH_H / atlas_h;
+}
 
-  // convert to Normalized Device Coordinates (NDC) extents
-  float half_w_ndc =
-      (w_px / win_w) * 1.0f; // 2*half_w_ndc would be width in NDC
-  float half_h_ndc = (h_px / win_h) * 1.0f;
+void draw_string(const char *text, float x_ndc, float y_ndc, float scale) {
+  glBindTexture(GL_TEXTURE_2D, fontTexture);
 
-  // Keep exact pixel mapping for crispness: compute NDC from exact pixel
-  // centers
-  float left = -(w_px / (float)win_w);
-  float right = (w_px / (float)win_w);
-  float top = (h_px / (float)win_h);
-  float bottom = -(h_px / (float)win_h);
+  float cursor = x_ndc;
+  for (int i = 0; text[i]; ++i) {
+    float u0, v0, u1, v1;
+    get_glyph_uv(text[i], &u0, &v0, &u1, &v1);
 
-  // Full quad centered; UVs cover [0,1]
-  const GLfloat verts[] = {
-      //   x,      y,    u,  v
-      left, bottom, 0.0f, 1.0f, right, bottom, 1.0f, 1.0f,
-      left, top,    0.0f, 0.0f, right, top,    1.0f, 0.0f,
-  };
-  glBindBuffer(GL_ARRAY_BUFFER, vertextBufferObject);
-  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts);
+    float w = (GLYPH_W * scale) / (float)win_w * ndc_scale;
+    float h = (GLYPH_H * scale) / (float)win_h * ndc_scale;
+
+    float x0 = cursor;
+    float x1 = cursor + w;
+    float y0 = y_ndc;
+    float y1 = y_ndc + h;
+
+    GLfloat verts[] = {
+        x0, y0, u0, v1, x1, y0, u1, v1, x0, y1, u0, v0, x1, y1, u1, v0,
+    };
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertextBufferObject);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts);
+    glBindVertexArray(vertexArrayObject);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+    float spacing = (GLYPH_SPACING * scale) / (float)win_w * ndc_scale;
+    cursor += w + spacing;
+  }
+}
+
+// 5x7 monospace glyphs for only the letters we need: S, c, r, i, b, e
+// Each row is 5 chars '0'/'1'; 7 rows per glyph; 1 column spacing between
+// glyphs.
+static void init_font() {
+  // Uppercase S (5x7)
+  font5x7['S'] = (struct Glyph){
+      {"01110", "10001", "10000", "01110", "00001", "10001", "01110"}};
+  // Lowercase c
+  font5x7['c'] = (struct Glyph){
+      {"00000", "00000", "01110", "10000", "10000", "10001", "01110"}};
+  // Lowercase r
+  font5x7['r'] = (struct Glyph){
+      {"00000", "00000", "10110", "11001", "10000", "10000", "10000"}};
+  // Lowercase i
+  font5x7['i'] = (struct Glyph){
+      {"00100", "00000", "01100", "00100", "00100", "00100", "01110"}};
+  // Lowercase b
+  font5x7['b'] = (struct Glyph){
+      {"10000", "10000", "11110", "10001", "10001", "10001", "11110"}};
+  // Lowercase e
+  font5x7['e'] = (struct Glyph){
+      {"00000", "00000", "01110", "10001", "11111", "10000", "01110"}};
 }
 
 static char *load_file(const char *path) {
   FILE *f = fopen(path, "rb");
   if (!f) {
-    fprintf(stderr, "Failed to open %s\n", path);
+    fprintf(stderr, "Failed to open: %s\n", path);
     return NULL;
   }
   fseek(f, 0, SEEK_END);
@@ -145,7 +166,7 @@ static char *load_file(const char *path) {
 
   char *buf = malloc(len + 1);
   if (!buf) {
-    fprintf(stderr, "Out of memory reading %s\n", path);
+    fprintf(stderr, "Out of memory reading: %s\n", path);
     fclose(f);
     return NULL;
   }
@@ -173,7 +194,9 @@ static GLuint compile_shader(GLenum type, const char *src) {
 
 static GLuint compile_shader_from(GLenum type, const char *path) {
   char *src = load_file(path);
-  return compile_shader(type, src);
+  GLuint shader = compile_shader(type, src);
+  free(src);
+  return shader;
 }
 
 static void init_shaders() {
@@ -194,35 +217,29 @@ static void init_shaders() {
   }
   glDeleteShader(vs);
   glDeleteShader(fs);
+}
 
-  create_text_texture();
-
-  static const GLuint indices[] = {0, 1, 2, 2, 1, 3};
-
+static void setup_buffers() {
   glGenVertexArrays(1, &vertexArrayObject);
   glBindVertexArray(vertexArrayObject);
 
   glGenBuffers(1, &vertextBufferObject);
   glBindBuffer(GL_ARRAY_BUFFER, vertextBufferObject);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 16, NULL,
-               GL_DYNAMIC_DRAW); // will fill in update_text_quad()
+  glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 16, NULL, GL_DYNAMIC_DRAW);
 
   glGenBuffers(1, &elementBufferObject);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferObject);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
+
+  static const GLuint quad_indices[] = {0, 1, 2, 2, 1, 3};
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quad_indices), quad_indices,
                GL_STATIC_DRAW);
 
-  // attribute 0: positions (xy)
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 4,
                         (GLvoid *)0);
-
-  // attribute 1: texcoords (uv)
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 4,
                         (GLvoid *)(sizeof(GLfloat) * 2));
-
-  update_text_quad();
 
   glBindVertexArray(0);
 
@@ -238,15 +255,13 @@ static void draw_frame() {
   glUseProgram(program);
 
   glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, textTex);
-  // shader uses sampler2D uTex at location 0 by default; set it once:
+  glBindTexture(GL_TEXTURE_2D, fontTexture);
+
   GLint loc = glGetUniformLocation(program, "uTex");
   if (loc >= 0)
     glUniform1i(loc, 0);
 
-  glBindVertexArray(vertexArrayObject);
-  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (GLvoid *)0);
-  glBindVertexArray(0);
+  draw_string("Scribe", -0.7f, 0.0f, pixel_scale);
 
   eglSwapBuffers(egl_display, egl_surface);
 }
@@ -325,7 +340,6 @@ static void xdg_toplevel_configure(void *data, struct xdg_toplevel *tl,
     if (egl_window) {
       wl_egl_window_resize(egl_window, win_w, win_h, 0, 0);
       glBindVertexArray(vertexArrayObject);
-      update_text_quad();
       glBindVertexArray(0);
     }
   }
@@ -429,6 +443,11 @@ static void init_egl(struct wl_surface *wl_surface) {
     exit(1);
   }
 
+  if (!eglBindAPI(EGL_OPENGL_ES_API)) {
+    fprintf(stderr, "eglBindAPI(EGL_OPENGL_ES_API) failed\n");
+    exit(1);
+  }
+
   EGLint ctx_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
   egl_context =
       eglCreateContext(egl_display, config, EGL_NO_CONTEXT, ctx_attribs);
@@ -488,6 +507,9 @@ int main() {
 
   init_egl(surface);
   init_shaders();
+  setup_buffers();
+  init_font();
+  create_font_atlas();
 
   while (running && wl_display_dispatch(display) != -1) {
     // noop
