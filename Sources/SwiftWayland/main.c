@@ -11,20 +11,21 @@
 #include <wayland-client.h>
 #include <wayland-egl.h>
 
+static GLuint program = 0;
+static GLuint vertextBufferObject = 0;
+static GLuint vertexArrayObject = 0;
+static GLuint elementBufferObject = 0;
+
 static struct wl_display *display;
 static struct wl_registry *registry;
 static struct wl_compositor *compositor;
 static struct xdg_wm_base *wm_base;
-static struct wl_seat *seat;
-static struct wl_keyboard *keyboard;
-
 static struct wl_surface *surface;
 static struct xdg_surface *xdg_surface;
 static struct xdg_toplevel *xdg_toplevel;
 static struct wl_callback *frame_callback;
-
-static bool running = true;
-static bool configured = false;
+static struct wl_seat *seat;
+static struct wl_keyboard *keyboard;
 
 static struct wl_egl_window *egl_window;
 static EGLDisplay egl_display;
@@ -34,24 +35,102 @@ static EGLSurface egl_surface;
 static int win_w = 640;
 static int win_h = 480;
 
-static GLuint program = 0;
-static GLuint vertextBufferObject = 0;
-static GLuint vertexArrayObject = 0;
-static GLuint elementBufferObject = 0;
+static bool running = true;
+static bool configured = false;
 
-static GLuint compile_shader(GLenum type, const char *src) {
-  GLuint shader = glCreateShader(type);
-  glShaderSource(shader, 1, &src, NULL);
-  glCompileShader(shader);
-  GLint ok;
-  glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
-  if (!ok) {
-    char log[512];
-    glGetShaderInfoLog(shader, sizeof(log), NULL, log);
-    fprintf(stderr, "Shader compile error: %s\n", log);
-    exit(1);
+static GLuint textTex = 0;
+static int text_w_px = 0;
+static int text_h_px = 0;
+static float pixel_scale = 12.0f;
+
+static void make_text_bitmap_Scribe(unsigned char **out, int *w, int *h) {
+  // 5x7 monospace glyphs for only the letters we need: S, c, r, i, b, e
+  // Each row is 5 chars '0'/'1'; 7 rows per glyph; 1 column spacing between
+  // glyphs.
+
+  // Uppercase S (5x7)
+  static const char *G_S[7] = {"01110", "10001", "10000", "01110",
+                               "00001", "10001", "01110"};
+  // Lowercase c
+  static const char *G_c[7] = {"00000", "00000", "01110", "10000",
+                               "10000", "10001", "01110"};
+  // Lowercase r
+  static const char *G_r[7] = {"00000", "00000", "10110", "11001",
+                               "10000", "10000", "10000"};
+  // Lowercase i
+  static const char *G_i[7] = {"00100", "00000", "01100", "00100",
+                               "00100", "00100", "01110"};
+  // Lowercase b
+  static const char *G_b[7] = {"10000", "10000", "11110", "10001",
+                               "10001", "10001", "11110"};
+  // Lowercase e
+  static const char *G_e[7] = {"00000", "00000", "01110", "10001",
+                               "11111", "10000", "01110"};
+
+  const char **glyphs[6] = {G_S, G_c, G_r, G_i, G_b, G_e};
+  const int gw = 5, gh = 7, space = 1; // 1 column spacing between glyphs
+  const int n = 6;
+
+  *w = n * gw + (n - 1) * space;
+  *h = gh;
+  unsigned char *img = (unsigned char *)calloc((text_w_px) * (text_h_px), 1);
+
+  int xoff = 0;
+  for (int g = 0; g < n; ++g) {
+    for (int y = 0; y < gh; ++y) {
+      for (int x = 0; x < gw; ++x) {
+        char bit = glyphs[g][y][x];
+        img[y * (*w) + (xoff + x)] = (bit == '1') ? 255 : 0;
+      }
+    }
+    xoff += gw + ((g < n - 1) ? space : 0);
   }
-  return shader;
+  *out = img;
+}
+
+static void create_text_texture(void) {
+  unsigned char *img = NULL;
+  make_text_bitmap_Scribe(&img, &text_w_px, &text_h_px);
+
+  glGenTextures(1, &textTex);
+  glBindTexture(GL_TEXTURE_2D, textTex);
+
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, text_w_px, text_h_px, 0, GL_RED,
+               GL_UNSIGNED_BYTE, img);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+  free(img);
+}
+
+static void update_text_quad(void) {
+  // desired on-screen size in pixels
+  float w_px = text_w_px * pixel_scale;
+  float h_px = text_h_px * pixel_scale;
+
+  // convert to Normalized Device Coordinates (NDC) extents
+  float half_w_ndc =
+      (w_px / win_w) * 1.0f; // 2*half_w_ndc would be width in NDC
+  float half_h_ndc = (h_px / win_h) * 1.0f;
+
+  // Keep exact pixel mapping for crispness: compute NDC from exact pixel
+  // centers
+  float left = -(w_px / (float)win_w);
+  float right = (w_px / (float)win_w);
+  float top = (h_px / (float)win_h);
+  float bottom = -(h_px / (float)win_h);
+
+  // Full quad centered; UVs cover [0,1]
+  const GLfloat verts[] = {
+      //   x,      y,    u,  v
+      left, bottom, 0.0f, 1.0f, right, bottom, 1.0f, 1.0f,
+      left, top,    0.0f, 0.0f, right, top,    1.0f, 0.0f,
+  };
+  glBindBuffer(GL_ARRAY_BUFFER, vertextBufferObject);
+  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts);
 }
 
 static char *load_file(const char *path) {
@@ -75,6 +154,21 @@ static char *load_file(const char *path) {
   buf[len] = '\0'; // Null-terminate
   fclose(f);
   return buf;
+}
+
+static GLuint compile_shader(GLenum type, const char *src) {
+  GLuint shader = glCreateShader(type);
+  glShaderSource(shader, 1, &src, NULL);
+  glCompileShader(shader);
+  GLint ok;
+  glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+  if (!ok) {
+    char log[512];
+    glGetShaderInfoLog(shader, sizeof(log), NULL, log);
+    fprintf(stderr, "Shader compile error: %s\n", log);
+    exit(1);
+  }
+  return shader;
 }
 
 static GLuint compile_shader_from(GLenum type, const char *path) {
@@ -101,96 +195,39 @@ static void init_shaders() {
   glDeleteShader(vs);
   glDeleteShader(fs);
 
-  static const GLfloat pointData[] = {
-      // first quad (4 vertices)
-      // bottom-left
-      0.0f,
-      0.0f,
-      0.0f,
-      1.0f,
-      0.0f,
-      0.0f,
-      // bottom-right
-      1.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      1.0f,
-      0.0f,
-      // top-left
-      0.0f,
-      1.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      1.0f,
-      // top-right
-      1.0f,
-      1.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      1.0f,
+  create_text_texture();
 
-      // second quad (4 vertices)
-      // bottom-left
-      -1.0f,
-      -1.0f,
-      0.0f,
-      1.0f,
-      0.0f,
-      0.0f,
-      // bottom-right
-      0.0f,
-      -1.0f,
-      0.0f,
-      0.0f,
-      1.0f,
-      0.0f,
-      // top-left
-      -1.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      1.0f,
-      // top-right
-      0.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      1.0f,
-  };
-
-  static const GLuint indices[] = {
-      2, 0, 1, 1, 3, 2, // first quad
-      6, 4, 5, 5, 7, 6  // second quad
-  };
+  static const GLuint indices[] = {0, 1, 2, 2, 1, 3};
 
   glGenVertexArrays(1, &vertexArrayObject);
   glBindVertexArray(vertexArrayObject);
 
   glGenBuffers(1, &vertextBufferObject);
   glBindBuffer(GL_ARRAY_BUFFER, vertextBufferObject);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(pointData), pointData, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 16, NULL,
+               GL_DYNAMIC_DRAW); // will fill in update_text_quad()
 
   glGenBuffers(1, &elementBufferObject);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferObject);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
                GL_STATIC_DRAW);
 
-  // attribute 0: positions (xyz)
+  // attribute 0: positions (xy)
   glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 6,
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 4,
                         (GLvoid *)0);
 
-  // attribute 1: colors (rgb)
+  // attribute 1: texcoords (uv)
   glEnableVertexAttribArray(1);
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 6,
-                        (GLvoid *)(sizeof(GLfloat) * 3));
+  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 4,
+                        (GLvoid *)(sizeof(GLfloat) * 2));
+
+  update_text_quad();
 
   glBindVertexArray(0);
+
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 static void draw_frame() {
@@ -199,8 +236,16 @@ static void draw_frame() {
   glClear(GL_COLOR_BUFFER_BIT);
 
   glUseProgram(program);
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, textTex);
+  // shader uses sampler2D uTex at location 0 by default; set it once:
+  GLint loc = glGetUniformLocation(program, "uTex");
+  if (loc >= 0)
+    glUniform1i(loc, 0);
+
   glBindVertexArray(vertexArrayObject);
-  glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, (GLvoid *)0);
+  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (GLvoid *)0);
   glBindVertexArray(0);
 
   eglSwapBuffers(egl_display, egl_surface);
@@ -277,8 +322,12 @@ static void xdg_toplevel_configure(void *data, struct xdg_toplevel *tl,
   if (width > 0 && height > 0) {
     win_w = width;
     win_h = height;
-    if (egl_window)
+    if (egl_window) {
       wl_egl_window_resize(egl_window, win_w, win_h, 0, 0);
+      glBindVertexArray(vertexArrayObject);
+      update_text_quad();
+      glBindVertexArray(0);
+    }
   }
 }
 
