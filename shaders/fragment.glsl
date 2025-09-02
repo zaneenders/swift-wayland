@@ -1,7 +1,9 @@
-#version 310 es
+#version 300 es
 precision mediump float;
-uniform float u_anim;
-out vec4 fragColor;
+
+in vec3 v_vertexColors;
+out vec4 color;
+
 void main() {
-    fragColor = vec4(u_anim, 0.3, 1.0 - u_anim, 1.0);
+  color = vec4(v_vertexColors, 1.0);
 }

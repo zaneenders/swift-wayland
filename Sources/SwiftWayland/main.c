@@ -1,13 +1,12 @@
 #include "xdg-shell-client-protocol.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#include <GLES2/gl2.h>
+#include <GLES3/gl3.h>
 #include <linux/input-event-codes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
@@ -35,17 +34,10 @@ static EGLSurface egl_surface;
 static int win_w = 640;
 static int win_h = 480;
 
-static double start_time = 0.0;
-static float anim_value = 0.0f;
-
 static GLuint program = 0;
-static GLuint vbo = 0;
-
-static double get_time_ms() {
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  return ts.tv_sec * 1000.0 + ts.tv_nsec / 1.0e6;
-}
+static GLuint vertextBufferObject = 0;
+static GLuint vertexArrayObject = 0;
+static GLuint elementBufferObject = 0;
 
 static GLuint compile_shader(GLenum type, const char *src) {
   GLuint shader = glCreateShader(type);
@@ -109,11 +101,109 @@ static void init_shaders() {
   glDeleteShader(vs);
   glDeleteShader(fs);
 
-  GLfloat verts[] = {0.0f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f};
+  static const GLfloat pointData[] = {
+      // first quad (4 vertices)
+      // bottom-left
+      0.0f,
+      0.0f,
+      0.0f,
+      1.0f,
+      0.0f,
+      0.0f,
+      // bottom-right
+      1.0f,
+      0.0f,
+      0.0f,
+      0.0f,
+      1.0f,
+      0.0f,
+      // top-left
+      0.0f,
+      1.0f,
+      0.0f,
+      0.0f,
+      0.0f,
+      1.0f,
+      // top-right
+      1.0f,
+      1.0f,
+      0.0f,
+      0.0f,
+      0.0f,
+      1.0f,
 
-  glGenBuffers(1, &vbo);
-  glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+      // second quad (4 vertices)
+      // bottom-left
+      -1.0f,
+      -1.0f,
+      0.0f,
+      1.0f,
+      0.0f,
+      0.0f,
+      // bottom-right
+      0.0f,
+      -1.0f,
+      0.0f,
+      0.0f,
+      1.0f,
+      0.0f,
+      // top-left
+      -1.0f,
+      0.0f,
+      0.0f,
+      0.0f,
+      0.0f,
+      1.0f,
+      // top-right
+      0.0f,
+      0.0f,
+      0.0f,
+      0.0f,
+      0.0f,
+      1.0f,
+  };
+
+  static const GLuint indices[] = {
+      2, 0, 1, 1, 3, 2, // first quad
+      6, 4, 5, 5, 7, 6  // second quad
+  };
+
+  glGenVertexArrays(1, &vertexArrayObject);
+  glBindVertexArray(vertexArrayObject);
+
+  glGenBuffers(1, &vertextBufferObject);
+  glBindBuffer(GL_ARRAY_BUFFER, vertextBufferObject);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(pointData), pointData, GL_STATIC_DRAW);
+
+  glGenBuffers(1, &elementBufferObject);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferObject);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
+               GL_STATIC_DRAW);
+
+  // attribute 0: positions (xyz)
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 6,
+                        (GLvoid *)0);
+
+  // attribute 1: colors (rgb)
+  glEnableVertexAttribArray(1);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 6,
+                        (GLvoid *)(sizeof(GLfloat) * 3));
+
+  glBindVertexArray(0);
+}
+
+static void draw_frame() {
+  glViewport(0, 0, win_w, win_h);
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  glUseProgram(program);
+  glBindVertexArray(vertexArrayObject);
+  glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, (GLvoid *)0);
+  glBindVertexArray(0);
+
+  eglSwapBuffers(egl_display, egl_surface);
 }
 
 static void xdg_wm_base_ping(void *data, struct xdg_wm_base *xdg_wm_base,
@@ -145,30 +235,6 @@ static const struct wl_registry_listener registry_listener = {
     .global_remove = registry_global_remove,
 };
 
-static void draw_frame(double ms) {
-  anim_value = (float)fmod(ms / 3000.0, 1.0);
-
-  glViewport(0, 0, win_w, win_h);
-  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-  glClear(GL_COLOR_BUFFER_BIT);
-
-  glUseProgram(program);
-  GLint loc = glGetUniformLocation(program, "u_anim");
-  glUniform1f(loc, anim_value);
-
-  GLint apos = glGetAttribLocation(program, "pos");
-
-  glEnableVertexAttribArray(apos);
-  glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glVertexAttribPointer(apos, 2, GL_FLOAT, GL_FALSE, 0, 0);
-
-  glDrawArrays(GL_TRIANGLES, 0, 3);
-
-  glDisableVertexAttribArray(apos);
-
-  eglSwapBuffers(egl_display, egl_surface);
-}
-
 static void frame_done(void *data, struct wl_callback *callback, uint32_t time);
 static const struct wl_callback_listener frame_listener = {frame_done};
 
@@ -187,8 +253,7 @@ static void frame_done(void *data, struct wl_callback *callback,
   if (!configured)
     return;
 
-  double ms = get_time_ms() - start_time;
-  draw_frame(ms);
+  draw_frame();
   schedule_next_frame_and_commit();
 }
 
@@ -197,9 +262,7 @@ static void xdg_surface_configure(void *data, struct xdg_surface *xs,
   xdg_surface_ack_configure(xs, serial);
   if (!configured) {
     configured = true;
-    start_time = get_time_ms();
-    double ms = 0.0;
-    draw_frame(ms);
+    draw_frame();
     schedule_next_frame_and_commit();
   }
 }
@@ -308,7 +371,7 @@ static void init_egl(struct wl_surface *wl_surface) {
                              EGL_ALPHA_SIZE,
                              8,
                              EGL_RENDERABLE_TYPE,
-                             EGL_OPENGL_ES2_BIT,
+                             EGL_OPENGL_ES3_BIT_KHR,
                              EGL_NONE};
   EGLConfig config;
   EGLint n = 0;
