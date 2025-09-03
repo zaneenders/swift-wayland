@@ -11,11 +11,6 @@
 #include <wayland-client.h>
 #include <wayland-egl.h>
 
-static GLuint program = 0;
-static GLuint vertextBufferObject = 0;
-static GLuint vertexArrayObject = 0;
-static GLuint elementBufferObject = 0;
-
 static struct wl_display *display;
 static struct wl_registry *registry;
 static struct wl_compositor *compositor;
@@ -26,7 +21,6 @@ static struct xdg_toplevel *xdg_toplevel;
 static struct wl_callback *frame_callback;
 static struct wl_seat *seat;
 static struct wl_keyboard *keyboard;
-
 static struct wl_egl_window *egl_window;
 static EGLDisplay egl_display;
 static EGLContext egl_context;
@@ -38,9 +32,9 @@ static int win_h = 480;
 static bool running = true;
 static bool configured = false;
 
-static float pixel_scale = 12.0f;
 // Normalzed Device Cordinates (NDC)
 static float ndc_scale = 2.0f;
+static float pixel_scale = 12.0f;
 
 #define GLYPH_W 5
 #define GLYPH_H 7
@@ -49,8 +43,35 @@ static float ndc_scale = 2.0f;
 #define LAST_CHAR 126
 #define NUM_CHARS (LAST_CHAR - FIRST_CHAR + 1)
 
+static GLuint program = 0;
+static GLuint vertexArrayObject = 0;
 static GLuint fontTexture = 0;
+static GLuint whiteTexture = 0;
+static GLuint static_quad_vbo = 0;
+static GLuint instanceVBO = 0;
 static int atlas_w, atlas_h;
+
+struct Color {
+  GLfloat r;
+  GLfloat g;
+  GLfloat b;
+  GLfloat a;
+};
+
+struct RectInstance {
+  GLfloat dst_p0[2];
+  GLfloat dst_p1[2];
+  GLfloat texture_tl[2];
+  GLfloat texture_br[2];
+  struct Color color;
+};
+
+static const GLfloat quad_verts[8] = {
+    -1.0f, 1.0f,  // top-left
+    1.0f,  1.0f,  // top-right
+    -1.0f, -1.0f, // bottom-left
+    1.0f,  -1.0f, // bottom-right
+};
 
 struct Glyph {
   const char *rows[GLYPH_H];
@@ -61,16 +82,21 @@ static struct Glyph font5x7[128];
 static void create_font_atlas() {
   atlas_w = NUM_CHARS * (GLYPH_W + GLYPH_SPACING);
   atlas_h = GLYPH_H;
-  unsigned char *img = calloc(atlas_w * atlas_h, 1);
+
+  unsigned char *img = calloc(atlas_w * atlas_h * 4, 1);
 
   for (int c = FIRST_CHAR; c <= LAST_CHAR; ++c) {
     struct Glyph *g = &font5x7[c];
     int xoff = (c - FIRST_CHAR) * (GLYPH_W + GLYPH_SPACING);
     for (int y = 0; y < GLYPH_H; ++y) {
       for (int x = 0; x < GLYPH_W; ++x) {
-        if (g->rows[0]) { // defined glyph?
+        if (g->rows[0]) {
           char bit = g->rows[y][x];
-          img[y * atlas_w + xoff + x] = (bit == '1') ? 255 : 0;
+          int idx = (y * atlas_w + xoff + x) * 4;
+          img[idx + 0] = 255;                    // R
+          img[idx + 1] = 255;                    // G
+          img[idx + 2] = 255;                    // B
+          img[idx + 3] = (bit == '1') ? 255 : 0; // A
         }
       }
     }
@@ -79,8 +105,9 @@ static void create_font_atlas() {
   glGenTextures(1, &fontTexture);
   glBindTexture(GL_TEXTURE_2D, fontTexture);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, atlas_w, atlas_h, 0, GL_RED,
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, atlas_w, atlas_h, 0, GL_RGBA,
                GL_UNSIGNED_BYTE, img);
+
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -96,60 +123,21 @@ static void get_glyph_uv(char c, float *u0, float *v0, float *u1, float *v1) {
   int xoff = idx * (GLYPH_W + GLYPH_SPACING);
   *u0 = (float)xoff / atlas_w;
   *u1 = (float)(xoff + GLYPH_W) / atlas_w;
-  *v0 = 0.0f;
-  *v1 = (float)GLYPH_H / atlas_h;
+  *v0 = 1.0f - (float)GLYPH_H / atlas_h;
+  *v1 = 1.0f;
 }
 
-void draw_string(const char *text, float x_ndc, float y_ndc, float scale) {
-  glBindTexture(GL_TEXTURE_2D, fontTexture);
-
-  float cursor = x_ndc;
-  for (int i = 0; text[i]; ++i) {
-    float u0, v0, u1, v1;
-    get_glyph_uv(text[i], &u0, &v0, &u1, &v1);
-
-    float w = (GLYPH_W * scale) / (float)win_w * ndc_scale;
-    float h = (GLYPH_H * scale) / (float)win_h * ndc_scale;
-
-    float x0 = cursor;
-    float x1 = cursor + w;
-    float y0 = y_ndc;
-    float y1 = y_ndc + h;
-
-    GLfloat verts[] = {
-        x0, y0, u0, v1, x1, y0, u1, v1, x0, y1, u0, v0, x1, y1, u1, v0,
-    };
-
-    glBindBuffer(GL_ARRAY_BUFFER, vertextBufferObject);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts);
-    glBindVertexArray(vertexArrayObject);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-    float spacing = (GLYPH_SPACING * scale) / (float)win_w * ndc_scale;
-    cursor += w + spacing;
-  }
-}
-
-// 5x7 monospace glyphs for only the letters we need: S, c, r, i, b, e
-// Each row is 5 chars '0'/'1'; 7 rows per glyph; 1 column spacing between
-// glyphs.
 static void init_font() {
-  // Uppercase S (5x7)
   font5x7['S'] = (struct Glyph){
       {"01110", "10001", "10000", "01110", "00001", "10001", "01110"}};
-  // Lowercase c
   font5x7['c'] = (struct Glyph){
       {"00000", "00000", "01110", "10000", "10000", "10001", "01110"}};
-  // Lowercase r
   font5x7['r'] = (struct Glyph){
       {"00000", "00000", "10110", "11001", "10000", "10000", "10000"}};
-  // Lowercase i
   font5x7['i'] = (struct Glyph){
       {"00100", "00000", "01100", "00100", "00100", "00100", "01110"}};
-  // Lowercase b
   font5x7['b'] = (struct Glyph){
       {"10000", "10000", "11110", "10001", "10001", "10001", "11110"}};
-  // Lowercase e
   font5x7['e'] = (struct Glyph){
       {"00000", "00000", "01110", "10001", "11111", "10000", "01110"}};
 }
@@ -220,31 +208,49 @@ static void init_shaders() {
 }
 
 static void setup_buffers() {
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
   glGenVertexArrays(1, &vertexArrayObject);
   glBindVertexArray(vertexArrayObject);
 
-  glGenBuffers(1, &vertextBufferObject);
-  glBindBuffer(GL_ARRAY_BUFFER, vertextBufferObject);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 16, NULL, GL_DYNAMIC_DRAW);
-
-  glGenBuffers(1, &elementBufferObject);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferObject);
-
-  static const GLuint quad_indices[] = {0, 1, 2, 2, 1, 3};
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quad_indices), quad_indices,
-               GL_STATIC_DRAW);
+  glGenBuffers(1, &static_quad_vbo);
+  glBindBuffer(GL_ARRAY_BUFFER, static_quad_vbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(quad_verts), quad_verts, GL_STATIC_DRAW);
 
   glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 4,
-                        (GLvoid *)0);
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat),
+                        (void *)0);
+
+  glGenBuffers(1, &instanceVBO);
+  glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+  glBufferData(GL_ARRAY_BUFFER, 4000 * sizeof(struct RectInstance), NULL,
+               GL_DYNAMIC_DRAW);
+
   glEnableVertexAttribArray(1);
-  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 4,
-                        (GLvoid *)(sizeof(GLfloat) * 2));
+  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(struct RectInstance),
+                        (void *)offsetof(struct RectInstance, dst_p0));
+  glVertexAttribDivisor(1, 1);
 
-  glBindVertexArray(0);
+  glEnableVertexAttribArray(2);
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(struct RectInstance),
+                        (void *)offsetof(struct RectInstance, dst_p1));
+  glVertexAttribDivisor(2, 1);
 
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glEnableVertexAttribArray(3);
+  glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(struct RectInstance),
+                        (void *)offsetof(struct RectInstance, texture_tl));
+  glVertexAttribDivisor(3, 1);
+
+  glEnableVertexAttribArray(4);
+  glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(struct RectInstance),
+                        (void *)offsetof(struct RectInstance, texture_br));
+  glVertexAttribDivisor(4, 1);
+
+  glEnableVertexAttribArray(5);
+  glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(struct RectInstance),
+                        (void *)offsetof(struct RectInstance, color));
+  glVertexAttribDivisor(5, 1);
 }
 
 static void draw_frame() {
@@ -253,15 +259,74 @@ static void draw_frame() {
   glClear(GL_COLOR_BUFFER_BIT);
 
   glUseProgram(program);
+  GLint uResLoc = glGetUniformLocation(program, "uRes");
+  GLint uTexLoc = glGetUniformLocation(program, "uTex");
+  glUniform2f(uResLoc, (float)win_w, (float)win_h);
+  glUniform1i(uTexLoc, 0);
+
+  glBindVertexArray(vertexArrayObject);
+
+  struct RectInstance rects[64];
+  int n = 0;
+
+  rects[n++] = (struct RectInstance){.dst_p0 = {0, 0},
+                                     .dst_p1 = {win_w, 200},
+                                     .texture_tl = {0.0f, 0.0f},
+                                     .texture_br = {1.0f, 1.0f},
+                                     .color = {0.0f, 1.0f, 1.0f, 1.0f}};
+
+  rects[n++] = (struct RectInstance){.dst_p0 = {win_w, win_h - 200},
+                                     .dst_p1 = {0, win_h},
+                                     .texture_tl = {0.0f, 0.0f},
+                                     .texture_br = {1.0f, 1.0f},
+                                     .color = {0.5f, 1.0f, 0.5f, 1.0f}};
 
   glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, whiteTexture);
+
+  glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+  glBufferSubData(GL_ARRAY_BUFFER, 0, n * sizeof(struct RectInstance), rects);
+  glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, n);
+
+  // Draw Scribe
   glBindTexture(GL_TEXTURE_2D, fontTexture);
+  const char *msg = "Scribe";
+  int len = strlen(msg);
+  float scale = pixel_scale;
 
-  GLint loc = glGetUniformLocation(program, "uTex");
-  if (loc >= 0)
-    glUniform1i(loc, 0);
+  float text_w = 0.0f;
+  for (int i = 0; i < len; i++) {
+    text_w += GLYPH_W * scale + GLYPH_SPACING * scale;
+  }
+  if (len > 0)
+    text_w -= GLYPH_SPACING * scale;
 
-  draw_string("Scribe", -0.7f, 0.0f, pixel_scale);
+  float text_h = GLYPH_H * scale;
+
+  float pen_x = (win_w - text_w) * 0.5f;
+  float pen_y = (win_h - text_h) * 0.5f;
+
+  int tcount = 0;
+  for (int i = 0; msg[i] && tcount < 64; ++i) {
+    char c = msg[i];
+    float u0, v0, u1, v1;
+    get_glyph_uv(c, &u0, &v0, &u1, &v1);
+
+    float w = GLYPH_W * scale;
+    float h = GLYPH_H * scale;
+
+    rects[tcount++] = (struct RectInstance){.dst_p0 = {pen_x, pen_y},
+                                            .dst_p1 = {pen_x + w, pen_y + h},
+                                            .texture_tl = {u0, v0},
+                                            .texture_br = {u1, v1},
+                                            .color = {1.0f, 1.0f, 1.0f, 1.0f}};
+
+    pen_x += w + (GLYPH_SPACING * scale);
+  }
+
+  glBufferSubData(GL_ARRAY_BUFFER, 0, tcount * sizeof(struct RectInstance),
+                  rects);
+  glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, tcount);
 
   eglSwapBuffers(egl_display, egl_surface);
 }
@@ -476,6 +541,18 @@ static void init_egl(struct wl_surface *wl_surface) {
   eglSwapInterval(egl_display, 1);
 }
 
+static void create_white_texture(void) {
+  glGenTextures(1, &whiteTexture);
+  glBindTexture(GL_TEXTURE_2D, whiteTexture);
+  unsigned char px[4] = {255, 255, 255, 255};
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+               px);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
 int main() {
   display = wl_display_connect(NULL);
   if (!display) {
@@ -509,6 +586,7 @@ int main() {
   init_shaders();
   setup_buffers();
   init_font();
+  create_white_texture();
   create_font_atlas();
 
   while (running && wl_display_dispatch(display) != -1) {
