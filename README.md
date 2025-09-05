@@ -25,7 +25,7 @@ swift run
 Install wayland headers
 
 ```console
-sudo dnf install wayland-protocols-devel
+sudo dnf install -y wayland-devel wayland-protocols-devel mesa-libEGL-devel mesa-libGLES-devel
 ```
 
 Generate xdg-shell files from `protocols/xdg-shell.xml`

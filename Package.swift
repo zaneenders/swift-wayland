@@ -7,17 +7,51 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "SwiftWayland",
-            dependencies: ["CClient"],
+            dependencies: [
+                "CWaylandClient",
+                "CWaylandEGL",
+                "CEGL",
+                "CGLES3",
+                "CXDGShell",
+            ],
+            resources: [
+                .process("../../shaders/vertex.glsl"),
+                .process("../../shaders/fragment.glsl"),
+            ],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .systemLibrary(
+            name: "CWaylandClient",
+            pkgConfig: "wayland-client",
+            providers: [
+                .yum(["wayland-devel"])
+            ]
+        ),
+        .systemLibrary(
+            name: "CWaylandEGL",
+            pkgConfig: "wayland-egl",
+            providers: [
+                .yum(["wayland-protocols", "wayland-devel"])
+            ]
+        ),
+        .systemLibrary(
+            name: "CEGL",
+            pkgConfig: "egl",
+            providers: [
+                .yum(["mesa-libEGL-devel"])
+            ]
+        ),
+        .systemLibrary(
+            name: "CGLES3",
+            pkgConfig: "glesv3",
+            providers: [
+                .yum(["mesa-libGLES-devel"])
+            ]
         ),
         .target(
-            name: "CClient",
-            linkerSettings: [
-                .linkedLibrary("m"),
-                .linkedLibrary("wayland-client"),
-                .linkedLibrary("wayland-egl"),
-                .linkedLibrary("EGL"),
-                .linkedLibrary("GLESv2"),
-            ]
+            name: "CXDGShell",
+            path: "Sources/CXDGShell",
+            publicHeadersPath: "include",
         ),
     ]
 )
