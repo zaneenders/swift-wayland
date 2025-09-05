@@ -2,18 +2,31 @@
 
 A minimal graphics client using Wayland.
 
+## Note
+
 Currently I am using `wayland-client` to get this up and running but ideally 
 this will be down without this dependency.
 
 ## Setup
 
-Install dependencies
+Install Dependencies
+
+- Wayland compositor ([Hyprland](https://hypr.land/))
+- [Swift](https://www.swift.org/install)
+
+## Run
+
+```
+swift run
+```
+
+## Dev
+
+Install wayland headers
 
 ```console
 sudo dnf install wayland-protocols-devel
 ```
-
-## Dev
 
 Generate xdg-shell files from `protocols/xdg-shell.xml`
 
