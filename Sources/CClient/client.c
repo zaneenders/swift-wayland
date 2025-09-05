@@ -553,7 +553,7 @@ static void create_white_texture(void) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
-int main() {
+int start() {
   display = wl_display_connect(NULL);
   if (!display) {
     fprintf(stderr, "Failed to connect to Wayland display.\n");
