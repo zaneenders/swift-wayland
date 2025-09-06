@@ -70,10 +70,6 @@ internal enum Wayland {
     static let lastChar: UInt8 = 126
     static let charCount = Int(lastChar - firstChar + 1)
 
-    static var _wl_seat_interface: wl_interface = wl_seat_interface
-    static var _wl_compositor_interface: wl_interface = wl_compositor_interface
-    static var _xdg_wm_base_interface: wl_interface = xdg_wm_base_interface
-
     static func initEGL() {
         eglDisplay = eglGetDisplay(EGLNativeDisplayType(display))
         guard eglDisplay != nil else { fatalError("eglGetDisplay failed") }
@@ -415,6 +411,31 @@ internal enum Wayland {
         scheduleNextFrame()
     }
 
+    static var seatListener = wl_seat_listener(
+        capabilities: seat_capabilities_cb,
+        name: { _, _, _ in }
+    )
+
+    static var _wl_seat_interface: wl_interface = wl_seat_interface
+    static var _wl_compositor_interface: wl_interface = wl_compositor_interface
+    static var _xdg_wm_base_interface: wl_interface = xdg_wm_base_interface
+
+    static var xdgToplevelListener = xdg_toplevel_listener(
+        configure: xdg_toplevel_configure_cb,
+        close: { _, _ in },
+        configure_bounds: { _, _, _, _ in },
+        wm_capabilities: { _, _, _ in }
+    )
+
+    static var keyboard_listener = wl_keyboard_listener(
+        keymap: keyboard_keymap_cb,
+        enter: keyboard_enter_cb,
+        leave: keyboard_leave_cb,
+        key: keyboard_key_cb,
+        modifiers: keyboard_modifiers_cb,
+        repeat_info: keyboard_repeat_info_cb
+    )
+
     static func setup() {
         Task {
             display = wl_display_connect(nil)
@@ -496,20 +517,6 @@ internal enum Wayland {
             }
         }
 
-    static var seatListener = wl_seat_listener(
-        capabilities: seat_capabilities_cb,
-        name: { _, _, _ in }
-    )
-
-    static var keyboard_listener = wl_keyboard_listener(
-        keymap: keyboard_keymap_cb,
-        enter: keyboard_enter_cb,
-        leave: keyboard_leave_cb,
-        key: keyboard_key_cb,
-        modifiers: keyboard_modifiers_cb,
-        repeat_info: keyboard_repeat_info_cb
-    )
-
     static let onGlobal:
         @convention(c) (
             UnsafeMutableRawPointer?, OpaquePointer?, UInt32, UnsafePointer<CChar>?, UInt32
@@ -590,13 +597,6 @@ internal enum Wayland {
                 wl_keyboard_add_listener(keyboard, &keyboard_listener, nil)
             }
         }
-
-    static var xdgToplevelListener = xdg_toplevel_listener(
-        configure: xdg_toplevel_configure_cb,
-        close: { _, _ in },
-        configure_bounds: { _, _, _, _ in },
-        wm_capabilities: { _, _, _ in }
-    )
 }
 
 enum WaylandEvent {
