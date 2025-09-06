@@ -436,11 +436,11 @@ internal enum Wayland {
 
     static var keyboard_listener = wl_keyboard_listener(
         keymap: keyboard_keymap_cb,
-        enter: keyboard_enter_cb,
-        leave: keyboard_leave_cb,
+        enter: { _, _, _, _, _ in },
+        leave: { _, _, _, _ in },
         key: keyboard_key_cb,
-        modifiers: keyboard_modifiers_cb,
-        repeat_info: keyboard_repeat_info_cb
+        modifiers: { _, _, _, _, _, _, _ in },
+        repeat_info: { _, _, _, _ in }
     )
 
     static var seatListener = wl_seat_listener(
@@ -451,7 +451,7 @@ internal enum Wayland {
     static var _wl_seat_interface: wl_interface = wl_seat_interface
     static var _wl_compositor_interface: wl_interface = wl_compositor_interface
     static var _xdg_wm_base_interface: wl_interface = xdg_wm_base_interface
-    static var registryListener = wl_registry_listener(global: onGlobal, global_remove: onGlobalRemove)
+    static var registryListener = wl_registry_listener(global: onGlobal, global_remove: { _, _, _ in })
 
     static func setup() {
         Task {
@@ -543,12 +543,6 @@ internal enum Wayland {
             }
         }
 
-    static let onGlobalRemove:
-        @convention(c) (
-            UnsafeMutableRawPointer?, OpaquePointer?, UInt32
-        ) -> Void = { _, _, name in
-        }
-
     static let keyboard_keymap_cb:
         @convention(c) (
             UnsafeMutableRawPointer?, OpaquePointer?, UInt32, Int32, UInt32
@@ -556,35 +550,11 @@ internal enum Wayland {
             close(shared_fd)
         }
 
-    static let keyboard_enter_cb:
-        @convention(c) (
-            UnsafeMutableRawPointer?, OpaquePointer?, UInt32, OpaquePointer?, UnsafeMutablePointer<wl_array>?
-        ) -> Void = { _, _, _, _, _ in
-        }
-
-    static let keyboard_leave_cb:
-        @convention(c) (
-            UnsafeMutableRawPointer?, OpaquePointer?, UInt32, OpaquePointer?
-        ) -> Void = { _, _, _, _ in
-        }
-
     static let keyboard_key_cb:
         @convention(c) (
             UnsafeMutableRawPointer?, OpaquePointer?, UInt32, UInt32, UInt32, UInt32
         ) -> Void = { _, _, _, _, key, state in
             WaylandEvents.send(.key(code: key, state: state))
-        }
-
-    static let keyboard_modifiers_cb:
-        @convention(c) (
-            UnsafeMutableRawPointer?, OpaquePointer?, UInt32, UInt32, UInt32, UInt32, UInt32
-        ) -> Void = { _, _, _, _, _, _, _ in
-        }
-
-    static let keyboard_repeat_info_cb:
-        @convention(c) (
-            UnsafeMutableRawPointer?, OpaquePointer?, Int32, Int32
-        ) -> Void = { _, _, _, _ in
         }
 
     static let seat_capabilities_cb:
