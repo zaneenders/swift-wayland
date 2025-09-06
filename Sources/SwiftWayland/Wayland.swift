@@ -1,48 +1,43 @@
-@preconcurrency import CEGL
-@preconcurrency import CGLES3
-@preconcurrency import CWaylandClient
-@preconcurrency import CWaylandEGL
-@preconcurrency import CXDGShell
+import CEGL
+import CGLES3
+import CWaylandClient
+import CWaylandEGL
+import CXDGShell
 import Foundation
-
-@MainActor
-struct Glyph {
-    var rows: [String] = Array(repeating: "", count: Wayland.GLYPH_H)
-}
 
 @MainActor
 enum Wayland {
 
-    static var winW: Int32 = 800
-    static var winH: Int32 = 600
+    private static var start = ContinuousClock.now
+    private static var end = ContinuousClock.now
 
-    static var egl_display: EGLDisplay?
-    static var egl_context: EGLContext?
-    static var egl_surface: EGLSurface?
-    static var egl_window: OpaquePointer?
-    static let EGL_NO_CONTEXT: EGLContext? = EGLContext(bitPattern: 0)
-    static let EGL_NO_DISPLAY: EGLDisplay? = EGLDisplay(bitPattern: 0)
-    static let EGL_NO_SURFACE: EGLSurface? = EGLSurface(bitPattern: 0)
-    static var v: UInt32 = UInt32.max
+    static var stillRunning: Bool {
+        Core.running && wl_display_dispatch(Core.display) != -1
+    }
 
-    static let GLYPH_W = 5
-    static let GLYPH_H = 7
-    static let GLYPH_SPACING = 1
-    static let FIRST_CHAR: UInt8 = 32
-    static let LAST_CHAR: UInt8 = 126
-    static let NUM_CHARS = Int(LAST_CHAR - FIRST_CHAR + 1)
-    static var program: GLuint = 0
-    static var vao: GLuint = 0
-    static var fontTex: GLuint = 0
-    static var whiteTex: GLuint = 0
-    static var quadVBO: GLuint = 0
-    static var instanceVBO: GLuint = 0
-    static var atlasW = 0
-    static var atlasH = 0
-    static var font5x7 = Array(repeating: Glyph(), count: 128)
+    static func drawFrame(word: String) {
+        Core._drawFrame(word)
+        end = ContinuousClock.now
+        print(end - start)
+        start = ContinuousClock.now
+    }
+
+    static func setupWayland() {
+        Core._setupWayland()
+    }
+}
+
+@MainActor
+private enum Core {
+
+    @MainActor
+    private struct Glyph {
+        var rows: [String] = Array(repeating: "", count: Core.glyphH)
+    }
 
     struct Color { var r, g, b, a: GLfloat }
-    struct RectInstance {
+
+    struct Quad {
         var dst_p0: (GLfloat, GLfloat)
         var dst_p1: (GLfloat, GLfloat)
         var tex_tl: (GLfloat, GLfloat)
@@ -56,6 +51,49 @@ enum Wayland {
         -1.0, -1.0,  // BL
         1.0, -1.0,  // BR
     ]
+
+    static let glyphW = 5
+    static let glyphH = 7
+    static let glyphSpacing = 1
+    static let firstChar: UInt8 = 32
+    static let lastChar: UInt8 = 126
+    static let charCount = Int(lastChar - firstChar + 1)
+
+    static var winW: Int32 = 800
+    static var winH: Int32 = 600
+
+    static var egl_display: EGLDisplay?
+    static var egl_context: EGLContext?
+    static var egl_surface: EGLSurface?
+    static var egl_window: OpaquePointer?
+
+    static let EGL_NO_CONTEXT: EGLContext? = EGLContext(bitPattern: 0)
+    static let EGL_NO_DISPLAY: EGLDisplay? = EGLDisplay(bitPattern: 0)
+    static let EGL_NO_SURFACE: EGLSurface? = EGLSurface(bitPattern: 0)
+
+    static var program: GLuint = 0
+    static var vao: GLuint = 0
+    static var fontTex: GLuint = 0
+    static var whiteTex: GLuint = 0
+    static var quadVBO: GLuint = 0
+    static var instanceVBO: GLuint = 0
+
+    static var atlasW = 0
+    static var atlasH = 0
+    private static var font5x7 = Array(repeating: Glyph(), count: 128)
+
+    static var display: OpaquePointer!
+    static var registry: OpaquePointer!
+    static var compositor: OpaquePointer!
+    static var wm_base: OpaquePointer!
+    static var seat: OpaquePointer!
+    static var surface: OpaquePointer!
+    static var xdgSurface: OpaquePointer!
+    static var xdgToplevel: OpaquePointer!
+    static var keyboard: OpaquePointer!
+
+    static var running = true
+    static var v: UInt32 = UInt32.max
 
     static func initEGL(_ wlSurface: OpaquePointer) {
         egl_display = eglGetDisplay(EGLNativeDisplayType(display))
@@ -165,11 +203,13 @@ enum Wayland {
 
         glGenBuffers(1, &instanceVBO)
         glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-        glBufferData(GLenum(GL_ARRAY_BUFFER), 4000 * MemoryLayout<RectInstance>.stride, nil, GLenum(GL_DYNAMIC_DRAW))
+        glBufferData(
+            GLenum(GL_ARRAY_BUFFER), 4000 * MemoryLayout<Quad>.stride, nil, GLenum(GL_DYNAMIC_DRAW))
 
-        let stride = GLsizei(MemoryLayout<RectInstance>.stride)
+        let stride = GLsizei(MemoryLayout<Quad>.stride)
         glEnableVertexAttribArray(1)
-        glVertexAttribPointer(1, 2, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: 0 + 0))
+        glVertexAttribPointer(
+            1, 2, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: 0 + 0))
         glVertexAttribDivisor(1, 1)
 
         let off_dst_p1 = MemoryLayout<(GLfloat, GLfloat)>.stride
@@ -227,20 +267,20 @@ enum Wayland {
     }
 
     static func createFontAtlas() {
-        atlasW = NUM_CHARS * (GLYPH_W + GLYPH_SPACING)
-        atlasH = GLYPH_H
+        atlasW = charCount * (glyphW + glyphSpacing)
+        atlasH = glyphH
         let pixelsCount = atlasW * atlasH * 4
         let img = UnsafeMutablePointer<UInt8>.allocate(capacity: pixelsCount)
         img.initialize(repeating: 0, count: pixelsCount)
         defer { img.deallocate() }
 
-        for c in Int(FIRST_CHAR)...Int(LAST_CHAR) {
+        for c in Int(firstChar)...Int(lastChar) {
             let g = font5x7[c]
-            let xoff = (c - Int(FIRST_CHAR)) * (GLYPH_W + GLYPH_SPACING)
+            let xoff = (c - Int(firstChar)) * (glyphW + glyphSpacing)
             if !g.rows[0].isEmpty {
-                for y in 0..<GLYPH_H {
+                for y in 0..<glyphH {
                     let row = Array(g.rows[y])
-                    for x in 0..<GLYPH_W {
+                    for x in 0..<glyphW {
                         let bit = row[x] == "1"
                         let idx = (y * atlasW + xoff + x) * 4
                         img[idx + 0] = 255
@@ -266,17 +306,17 @@ enum Wayland {
 
     static func glyphUV(_ c: UInt8) -> (GLfloat, GLfloat, GLfloat, GLfloat) {
         var ch = c
-        if ch < FIRST_CHAR || ch > LAST_CHAR { ch = 32 }
-        let idx = Int(ch - FIRST_CHAR)
-        let xoff = idx * (GLYPH_W + GLYPH_SPACING)
+        if ch < firstChar || ch > lastChar { ch = 32 }
+        let idx = Int(ch - firstChar)
+        let xoff = idx * (glyphW + glyphSpacing)
         let u0 = GLfloat(xoff) / GLfloat(atlasW)
-        let u1 = GLfloat(xoff + GLYPH_W) / GLfloat(atlasW)
-        let v0 = GLfloat(1.0) - GLfloat(GLYPH_H) / GLfloat(atlasH)
+        let u1 = GLfloat(xoff + glyphW) / GLfloat(atlasW)
+        let v0 = GLfloat(1.0) - GLfloat(glyphH) / GLfloat(atlasH)
         let v1 = GLfloat(1.0)
         return (u0, v0, u1, v1)
     }
 
-    static func drawFrame() {
+    static func _drawFrame(_ word: String) {
         glViewport(0, 0, GLsizei(winW), GLsizei(winH))
         glClearColor(0, 0, 0, 1)
         glClear(GLbitfield(GL_COLOR_BUFFER_BIT))
@@ -288,19 +328,19 @@ enum Wayland {
         glUniform1i(uTex, 0)
 
         glBindVertexArray(vao)
-        var rects: [RectInstance] = Array(
-            repeating: RectInstance(
+        var rects: [Quad] = Array(
+            repeating: Quad(
                 dst_p0: (0, 0), dst_p1: (0, 0), tex_tl: (0, 0), tex_br: (0, 0), color: Color(r: 1, g: 1, b: 1, a: 1)
             ), count: 128)
         var n = 0
 
-        rects[n] = RectInstance(
+        rects[n] = Quad(
             dst_p0: (0, 0), dst_p1: (GLfloat(winW), 200),
             tex_tl: (0, 0), tex_br: (1, 1), color: Color(r: 0, g: 1, b: 1, a: 1)
         )
         n += 1
 
-        rects[n] = RectInstance(
+        rects[n] = Quad(
             dst_p0: (GLfloat(winW), GLfloat(winH - 200)), dst_p1: (0, GLfloat(winH)),
             tex_tl: (0, 0), tex_br: (1, 1), color: Color(r: 0.5, g: 1, b: 0.5, a: 1)
         )
@@ -310,19 +350,19 @@ enum Wayland {
         glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
         rects.withUnsafeBytes { buf in
             glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-            glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, n * MemoryLayout<RectInstance>.stride, buf.baseAddress)
+            glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, n * MemoryLayout<Quad>.stride, buf.baseAddress)
         }
         glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(n))
 
         glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
 
-        let msg = Array("Scribe".utf8)
+        let msg = Array(word.utf8)
 
         let scale: Float = 12.0
         var textW: Float = 0
-        for _ in msg { textW += Float(GLYPH_W) * scale + Float(GLYPH_SPACING) * scale }
-        textW -= Float(GLYPH_SPACING) * scale
-        let textH = Float(GLYPH_H) * scale
+        for _ in msg { textW += Float(glyphW) * scale + Float(glyphSpacing) * scale }
+        textW -= Float(glyphSpacing) * scale
+        let textH = Float(glyphH) * scale
         var penX = (Float(winW) - textW) * 0.5
         let penY = (Float(winH) - textH) * 0.5
 
@@ -330,36 +370,26 @@ enum Wayland {
         for c in msg {
             if tcount >= 64 { break }
             let (u0, v0, u1, v1) = glyphUV(c)
-            let w = Float(GLYPH_W) * scale
-            let h = Float(GLYPH_H) * scale
-            rects[tcount] = RectInstance(
+            let w = Float(glyphW) * scale
+            let h = Float(glyphH) * scale
+            rects[tcount] = Quad(
                 dst_p0: (GLfloat(penX), GLfloat(penY)),
                 dst_p1: (GLfloat(penX + w), GLfloat(penY + h)),
                 tex_tl: (u0, v0), tex_br: (u1, v1),
                 color: Color(r: 1, g: 1, b: 1, a: 1)
             )
             tcount += 1
-            penX += w + Float(GLYPH_SPACING) * scale
+            penX += w + Float(glyphSpacing) * scale
         }
         rects.withUnsafeBytes { buf in
             glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-            glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, tcount * MemoryLayout<RectInstance>.stride, buf.baseAddress)
+            glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, tcount * MemoryLayout<Quad>.stride, buf.baseAddress)
         }
         glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(tcount))
 
         _ = eglSwapBuffers(egl_display, egl_surface)
     }
 
-    static var display: OpaquePointer!
-    static var registry: OpaquePointer!
-    static var compositor: OpaquePointer!
-    static var wm_base: OpaquePointer!
-    static var seat: OpaquePointer!
-    static var surface: OpaquePointer!
-    static var xdgSurface: OpaquePointer!
-    static var xdgToplevel: OpaquePointer!
-    static var keyboard: OpaquePointer!
-    static var running = true
     static var wmBaseListener = xdg_wm_base_listener(ping: wm_base_ping_cb)
     static var xdgSurfaceListener = xdg_surface_listener(configure: xdg_surface_configure_cb)
     static var xdgToplevelListener = xdg_toplevel_listener(
@@ -382,7 +412,7 @@ enum Wayland {
     static var _wl_seat_interface: wl_interface = wl_seat_interface
     static var registryListener = wl_registry_listener(global: onGlobal, global_remove: onGlobalRemove)
 
-    static func setupWayland() {
+    static func _setupWayland() {
         display = wl_display_connect(nil)
         guard display != nil else {
             print("Failed to connect to Wayland display.\n")
