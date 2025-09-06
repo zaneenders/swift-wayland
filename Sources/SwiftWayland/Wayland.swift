@@ -8,22 +8,53 @@ import Foundation
 @MainActor
 enum Wayland {
 
-    private static var start = ContinuousClock.now
-    private static var end = ContinuousClock.now
+    private static var text: String = ""
+    private static var frameCallback: OpaquePointer?
 
     static var stillRunning: Bool {
-        Core.running && wl_display_dispatch(Core.display) != -1
+        Core.running
     }
 
-    static func drawFrame(word: String) {
-        Core._drawFrame(word)
-        end = ContinuousClock.now
-        print(end - start)
-        start = ContinuousClock.now
+    static func dispatch() {
+        wl_display_dispatch(Core.display)
     }
 
     static func setupWayland() {
         Core._setupWayland()
+    }
+
+    static func set(text: String) {
+        self.text = text
+    }
+
+    static func startRenderLoop(word: String) {
+        text = word
+        drawFrame()
+        scheduleNextFrame()
+    }
+
+    private static func scheduleNextFrame() {
+        frameCallback = wl_surface_frame(Core.surface)
+        wl_callback_add_listener(frameCallback, &frameListener, nil)
+        wl_surface_commit(Core.surface)
+    }
+
+    private static var frameListener = wl_callback_listener(
+        done: { _, callback, _ in
+            wl_callback_destroy(callback)
+            drawFrame()
+            scheduleNextFrame()
+        }
+    )
+
+    static func start() {
+        while Wayland.stillRunning {
+            Wayland.dispatch()
+        }
+    }
+
+    private static func drawFrame() {
+        Core._drawFrame(text)
     }
 }
 
@@ -557,15 +588,13 @@ private enum Core {
             let c_str = String(cString: cstr)
             switch c_str {
             case "wl_compositor":
-                v = min(version, 4)
-                compositor = OpaquePointer(wl_registry_bind(registry, name, &_wl_compositor_interface, v))
+                compositor = OpaquePointer(
+                    wl_registry_bind(registry, name, &_wl_compositor_interface, min(version, 4)))
             case "xdg_wm_base":
-                v = min(version, 2)
-                wm_base = OpaquePointer(wl_registry_bind(registry, name, &_xdg_wm_base_interface, v))
+                wm_base = OpaquePointer(wl_registry_bind(registry, name, &_xdg_wm_base_interface, min(version, 2)))
                 xdg_wm_base_add_listener(wm_base, &wmBaseListener, nil)
             case "wl_seat":
-                v = min(version, 5)
-                seat = OpaquePointer(wl_registry_bind(registry, name, &_wl_seat_interface, v))
+                seat = OpaquePointer(wl_registry_bind(registry, name, &_wl_seat_interface, min(version, 5)))
             default:
                 break
 
