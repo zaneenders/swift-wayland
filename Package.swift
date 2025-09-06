@@ -18,6 +18,10 @@ let package = Package(
                 .process("../../shaders/vertex.glsl"),
                 .process("../../shaders/fragment.glsl"),
             ],
+            swiftSettings: [
+                .strictMemorySafety(),
+                .treatAllWarnings(as: .error),
+            ]
         ),
         .systemLibrary(
             name: "CWaylandClient",
