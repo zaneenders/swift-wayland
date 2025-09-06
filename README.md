@@ -6,8 +6,7 @@ A minimal dependency graphics client using Wayland.
 
 - [x] Expose keyboard events
 - [x] Render colored rectangles
-- [ ] ASCII 5x7 character rendering
- - (partial)
+- [x] ASCII 5x7 character rendering
 - [x] Swift concurrency support
 
 ## Setup
