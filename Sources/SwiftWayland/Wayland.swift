@@ -7,74 +7,6 @@ import Foundation
 
 @MainActor
 internal enum Wayland {
-    static func setup() {
-        Task {
-            display = wl_display_connect(nil)
-            guard display != nil else {
-                print("Failed to connect to Wayland display.")
-                exit(1)
-            }
-            registry = wl_display_get_registry(display)
-            wl_registry_add_listener(registry, &registryListener, nil)
-            wl_display_roundtrip(display)
-            guard compositor != nil, wmBase != nil && surface == nil else {
-                print("No compositor, wmBase")
-                return
-            }
-
-            surface = wl_compositor_create_surface(compositor)
-            xdgSurface = xdg_wm_base_get_xdg_surface(wmBase, surface)
-            xdg_surface_add_listener(xdgSurface, &xdgSurfaceListener, nil)
-            toplevel = xdg_surface_get_toplevel(xdgSurface)
-            xdg_toplevel_add_listener(toplevel, &xdgToplevelListener, nil)
-            xdg_toplevel_set_title(toplevel, "Swift Wayland")
-            wl_surface_commit(surface)
-            wl_display_roundtrip(display)
-
-            eglDisplay = eglGetDisplay(EGLNativeDisplayType(display))
-            guard eglDisplay != nil else { fatalError("eglGetDisplay failed") }
-            guard eglInitialize(eglDisplay, nil, nil) == EGL_TRUE else { fatalError("eglInitialize failed") }
-
-            guard eglBindAPI(EGLenum(EGL_OPENGL_ES_API)) == EGL_TRUE else { fatalError("eglBindAPI failed") }
-
-            var cfg: EGLConfig?
-            var num: EGLint = 0
-            var attrs: [EGLint] = [
-                EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-                EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
-                EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR,
-                EGL_NONE,
-            ]
-            attrs.withUnsafeMutableBufferPointer { p in
-                _ = eglChooseConfig(eglDisplay, p.baseAddress, &cfg, 1, &num)
-            }
-            guard num > 0, let cfg else { fatalError("eglChooseConfig failed") }
-
-            var ctxAttrs: [EGLint] = [EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE]
-            eglContext = ctxAttrs.withUnsafeMutableBufferPointer { p in
-                eglCreateContext(eglDisplay, cfg, EGL_NO_CONTEXT, p.baseAddress)
-            }
-            guard eglContext != EGL_NO_CONTEXT else { fatalError("eglCreateContext failed") }
-
-            eglWindow = wl_egl_window_create(surface, winW, winH)
-            guard eglWindow != nil else { fatalError("wl_egl_window_create failed") }
-
-            eglSurface = eglCreateWindowSurface(eglDisplay, cfg, EGLNativeWindowType(bitPattern: eglWindow), nil)
-            guard eglSurface != EGL_NO_SURFACE else { fatalError("eglCreateWindowSurface failed") }
-
-            guard eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext) == EGL_TRUE else {
-                fatalError("eglMakeCurrent failed")
-            }
-
-            _ = eglSwapInterval(eglDisplay, 1)
-            initGL()
-
-            DispatchQueue.global().async {
-                while wl_display_dispatch(display) != -1 {}
-            }
-            WaylandEvents.send(.frame)
-        }
-    }
 
     static func drawFrame(_ word: String, count: Int) {
         glViewport(0, 0, GLsizei(winW), GLsizei(winH))
@@ -482,6 +414,75 @@ internal enum Wayland {
         let cb = wl_surface_frame(surface)
         wl_callback_add_listener(cb, &frameListener, nil)
         wl_surface_commit(surface)
+    }
+
+    static func setup() {
+        Task {
+            display = wl_display_connect(nil)
+            guard display != nil else {
+                print("Failed to connect to Wayland display.")
+                exit(1)
+            }
+            registry = wl_display_get_registry(display)
+            wl_registry_add_listener(registry, &registryListener, nil)
+            wl_display_roundtrip(display)
+            guard compositor != nil, wmBase != nil && surface == nil else {
+                print("No compositor, wmBase")
+                return
+            }
+
+            surface = wl_compositor_create_surface(compositor)
+            xdgSurface = xdg_wm_base_get_xdg_surface(wmBase, surface)
+            xdg_surface_add_listener(xdgSurface, &xdgSurfaceListener, nil)
+            toplevel = xdg_surface_get_toplevel(xdgSurface)
+            xdg_toplevel_add_listener(toplevel, &xdgToplevelListener, nil)
+            xdg_toplevel_set_title(toplevel, "Swift Wayland")
+            wl_surface_commit(surface)
+            wl_display_roundtrip(display)
+
+            eglDisplay = eglGetDisplay(EGLNativeDisplayType(display))
+            guard eglDisplay != nil else { fatalError("eglGetDisplay failed") }
+            guard eglInitialize(eglDisplay, nil, nil) == EGL_TRUE else { fatalError("eglInitialize failed") }
+
+            guard eglBindAPI(EGLenum(EGL_OPENGL_ES_API)) == EGL_TRUE else { fatalError("eglBindAPI failed") }
+
+            var cfg: EGLConfig?
+            var num: EGLint = 0
+            var attrs: [EGLint] = [
+                EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+                EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
+                EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR,
+                EGL_NONE,
+            ]
+            attrs.withUnsafeMutableBufferPointer { p in
+                _ = eglChooseConfig(eglDisplay, p.baseAddress, &cfg, 1, &num)
+            }
+            guard num > 0, let cfg else { fatalError("eglChooseConfig failed") }
+
+            var ctxAttrs: [EGLint] = [EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE]
+            eglContext = ctxAttrs.withUnsafeMutableBufferPointer { p in
+                eglCreateContext(eglDisplay, cfg, EGL_NO_CONTEXT, p.baseAddress)
+            }
+            guard eglContext != EGL_NO_CONTEXT else { fatalError("eglCreateContext failed") }
+
+            eglWindow = wl_egl_window_create(surface, winW, winH)
+            guard eglWindow != nil else { fatalError("wl_egl_window_create failed") }
+
+            eglSurface = eglCreateWindowSurface(eglDisplay, cfg, EGLNativeWindowType(bitPattern: eglWindow), nil)
+            guard eglSurface != EGL_NO_SURFACE else { fatalError("eglCreateWindowSurface failed") }
+
+            guard eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext) == EGL_TRUE else {
+                fatalError("eglMakeCurrent failed")
+            }
+
+            _ = eglSwapInterval(eglDisplay, 1)
+            initGL()
+
+            DispatchQueue.global().async {
+                while wl_display_dispatch(display) != -1 {}
+            }
+            WaylandEvents.send(.frame)
+        }
     }
 
     static let onGlobal:
