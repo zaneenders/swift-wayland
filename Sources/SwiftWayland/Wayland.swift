@@ -6,130 +6,182 @@ import CXDGShell
 import Foundation
 
 @MainActor
-enum Wayland {
+internal enum Wayland {
+    static func setup() {
+        Task {
+            display = wl_display_connect(nil)
+            guard display != nil else {
+                print("Failed to connect to Wayland display.")
+                exit(1)
+            }
+            registry = wl_display_get_registry(display)
+            wl_registry_add_listener(registry, &registryListener, nil)
+            wl_display_roundtrip(display)
+            guard compositor != nil, wmBase != nil && surface == nil else {
+                print("No compositor, wmBase")
+                return
+            }
 
-    private static var start = ContinuousClock.now
-    private static var end = ContinuousClock.now
+            surface = wl_compositor_create_surface(compositor)
+            xdgSurface = xdg_wm_base_get_xdg_surface(wmBase, surface)
+            xdg_surface_add_listener(xdgSurface, &xdgSurfaceListener, nil)
+            toplevel = xdg_surface_get_toplevel(xdgSurface)
+            xdg_toplevel_add_listener(toplevel, &xdgToplevelListener, nil)
+            xdg_toplevel_set_title(toplevel, "Swift Wayland")
+            wl_surface_commit(surface)
+            wl_display_roundtrip(display)
 
-    static var stillRunning: Bool {
-        Core.running && wl_display_dispatch(Core.display) != -1
+            eglDisplay = eglGetDisplay(EGLNativeDisplayType(display))
+            guard eglDisplay != nil else { fatalError("eglGetDisplay failed") }
+            guard eglInitialize(eglDisplay, nil, nil) == EGL_TRUE else { fatalError("eglInitialize failed") }
+
+            guard eglBindAPI(EGLenum(EGL_OPENGL_ES_API)) == EGL_TRUE else { fatalError("eglBindAPI failed") }
+
+            var cfg: EGLConfig?
+            var num: EGLint = 0
+            var attrs: [EGLint] = [
+                EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+                EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
+                EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR,
+                EGL_NONE,
+            ]
+            attrs.withUnsafeMutableBufferPointer { p in
+                _ = eglChooseConfig(eglDisplay, p.baseAddress, &cfg, 1, &num)
+            }
+            guard num > 0, let cfg else { fatalError("eglChooseConfig failed") }
+
+            var ctxAttrs: [EGLint] = [EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE]
+            eglContext = ctxAttrs.withUnsafeMutableBufferPointer { p in
+                eglCreateContext(eglDisplay, cfg, EGL_NO_CONTEXT, p.baseAddress)
+            }
+            guard eglContext != EGL_NO_CONTEXT else { fatalError("eglCreateContext failed") }
+
+            eglWindow = wl_egl_window_create(surface, winW, winH)
+            guard eglWindow != nil else { fatalError("wl_egl_window_create failed") }
+
+            eglSurface = eglCreateWindowSurface(eglDisplay, cfg, EGLNativeWindowType(bitPattern: eglWindow), nil)
+            guard eglSurface != EGL_NO_SURFACE else { fatalError("eglCreateWindowSurface failed") }
+
+            guard eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext) == EGL_TRUE else {
+                fatalError("eglMakeCurrent failed")
+            }
+
+            _ = eglSwapInterval(eglDisplay, 1)
+            initGL()
+
+            DispatchQueue.global().async {
+                while wl_display_dispatch(display) != -1 {}
+            }
+            WaylandEvents.send(.frame)
+        }
     }
 
-    static func drawFrame(word: String) {
-        Core._drawFrame(word)
+    static func drawFrame(_ word: String, count: Int) {
+        glViewport(0, 0, GLsizei(winW), GLsizei(winH))
+        glClearColor(0, 0, 0, 1)
+        glClear(GLbitfield(GL_COLOR_BUFFER_BIT))
+
+        glUseProgram(program)
+        let uRes = glGetUniformLocation(program, "uRes")
+        let uTex = glGetUniformLocation(program, "uTex")
+        glUniform2f(uRes, GLfloat(winW), GLfloat(winH))
+        glUniform1i(uTex, 0)
+
+        glBindVertexArray(vao)
+        var rects: [Quad] = Array(
+            repeating: Quad(
+                dst_p0: (0, 0), dst_p1: (0, 0), tex_tl: (0, 0), tex_br: (0, 0), color: Color(r: 1, g: 1, b: 1, a: 1)
+            ), count: 128)
+        var n = 0
+
+        rects[n] = Quad(
+            dst_p0: (0, 0), dst_p1: (GLfloat(winW), 200),
+            tex_tl: (0, 0), tex_br: (1, 1), color: Color(r: 0, g: 1, b: 1, a: 1)
+        )
+        n += 1
+
+        rects[n] = Quad(
+            dst_p0: (GLfloat(winW), GLfloat(winH - 200)), dst_p1: (0, GLfloat(winH)),
+            tex_tl: (0, 0), tex_br: (1, 1), color: Color(r: 0.5, g: 1, b: 0.5, a: 1)
+        )
+        n += 1
+
+        glActiveTexture(GLenum(GL_TEXTURE0))
+        glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
+        rects.withUnsafeBytes { buf in
+            glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
+            glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, n * MemoryLayout<Quad>.stride, buf.baseAddress)
+        }
+        glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(n))
+
+        glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
+
+        let msg = Array(word.utf8)
+
+        let scale: Float = 12.0
+        var textW: Float = 0
+        for _ in msg { textW += Float(glyphW) * scale + Float(glyphSpacing) * scale }
+        textW -= Float(glyphSpacing) * scale
+        var textH = Float(glyphH) * scale
+        var penX = (Float(winW) - textW) * 0.5
+        var penY = (Float(winH) - textH) * 0.5 - 50
+
+        var tcount = 0
+        for c in msg {
+            if tcount >= 64 { break }
+            let (u0, v0, u1, v1) = glyphUV(c)
+            let w = Float(glyphW) * scale
+            let h = Float(glyphH) * scale
+            rects[tcount] = Quad(
+                dst_p0: (GLfloat(penX), GLfloat(penY)),
+                dst_p1: (GLfloat(penX + w), GLfloat(penY + h)),
+                tex_tl: (u0, v0), tex_br: (u1, v1),
+                color: Color(r: 1, g: 1, b: 1, a: 1)
+            )
+            tcount += 1
+            penX += w + Float(glyphSpacing) * scale
+        }
+        rects.withUnsafeBytes { buf in
+            glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
+            glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, tcount * MemoryLayout<Quad>.stride, buf.baseAddress)
+        }
+        glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(tcount))
+
+        let cmsg = Array("\(count)".utf8)
+
+        textW = 0
+        for _ in cmsg { textW += Float(glyphW) * scale + Float(glyphSpacing) * scale }
+        textW -= Float(glyphSpacing) * scale
+        textH = Float(glyphH) * scale
+        penX = (Float(winW) - textW) * 0.5
+        penY = (Float(winH) - textH) * 0.5 + 50
+
+        tcount = 0
+        for c in cmsg {
+            if tcount >= 64 { break }
+            let (u0, v0, u1, v1) = glyphUV(c)
+            let w = Float(glyphW) * scale
+            let h = Float(glyphH) * scale
+            rects[tcount] = Quad(
+                dst_p0: (GLfloat(penX), GLfloat(penY)),
+                dst_p1: (GLfloat(penX + w), GLfloat(penY + h)),
+                tex_tl: (u0, v0), tex_br: (u1, v1),
+                color: Color(r: 1, g: 1, b: 1, a: 1)
+            )
+            tcount += 1
+            penX += w + Float(glyphSpacing) * scale
+        }
+        rects.withUnsafeBytes { buf in
+            glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
+            glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, tcount * MemoryLayout<Quad>.stride, buf.baseAddress)
+        }
+        glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(tcount))
+
+        _ = eglSwapBuffers(eglDisplay, eglSurface)
         end = ContinuousClock.now
-        print(end - start)
+        // print(#function, end - start)
         start = ContinuousClock.now
-    }
-
-    static func setupWayland() {
-        Core._setupWayland()
-    }
-}
-
-@MainActor
-private enum Core {
-
-    @MainActor
-    private struct Glyph {
-        var rows: [String] = Array(repeating: "", count: Core.glyphH)
-    }
-
-    struct Color { var r, g, b, a: GLfloat }
-
-    struct Quad {
-        var dst_p0: (GLfloat, GLfloat)
-        var dst_p1: (GLfloat, GLfloat)
-        var tex_tl: (GLfloat, GLfloat)
-        var tex_br: (GLfloat, GLfloat)
-        var color: Color
-    }
-
-    static let quadVerts: [GLfloat] = [
-        -1.0, 1.0,  // TL
-        1.0, 1.0,  // TR
-        -1.0, -1.0,  // BL
-        1.0, -1.0,  // BR
-    ]
-
-    static let glyphW = 5
-    static let glyphH = 7
-    static let glyphSpacing = 1
-    static let firstChar: UInt8 = 32
-    static let lastChar: UInt8 = 126
-    static let charCount = Int(lastChar - firstChar + 1)
-
-    static var winW: Int32 = 800
-    static var winH: Int32 = 600
-
-    static var egl_display: EGLDisplay?
-    static var egl_context: EGLContext?
-    static var egl_surface: EGLSurface?
-    static var egl_window: OpaquePointer?
-
-    static let EGL_NO_CONTEXT: EGLContext? = EGLContext(bitPattern: 0)
-    static let EGL_NO_DISPLAY: EGLDisplay? = EGLDisplay(bitPattern: 0)
-    static let EGL_NO_SURFACE: EGLSurface? = EGLSurface(bitPattern: 0)
-
-    static var program: GLuint = 0
-    static var vao: GLuint = 0
-    static var fontTex: GLuint = 0
-    static var whiteTex: GLuint = 0
-    static var quadVBO: GLuint = 0
-    static var instanceVBO: GLuint = 0
-
-    static var atlasW = 0
-    static var atlasH = 0
-    private static var font5x7 = Array(repeating: Glyph(), count: 128)
-
-    static var display: OpaquePointer!
-    static var registry: OpaquePointer!
-    static var compositor: OpaquePointer!
-    static var wm_base: OpaquePointer!
-    static var seat: OpaquePointer!
-    static var surface: OpaquePointer!
-    static var xdgSurface: OpaquePointer!
-    static var xdgToplevel: OpaquePointer!
-    static var keyboard: OpaquePointer!
-
-    static var running = true
-    static var v: UInt32 = UInt32.max
-
-    static func initEGL(_ wlSurface: OpaquePointer) {
-        egl_display = eglGetDisplay(EGLNativeDisplayType(display))
-        guard egl_display != nil else { fatalError("eglGetDisplay failed") }
-        guard eglInitialize(egl_display, nil, nil) == EGL_TRUE else { fatalError("eglInitialize failed") }
-
-        var cfg: EGLConfig? = nil
-        var num: EGLint = 0
-        var attrs: [EGLint] = [
-            EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-            EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
-            EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR,
-            EGL_NONE,
-        ]
-        attrs.withUnsafeMutableBufferPointer { p in
-            _ = eglChooseConfig(egl_display, p.baseAddress, &cfg, 1, &num)
-        }
-        guard num > 0 else { fatalError("eglChooseConfig failed") }
-        guard eglBindAPI(EGLenum(EGL_OPENGL_ES_API)) == EGL_TRUE else { fatalError("eglBindAPI failed") }
-
-        var ctxAttrs: [EGLint] = [EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE]
-        egl_context = ctxAttrs.withUnsafeMutableBufferPointer { p in
-            eglCreateContext(egl_display, cfg, EGL_NO_CONTEXT, p.baseAddress)
-        }
-        guard egl_context != EGL_NO_CONTEXT else { fatalError("eglCreateContext failed") }
-
-        egl_window = wl_egl_window_create(wlSurface, winW, winH)
-        guard egl_window != nil else { fatalError("wl_egl_window_create failed") }
-
-        egl_surface = eglCreateWindowSurface(egl_display, cfg, EGLNativeWindowType(bitPattern: egl_window), nil)
-        guard egl_surface != EGL_NO_SURFACE else { fatalError("eglCreateWindowSurface failed") }
-
-        guard eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context) == EGL_TRUE else {
-            fatalError("eglMakeCurrent failed")
-        }
-        _ = eglSwapInterval(egl_display, 1)
+        scheduleNextFrame()
     }
 
     static func compileShader(_ type: GLenum, _ src: String) -> GLuint {
@@ -179,6 +231,40 @@ private enum Core {
         glDeleteShader(fs)
         return p
     }
+
+    static let quadVerts: [GLfloat] = [
+        -1.0, 1.0,  // TL
+        1.0, 1.0,  // TR
+        -1.0, -1.0,  // BL
+        1.0, -1.0,  // BR
+    ]
+    struct Color { var r, g, b, a: GLfloat }
+    struct Quad {
+        var dst_p0: (GLfloat, GLfloat)
+        var dst_p1: (GLfloat, GLfloat)
+        var tex_tl: (GLfloat, GLfloat)
+        var tex_br: (GLfloat, GLfloat)
+        var color: Color
+    }
+
+    static let glyphW = 5
+    static let glyphH = 7
+    static let glyphSpacing = 1
+    static let firstChar: UInt8 = 32
+    static let lastChar: UInt8 = 126
+    static let charCount = Int(lastChar - firstChar + 1)
+
+    @MainActor
+    private struct Glyph {
+        var rows: [String] = Array(repeating: "", count: glyphH)
+    }
+
+    static var program: GLuint = 0
+    static var vao: GLuint = 0
+    static var fontTex: GLuint = 0
+    static var whiteTex: GLuint = 0
+    static var quadVBO: GLuint = 0
+    static var instanceVBO: GLuint = 0
 
     static func initGL() {
         let vs = compileShader(GLenum(GL_VERTEX_SHADER), loadText(resource: "vertex.glsl"))
@@ -253,6 +339,10 @@ private enum Core {
         createFontAtlas()
     }
 
+    static var atlasW = 0
+    static var atlasH = 0
+    private static var font5x7 = Array(repeating: Glyph(), count: 128)
+
     static func initFont() {
         func set(_ ch: Character, _ rows: [String]) {
             let i = Int(ch.unicodeScalars.first!.value)
@@ -264,6 +354,114 @@ private enum Core {
         set("i", ["00100", "00000", "01100", "00100", "00100", "00100", "01110"])
         set("b", ["10000", "10000", "11110", "10001", "10001", "10001", "11110"])
         set("e", ["00000", "00000", "01110", "10001", "11111", "10000", "01110"])
+        set("0", ["01110", "10001", "10011", "10101", "11001", "10001", "01110"])
+        set(
+            "1",
+            [
+                "00100",
+                "01100",
+                "00100",
+                "00100",
+                "00100",
+                "00100",
+                "01110",
+            ])
+
+        set(
+            "2",
+            [
+                "01110",
+                "10001",
+                "00001",
+                "00110",
+                "01000",
+                "10000",
+                "11111",
+            ])
+
+        set(
+            "3",
+            [
+                "11110",
+                "00001",
+                "00001",
+                "01110",
+                "00001",
+                "00001",
+                "11110",
+            ])
+
+        set(
+            "4",
+            [
+                "00010",
+                "00110",
+                "01010",
+                "10010",
+                "11111",
+                "00010",
+                "00010",
+            ])
+
+        set(
+            "5",
+            [
+                "11111",
+                "10000",
+                "11110",
+                "00001",
+                "00001",
+                "10001",
+                "01110",
+            ])
+
+        set(
+            "6",
+            [
+                "01110",
+                "10000",
+                "11110",
+                "10001",
+                "10001",
+                "10001",
+                "01110",
+            ])
+
+        set(
+            "7",
+            [
+                "11111",
+                "00001",
+                "00010",
+                "00100",
+                "01000",
+                "01000",
+                "01000",
+            ])
+
+        set(
+            "8",
+            [
+                "01110",
+                "10001",
+                "10001",
+                "01110",
+                "10001",
+                "10001",
+                "01110",
+            ])
+
+        set(
+            "9",
+            [
+                "01110",
+                "10001",
+                "10001",
+                "01111",
+                "00001",
+                "00001",
+                "01110",
+            ])
     }
 
     static func createFontAtlas() {
@@ -316,88 +514,56 @@ private enum Core {
         return (u0, v0, u1, v1)
     }
 
-    static func _drawFrame(_ word: String) {
-        glViewport(0, 0, GLsizei(winW), GLsizei(winH))
-        glClearColor(0, 0, 0, 1)
-        glClear(GLbitfield(GL_COLOR_BUFFER_BIT))
+    static let EGL_NO_CONTEXT: EGLContext? = EGLContext(bitPattern: 0)
+    static let EGL_NO_DISPLAY: EGLDisplay? = EGLDisplay(bitPattern: 0)
+    static let EGL_NO_SURFACE: EGLSurface? = EGLSurface(bitPattern: 0)
 
-        glUseProgram(program)
-        let uRes = glGetUniformLocation(program, "uRes")
-        let uTex = glGetUniformLocation(program, "uTex")
-        glUniform2f(uRes, GLfloat(winW), GLfloat(winH))
-        glUniform1i(uTex, 0)
+    static var eglDisplay: EGLDisplay!
+    static var eglContext: EGLContext!
+    static var eglSurface: EGLSurface!
+    static var eglWindow: OpaquePointer!
+    static var winW: Int32 = 800
+    static var winH: Int32 = 600
 
-        glBindVertexArray(vao)
-        var rects: [Quad] = Array(
-            repeating: Quad(
-                dst_p0: (0, 0), dst_p1: (0, 0), tex_tl: (0, 0), tex_br: (0, 0), color: Color(r: 1, g: 1, b: 1, a: 1)
-            ), count: 128)
-        var n = 0
+    nonisolated(unsafe) static var display: OpaquePointer!
+    static var compositor: OpaquePointer!
+    static var toplevel: OpaquePointer!
+    static var wmBase: OpaquePointer!
+    static var surface: OpaquePointer!
+    static var xdgSurface: OpaquePointer!
+    static var registry: OpaquePointer!
+    static var registryListener = wl_registry_listener(global: onGlobal, global_remove: onGlobalRemove)
+    static var seat: OpaquePointer!
+    static var keyboard: OpaquePointer!
 
-        rects[n] = Quad(
-            dst_p0: (0, 0), dst_p1: (GLfloat(winW), 200),
-            tex_tl: (0, 0), tex_br: (1, 1), color: Color(r: 0, g: 1, b: 1, a: 1)
-        )
-        n += 1
+    static var _wl_seat_interface: wl_interface = wl_seat_interface
+    static var _wl_compositor_interface: wl_interface = wl_compositor_interface
+    static var _xdg_wm_base_interface: wl_interface = xdg_wm_base_interface
 
-        rects[n] = Quad(
-            dst_p0: (GLfloat(winW), GLfloat(winH - 200)), dst_p1: (0, GLfloat(winH)),
-            tex_tl: (0, 0), tex_br: (1, 1), color: Color(r: 0.5, g: 1, b: 0.5, a: 1)
-        )
-        n += 1
-
-        glActiveTexture(GLenum(GL_TEXTURE0))
-        glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
-        rects.withUnsafeBytes { buf in
-            glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-            glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, n * MemoryLayout<Quad>.stride, buf.baseAddress)
+    static var wmBaseListener = xdg_wm_base_listener(
+        ping: { _, base, serial in
+            xdg_wm_base_pong(base, serial)
         }
-        glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(n))
-
-        glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
-
-        let msg = Array(word.utf8)
-
-        let scale: Float = 12.0
-        var textW: Float = 0
-        for _ in msg { textW += Float(glyphW) * scale + Float(glyphSpacing) * scale }
-        textW -= Float(glyphSpacing) * scale
-        let textH = Float(glyphH) * scale
-        var penX = (Float(winW) - textW) * 0.5
-        let penY = (Float(winH) - textH) * 0.5
-
-        var tcount = 0
-        for c in msg {
-            if tcount >= 64 { break }
-            let (u0, v0, u1, v1) = glyphUV(c)
-            let w = Float(glyphW) * scale
-            let h = Float(glyphH) * scale
-            rects[tcount] = Quad(
-                dst_p0: (GLfloat(penX), GLfloat(penY)),
-                dst_p1: (GLfloat(penX + w), GLfloat(penY + h)),
-                tex_tl: (u0, v0), tex_br: (u1, v1),
-                color: Color(r: 1, g: 1, b: 1, a: 1)
-            )
-            tcount += 1
-            penX += w + Float(glyphSpacing) * scale
-        }
-        rects.withUnsafeBytes { buf in
-            glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-            glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, tcount * MemoryLayout<Quad>.stride, buf.baseAddress)
-        }
-        glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(tcount))
-
-        _ = eglSwapBuffers(egl_display, egl_surface)
-    }
-
-    static var wmBaseListener = xdg_wm_base_listener(ping: wm_base_ping_cb)
-    static var xdgSurfaceListener = xdg_surface_listener(configure: xdg_surface_configure_cb)
-    static var xdgToplevelListener = xdg_toplevel_listener(
-        configure: xdg_toplevel_configure_cb,
-        close: xdg_toplevel_close_cb,
-        configure_bounds: { _, _, _, _ in },
-        wm_capabilities: { _, _, _ in }
     )
+
+    static var xdgSurfaceListener = xdg_surface_listener(
+        configure: { _, surface, serial in
+            xdg_surface_ack_configure(surface, serial)
+        }
+    )
+
+    static var frameListener = wl_callback_listener(
+        done: { _, callback, _time in
+            wl_callback_destroy(callback)
+            WaylandEvents.send(.frame)
+        }
+    )
+
+    static var seatListener = wl_seat_listener(
+        capabilities: seat_capabilities_cb,
+        name: { _, _, _ in }  // we don’t use "name" here
+    )
+
     static var keyboard_listener = wl_keyboard_listener(
         keymap: keyboard_keymap_cb,
         enter: keyboard_enter_cb,
@@ -406,80 +572,46 @@ private enum Core {
         modifiers: keyboard_modifiers_cb,
         repeat_info: keyboard_repeat_info_cb
     )
-    static var seatListener = wl_seat_listener(capabilities: seat_capabilities_cb, name: seat_name_cb)
-    static var _wl_compositor_interface: wl_interface = wl_compositor_interface
-    static var _xdg_wm_base_interface: wl_interface = xdg_wm_base_interface
-    static var _wl_seat_interface: wl_interface = wl_seat_interface
-    static var registryListener = wl_registry_listener(global: onGlobal, global_remove: onGlobalRemove)
 
-    static func _setupWayland() {
-        display = wl_display_connect(nil)
-        guard display != nil else {
-            print("Failed to connect to Wayland display.\n")
-            exit(1)
-        }
+    static var start = ContinuousClock.now
+    static var end = ContinuousClock.now
 
-        registry = wl_display_get_registry(display)
-        wl_registry_add_listener(registry, &registryListener, nil)
-        wl_display_roundtrip(display)
-
-        if seat != nil { wl_seat_add_listener(seat, &seatListener, nil) }
-        guard compositor != nil && wm_base != nil else {
-            print("Compositor or xdg_wm_base not available.\n")
-            exit(1)
-        }
-
-        surface = wl_compositor_create_surface(compositor)
-        xdgSurface = xdg_wm_base_get_xdg_surface(wm_base, surface)
-        xdg_surface_add_listener(xdgSurface, &xdgSurfaceListener, nil)
-
-        xdgToplevel = xdg_surface_get_toplevel(xdgSurface)
-        xdg_toplevel_add_listener(xdgToplevel, &xdgToplevelListener, nil)
-        xdg_toplevel_set_title(xdgToplevel, "Swift Wayland")
+    static func scheduleNextFrame() {
+        let cb = wl_surface_frame(surface)
+        wl_callback_add_listener(cb, &frameListener, nil)
         wl_surface_commit(surface)
-
-        initEGL(surface)
-        initGL()
     }
 
-    static let wm_base_ping_cb:
+    static let onGlobal:
         @convention(c) (
-            UnsafeMutableRawPointer?, OpaquePointer?, UInt32
-        ) -> Void = { data, base, serial in
-            xdg_wm_base_pong(base, serial)
-        }
-
-    static let xdg_surface_configure_cb:
-        @convention(c) (
-            UnsafeMutableRawPointer?, OpaquePointer?, UInt32
-        ) -> Void = { data, xs, serial in
-            xdg_surface_ack_configure(xs, serial)
-        }
-
-    static let xdg_toplevel_configure_cb:
-        @convention(c) (
-            _ data: UnsafeMutableRawPointer?,
-            _ toplevel: OpaquePointer?,
-            _ width: Int32,
-            _ height: Int32,
-            _ states: UnsafeMutablePointer<wl_array>?
-        ) -> Void = { data, toplevel, width, height, states in
-            if width > 0 && height > 0 {
-                winW = width
-                winH = height
-                if egl_window != nil {
-                    wl_egl_window_resize(egl_window, winW, winH, 0, 0)
-                    glBindVertexArray(vao)
-                    glBindVertexArray(0)
-                }
+            UnsafeMutableRawPointer?, OpaquePointer?, UInt32, UnsafePointer<CChar>?, UInt32
+        ) -> Void = { _, registry, id, interface, version in
+            guard let cstr = interface else { return }
+            let iface = String(cString: cstr)
+            switch iface {
+            case "wl_compositor":
+                compositor = OpaquePointer(
+                    wl_registry_bind(registry, id, &_wl_compositor_interface, min(version, 4))
+                )
+            case "xdg_wm_base":
+                wmBase = OpaquePointer(
+                    wl_registry_bind(registry, id, &_xdg_wm_base_interface, min(version, 2))
+                )
+                xdg_wm_base_add_listener(wmBase, &wmBaseListener, nil)
+            case "wl_seat":
+                seat = OpaquePointer(
+                    wl_registry_bind(registry, id, &_wl_seat_interface, min(version, 5))
+                )
+                wl_seat_add_listener(seat, &seatListener, nil)
+            default:
+                ()
             }
         }
 
-    static let xdg_toplevel_close_cb:
+    static let onGlobalRemove:
         @convention(c) (
-            UnsafeMutableRawPointer?, OpaquePointer?
-        ) -> Void = { _, _ in
-            running = false
+            UnsafeMutableRawPointer?, OpaquePointer?, UInt32
+        ) -> Void = { _, _, name in
         }
 
     static let keyboard_keymap_cb:
@@ -505,16 +637,7 @@ private enum Core {
         @convention(c) (
             UnsafeMutableRawPointer?, OpaquePointer?, UInt32, UInt32, UInt32, UInt32
         ) -> Void = { _, _, _, _, key, state in
-            let WL_KEYBOARD_KEY_STATE_PRESSED: UInt32 = 1
-            let KEY_ESC: UInt32 = 1
-            if state == WL_KEYBOARD_KEY_STATE_PRESSED {
-                if key == KEY_ESC {
-                    print("ESC pressed, exiting.")
-                    running = false
-                } else {
-                    print("Key pressed: \(key)")
-                }
-            }
+            WaylandEvents.send(.key(code: key, state: state))
         }
 
     static let keyboard_modifiers_cb:
@@ -537,44 +660,50 @@ private enum Core {
             if (caps & WL_SEAT_CAPABILITY_KEYBOARD) != 0 && keyboard == nil {
                 keyboard = wl_seat_get_keyboard(s)
                 wl_keyboard_add_listener(keyboard, &keyboard_listener, nil)
-            } else if (caps & WL_SEAT_CAPABILITY_KEYBOARD) == 0 && keyboard != nil {
-                wl_keyboard_destroy(keyboard)
-                keyboard = nil
             }
         }
 
-    static let seat_name_cb:
-        @convention(c) (
-            UnsafeMutableRawPointer?, OpaquePointer?, UnsafePointer<CChar>?
-        ) -> Void = { _, _, _ in
-        }
+    static var xdgToplevelListener = xdg_toplevel_listener(
+        configure: xdg_toplevel_configure_cb,
+        close: { _, _ in },
+        configure_bounds: { _, _, _, _ in },
+        wm_capabilities: { _, _, _ in }
+    )
 
-    static let onGlobal:
+    static let xdg_toplevel_configure_cb:
         @convention(c) (
-            UnsafeMutableRawPointer?, OpaquePointer?, UInt32, UnsafePointer<CChar>?, UInt32
-        ) -> Void = { _, registry, name, interface, version in
-            guard let cstr = interface else { return }
-            let c_str = String(cString: cstr)
-            switch c_str {
-            case "wl_compositor":
-                v = min(version, 4)
-                compositor = OpaquePointer(wl_registry_bind(registry, name, &_wl_compositor_interface, v))
-            case "xdg_wm_base":
-                v = min(version, 2)
-                wm_base = OpaquePointer(wl_registry_bind(registry, name, &_xdg_wm_base_interface, v))
-                xdg_wm_base_add_listener(wm_base, &wmBaseListener, nil)
-            case "wl_seat":
-                v = min(version, 5)
-                seat = OpaquePointer(wl_registry_bind(registry, name, &_wl_seat_interface, v))
-            default:
-                break
-
+            _ data: UnsafeMutableRawPointer?,
+            _ toplevel: OpaquePointer?,
+            _ width: Int32,
+            _ height: Int32,
+            _ states: UnsafeMutablePointer<wl_array>?
+        ) -> Void = { data, toplevel, width, height, states in
+            if width > 0 && height > 0 {
+                winW = width
+                winH = height
+                if eglWindow != nil {
+                    wl_egl_window_resize(eglWindow, winW, winH, 0, 0)
+                    glBindVertexArray(vao)
+                    glBindVertexArray(0)
+                }
             }
         }
+}
 
-    static let onGlobalRemove:
-        @convention(c) (
-            UnsafeMutableRawPointer?, OpaquePointer?, UInt32
-        ) -> Void = { _, _, _ in
-        }
+enum WaylandEvent {
+    case key(code: UInt32, state: UInt32)
+    case frame
+}
+
+@MainActor
+enum WaylandEvents {
+    private static var continuation: AsyncStream<WaylandEvent>.Continuation?
+
+    static func events() -> AsyncStream<WaylandEvent> {
+        AsyncStream { cont in continuation = cont }
+    }
+
+    static func send(_ ev: WaylandEvent) {
+        continuation?.yield(ev)
+    }
 }
