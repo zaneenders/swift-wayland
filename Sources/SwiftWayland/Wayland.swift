@@ -30,34 +30,24 @@ internal enum Wayland {
         1.0, -1.0,  // BR
     ]
 
-    static let glyphW = 5
-    static let glyphH = 7
-    static let glyphSpacing = 1
-    static let firstChar: UInt8 = 32
-    static let lastChar: UInt8 = 126
-    static let charCount = Int(lastChar - firstChar + 1)
-
-    static var program: GLuint = 0
-    static var vao: GLuint = 0
-    static var fontTex: GLuint = 0
-    static var whiteTex: GLuint = 0
-    static var quadVBO: GLuint = 0
-    static var instanceVBO: GLuint = 0
-
-    static var atlasW = 0
-    static var atlasH = 0
-    private static var font5x7 = Array(repeating: Glyph(), count: 128)
-
-    static let EGL_NO_CONTEXT: EGLContext? = EGLContext(bitPattern: 0)
-    static let EGL_NO_DISPLAY: EGLDisplay? = EGLDisplay(bitPattern: 0)
-    static let EGL_NO_SURFACE: EGLSurface? = EGLSurface(bitPattern: 0)
+    static var winW: Int32 = 800
+    static var winH: Int32 = 600
 
     static var eglDisplay: EGLDisplay!
     static var eglContext: EGLContext!
     static var eglSurface: EGLSurface!
     static var eglWindow: OpaquePointer!
-    static var winW: Int32 = 800
-    static var winH: Int32 = 600
+
+    static let EGL_NO_CONTEXT: EGLContext? = EGLContext(bitPattern: 0)
+    static let EGL_NO_DISPLAY: EGLDisplay? = EGLDisplay(bitPattern: 0)
+    static let EGL_NO_SURFACE: EGLSurface? = EGLSurface(bitPattern: 0)
+
+    static var program: GLuint = 0
+    static var vao: GLuint = 0
+    static var fontTex: GLuint = 0
+    static var atlasW = 0
+    static var atlasH = 0
+    private static var font5x7 = Array(repeating: Glyph(), count: 128)
 
     nonisolated(unsafe) static var display: OpaquePointer!
     static var compositor: OpaquePointer!
@@ -69,6 +59,16 @@ internal enum Wayland {
     static var registryListener = wl_registry_listener(global: onGlobal, global_remove: onGlobalRemove)
     static var seat: OpaquePointer!
     static var keyboard: OpaquePointer!
+
+    static var whiteTex: GLuint = 0
+    static var quadVBO: GLuint = 0
+    static var instanceVBO: GLuint = 0
+    static let glyphW = 5
+    static let glyphH = 7
+    static let glyphSpacing = 1
+    static let firstChar: UInt8 = 32
+    static let lastChar: UInt8 = 126
+    static let charCount = Int(lastChar - firstChar + 1)
 
     static var _wl_seat_interface: wl_interface = wl_seat_interface
     static var _wl_compositor_interface: wl_interface = wl_compositor_interface
@@ -132,6 +132,33 @@ internal enum Wayland {
             fatalError("Shader compile error: \(msg)")
         }
         return s
+    }
+
+    static func loadText(resource name: String) -> String {
+        let url = Bundle.module.url(forResource: name, withExtension: nil)!
+        let data = try! Data(contentsOf: url)
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    static func linkProgram(vs: GLuint, fs: GLuint) -> GLuint {
+        let p = glCreateProgram()
+        glAttachShader(p, vs)
+        glAttachShader(p, fs)
+        glLinkProgram(p)
+        var ok: GLint = 0
+        glGetProgramiv(p, GLenum(GL_LINK_STATUS), &ok)
+        if ok == 0 {
+            var logLen: GLint = 0
+            glGetProgramiv(p, GLenum(GL_INFO_LOG_LENGTH), &logLen)
+            let buf = UnsafeMutablePointer<GLchar>.allocate(capacity: Int(logLen))
+            defer { buf.deallocate() }
+            glGetProgramInfoLog(p, GLsizei(logLen), nil, buf)
+            let msg = String(cString: buf)
+            fatalError("Program link error: \(msg)")
+        }
+        glDeleteShader(vs)
+        glDeleteShader(fs)
+        return p
     }
 
     static func initGL() {
@@ -207,6 +234,29 @@ internal enum Wayland {
         createFontAtlas()
     }
 
+    static func initFont() {
+        func set(_ ch: Character, _ rows: [String]) {
+            let i = Int(ch.unicodeScalars.first!.value)
+            font5x7[i] = Glyph(rows: rows)
+        }
+        set("S", ["01110", "10001", "10000", "01110", "00001", "10001", "01110"])
+        set("c", ["00000", "00000", "01110", "10000", "10000", "10001", "01110"])
+        set("r", ["00000", "00000", "10110", "11001", "10000", "10000", "10000"])
+        set("i", ["00100", "00000", "01100", "00100", "00100", "00100", "01110"])
+        set("b", ["10000", "10000", "11110", "10001", "10001", "10001", "11110"])
+        set("e", ["00000", "00000", "01110", "10001", "11111", "10000", "01110"])
+        set("0", ["01110", "10001", "10011", "10101", "11001", "10001", "01110"])
+        set("1", ["00100", "01100", "00100", "00100", "00100", "00100", "01110"])
+        set("2", ["01110", "10001", "00001", "00110", "01000", "10000", "11111"])
+        set("3", ["11110", "00001", "00001", "01110", "00001", "00001", "11110"])
+        set("4", ["00010", "00110", "01010", "10010", "11111", "00010", "00010"])
+        set("5", ["11111", "10000", "11110", "00001", "00001", "10001", "01110"])
+        set("6", ["01110", "10000", "11110", "10001", "10001", "10001", "01110"])
+        set("7", ["11111", "00001", "00010", "00100", "01000", "01000", "01000"])
+        set("8", ["01110", "10001", "10001", "01110", "10001", "10001", "01110"])
+        set("9", ["01110", "10001", "10001", "01111", "00001", "00001", "01110"])
+    }
+
     static func createFontAtlas() {
         atlasW = charCount * (glyphW + glyphSpacing)
         atlasH = glyphH
@@ -243,6 +293,18 @@ internal enum Wayland {
         glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_MAG_FILTER), GL_NEAREST)
         glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_WRAP_S), GL_CLAMP_TO_EDGE)
         glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_WRAP_T), GL_CLAMP_TO_EDGE)
+    }
+
+    static func glyphUV(_ c: UInt8) -> (GLfloat, GLfloat, GLfloat, GLfloat) {
+        var ch = c
+        if ch < firstChar || ch > lastChar { ch = 32 }
+        let idx = Int(ch - firstChar)
+        let xoff = idx * (glyphW + glyphSpacing)
+        let u0 = GLfloat(xoff) / GLfloat(atlasW)
+        let u1 = GLfloat(xoff + glyphW) / GLfloat(atlasW)
+        let v0 = GLfloat(1.0) - GLfloat(glyphH) / GLfloat(atlasH)
+        let v1 = GLfloat(1.0)
+        return (u0, v0, u1, v1)
     }
 
     static func drawFrame(_ word: String, count: Int) {
@@ -353,67 +415,6 @@ internal enum Wayland {
         scheduleNextFrame()
     }
 
-    static func loadText(resource name: String) -> String {
-        let url = Bundle.module.url(forResource: name, withExtension: nil)!
-        let data = try! Data(contentsOf: url)
-        return String(decoding: data, as: UTF8.self)
-    }
-
-    static func linkProgram(vs: GLuint, fs: GLuint) -> GLuint {
-        let p = glCreateProgram()
-        glAttachShader(p, vs)
-        glAttachShader(p, fs)
-        glLinkProgram(p)
-        var ok: GLint = 0
-        glGetProgramiv(p, GLenum(GL_LINK_STATUS), &ok)
-        if ok == 0 {
-            var logLen: GLint = 0
-            glGetProgramiv(p, GLenum(GL_INFO_LOG_LENGTH), &logLen)
-            let buf = UnsafeMutablePointer<GLchar>.allocate(capacity: Int(logLen))
-            defer { buf.deallocate() }
-            glGetProgramInfoLog(p, GLsizei(logLen), nil, buf)
-            let msg = String(cString: buf)
-            fatalError("Program link error: \(msg)")
-        }
-        glDeleteShader(vs)
-        glDeleteShader(fs)
-        return p
-    }
-
-    static func initFont() {
-        func set(_ ch: Character, _ rows: [String]) {
-            let i = Int(ch.unicodeScalars.first!.value)
-            font5x7[i] = Glyph(rows: rows)
-        }
-        set("S", ["01110", "10001", "10000", "01110", "00001", "10001", "01110"])
-        set("c", ["00000", "00000", "01110", "10000", "10000", "10001", "01110"])
-        set("r", ["00000", "00000", "10110", "11001", "10000", "10000", "10000"])
-        set("i", ["00100", "00000", "01100", "00100", "00100", "00100", "01110"])
-        set("b", ["10000", "10000", "11110", "10001", "10001", "10001", "11110"])
-        set("e", ["00000", "00000", "01110", "10001", "11111", "10000", "01110"])
-        set("0", ["01110", "10001", "10011", "10101", "11001", "10001", "01110"])
-        set("1", ["00100", "01100", "00100", "00100", "00100", "00100", "01110"])
-        set("2", ["01110", "10001", "00001", "00110", "01000", "10000", "11111"])
-        set("3", ["11110", "00001", "00001", "01110", "00001", "00001", "11110"])
-        set("4", ["00010", "00110", "01010", "10010", "11111", "00010", "00010"])
-        set("5", ["11111", "10000", "11110", "00001", "00001", "10001", "01110"])
-        set("6", ["01110", "10000", "11110", "10001", "10001", "10001", "01110"])
-        set("7", ["11111", "00001", "00010", "00100", "01000", "01000", "01000"])
-        set("8", ["01110", "10001", "10001", "01110", "10001", "10001", "01110"])
-        set("9", ["01110", "10001", "10001", "01111", "00001", "00001", "01110"])
-    }
-
-    static func glyphUV(_ c: UInt8) -> (GLfloat, GLfloat, GLfloat, GLfloat) {
-        var ch = c
-        if ch < firstChar || ch > lastChar { ch = 32 }
-        let idx = Int(ch - firstChar)
-        let xoff = idx * (glyphW + glyphSpacing)
-        let u0 = GLfloat(xoff) / GLfloat(atlasW)
-        let u1 = GLfloat(xoff + glyphW) / GLfloat(atlasW)
-        let v0 = GLfloat(1.0) - GLfloat(glyphH) / GLfloat(atlasH)
-        let v1 = GLfloat(1.0)
-        return (u0, v0, u1, v1)
-    }
     static func setup() {
         Task {
             display = wl_display_connect(nil)
@@ -448,6 +449,22 @@ internal enum Wayland {
         }
     }
 
+    static var start = ContinuousClock.now
+    static var end = ContinuousClock.now
+
+    static func scheduleNextFrame() {
+        let cb = wl_surface_frame(surface)
+        wl_callback_add_listener(cb, &frameListener, nil)
+        wl_surface_commit(surface)
+    }
+
+    static var frameListener = wl_callback_listener(
+        done: { _, callback, _time in
+            wl_callback_destroy(callback)
+            WaylandEvents.send(.frame)
+        }
+    )
+
     static var wmBaseListener = xdg_wm_base_listener(
         ping: { _, base, serial in
             xdg_wm_base_pong(base, serial)
@@ -460,16 +477,28 @@ internal enum Wayland {
         }
     )
 
-    static var frameListener = wl_callback_listener(
-        done: { _, callback, _time in
-            wl_callback_destroy(callback)
-            WaylandEvents.send(.frame)
+    static let xdg_toplevel_configure_cb:
+        @convention(c) (
+            _ data: UnsafeMutableRawPointer?,
+            _ toplevel: OpaquePointer?,
+            _ width: Int32,
+            _ height: Int32,
+            _ states: UnsafeMutablePointer<wl_array>?
+        ) -> Void = { data, toplevel, width, height, states in
+            if width > 0 && height > 0 {
+                winW = width
+                winH = height
+                if eglWindow != nil {
+                    wl_egl_window_resize(eglWindow, winW, winH, 0, 0)
+                    glBindVertexArray(vao)
+                    glBindVertexArray(0)
+                }
+            }
         }
-    )
 
     static var seatListener = wl_seat_listener(
         capabilities: seat_capabilities_cb,
-        name: { _, _, _ in }  // we don’t use "name" here
+        name: { _, _, _ in }
     )
 
     static var keyboard_listener = wl_keyboard_listener(
@@ -480,15 +509,6 @@ internal enum Wayland {
         modifiers: keyboard_modifiers_cb,
         repeat_info: keyboard_repeat_info_cb
     )
-
-    static var start = ContinuousClock.now
-    static var end = ContinuousClock.now
-
-    static func scheduleNextFrame() {
-        let cb = wl_surface_frame(surface)
-        wl_callback_add_listener(cb, &frameListener, nil)
-        wl_surface_commit(surface)
-    }
 
     static let onGlobal:
         @convention(c) (
@@ -577,25 +597,6 @@ internal enum Wayland {
         configure_bounds: { _, _, _, _ in },
         wm_capabilities: { _, _, _ in }
     )
-
-    static let xdg_toplevel_configure_cb:
-        @convention(c) (
-            _ data: UnsafeMutableRawPointer?,
-            _ toplevel: OpaquePointer?,
-            _ width: Int32,
-            _ height: Int32,
-            _ states: UnsafeMutablePointer<wl_array>?
-        ) -> Void = { data, toplevel, width, height, states in
-            if width > 0 && height > 0 {
-                winW = width
-                winH = height
-                if eglWindow != nil {
-                    wl_egl_window_resize(eglWindow, winW, winH, 0, 0)
-                    glBindVertexArray(vao)
-                    glBindVertexArray(0)
-                }
-            }
-        }
 }
 
 enum WaylandEvent {
