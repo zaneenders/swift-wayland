@@ -1,11 +1,14 @@
 # Swift Wayland Client
 
-A minimal graphics client using Wayland.
+A minimal dependency graphics client using Wayland.
 
-## Note
+## Features 
 
-Currently I am using `wayland-client` to get this up and running but ideally 
-this will be down without this dependency.
+- [x] Expose keyboard events
+- [x] Render colored rectangles
+- [ ] ASCII 5x7 character rendering
+ - (partial)
+- [x] Swift concurrency support
 
 ## Setup
 
@@ -19,6 +22,11 @@ Install Dependencies
 ```
 swift run
 ```
+
+## Note
+
+Currently I am using `wayland-client` to get this up and running but ideally 
+this will be down without this dependency.
 
 ## Dev
 
