@@ -452,19 +452,15 @@ internal enum Wayland {
             unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, tcount * MemoryLayout<Quad>.stride, buf.baseAddress)
         }
         glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(tcount))
+
         let asciiStart = 32
         let asciiEnd = 126
         let asciiRange = asciiEnd - asciiStart + 1
-
-        // wrap count into range
         let code = asciiStart + (count % asciiRange)
-
-        // convert to Character
-        var char = Character(" ")
+        var cmsg = Array(Character(" ").utf8)
         if let scalar = UnicodeScalar(code) {
-            char = Character(scalar)
+            cmsg = Array(Character(scalar).utf8)
         }
-        let cmsg = Array(char.utf8)
 
         textW = 0
         for _ in cmsg { textW += Float(glyphW) * scale + Float(glyphSpacing) * scale }
