@@ -31,7 +31,7 @@ actor AsyncState {
     func start() {
         Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
+                try? await Task.sleep(for: .seconds(0.5))
                 self.count += 1
             }
         }
