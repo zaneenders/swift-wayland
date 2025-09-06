@@ -30,13 +30,20 @@ internal enum Wayland {
         1.0, -1.0,  // BR
     ]
 
+    static let glyphW = 5
+    static let glyphH = 7
+    static let glyphSpacing = 1
+    static let firstChar: UInt8 = 32
+    static let lastChar: UInt8 = 126
+    static let charCount = Int(lastChar - firstChar + 1)
+
     static var winW: Int32 = 800
     static var winH: Int32 = 600
 
-    static var eglDisplay: EGLDisplay!
-    static var eglContext: EGLContext!
-    static var eglSurface: EGLSurface!
-    static var eglWindow: OpaquePointer!
+    static var eglDisplay: EGLDisplay?
+    static var eglContext: EGLContext?
+    static var eglSurface: EGLSurface?
+    static var eglWindow: OpaquePointer?
 
     static let EGL_NO_CONTEXT: EGLContext? = EGLContext(bitPattern: 0)
     static let EGL_NO_DISPLAY: EGLDisplay? = EGLDisplay(bitPattern: 0)
@@ -45,30 +52,23 @@ internal enum Wayland {
     static var program: GLuint = 0
     static var vao: GLuint = 0
     static var fontTex: GLuint = 0
+    static var whiteTex: GLuint = 0
+    static var quadVBO: GLuint = 0
+    static var instanceVBO: GLuint = 0
+
     static var atlasW = 0
     static var atlasH = 0
     private static var font5x7 = Array(repeating: Glyph(), count: 128)
 
     nonisolated(unsafe) static var display: OpaquePointer!
+    static var registry: OpaquePointer!
     static var compositor: OpaquePointer!
-    static var toplevel: OpaquePointer!
     static var wmBase: OpaquePointer!
+    static var seat: OpaquePointer!
     static var surface: OpaquePointer!
     static var xdgSurface: OpaquePointer!
-    static var registry: OpaquePointer!
-    static var registryListener = wl_registry_listener(global: onGlobal, global_remove: onGlobalRemove)
-    static var seat: OpaquePointer!
+    static var toplevel: OpaquePointer!
     static var keyboard: OpaquePointer!
-
-    static var whiteTex: GLuint = 0
-    static var quadVBO: GLuint = 0
-    static var instanceVBO: GLuint = 0
-    static let glyphW = 5
-    static let glyphH = 7
-    static let glyphSpacing = 1
-    static let firstChar: UInt8 = 32
-    static let lastChar: UInt8 = 126
-    static let charCount = Int(lastChar - firstChar + 1)
 
     static func initEGL() {
         eglDisplay = eglGetDisplay(EGLNativeDisplayType(display))
@@ -411,14 +411,21 @@ internal enum Wayland {
         scheduleNextFrame()
     }
 
-    static var seatListener = wl_seat_listener(
-        capabilities: seat_capabilities_cb,
-        name: { _, _, _ in }
-    )
+    static var start = ContinuousClock.now
+    static var end = ContinuousClock.now
 
-    static var _wl_seat_interface: wl_interface = wl_seat_interface
-    static var _wl_compositor_interface: wl_interface = wl_compositor_interface
-    static var _xdg_wm_base_interface: wl_interface = xdg_wm_base_interface
+    static func scheduleNextFrame() {
+        let cb = wl_surface_frame(surface)
+        wl_callback_add_listener(cb, &frameListener, nil)
+        wl_surface_commit(surface)
+    }
+
+    static var frameListener = wl_callback_listener(
+        done: { _, callback, _time in
+            wl_callback_destroy(callback)
+            WaylandEvents.send(.frame)
+        }
+    )
 
     static var xdgToplevelListener = xdg_toplevel_listener(
         configure: xdg_toplevel_configure_cb,
@@ -435,6 +442,16 @@ internal enum Wayland {
         modifiers: keyboard_modifiers_cb,
         repeat_info: keyboard_repeat_info_cb
     )
+
+    static var seatListener = wl_seat_listener(
+        capabilities: seat_capabilities_cb,
+        name: { _, _, _ in }
+    )
+
+    static var _wl_seat_interface: wl_interface = wl_seat_interface
+    static var _wl_compositor_interface: wl_interface = wl_compositor_interface
+    static var _xdg_wm_base_interface: wl_interface = xdg_wm_base_interface
+    static var registryListener = wl_registry_listener(global: onGlobal, global_remove: onGlobalRemove)
 
     static func setup() {
         Task {
@@ -458,7 +475,6 @@ internal enum Wayland {
             xdg_toplevel_add_listener(toplevel, &xdgToplevelListener, nil)
             xdg_toplevel_set_title(toplevel, "Swift Wayland")
             wl_surface_commit(surface)
-            wl_display_roundtrip(display)
 
             initEGL()
             initGL()
@@ -469,22 +485,6 @@ internal enum Wayland {
             WaylandEvents.send(.frame)
         }
     }
-
-    static var start = ContinuousClock.now
-    static var end = ContinuousClock.now
-
-    static func scheduleNextFrame() {
-        let cb = wl_surface_frame(surface)
-        wl_callback_add_listener(cb, &frameListener, nil)
-        wl_surface_commit(surface)
-    }
-
-    static var frameListener = wl_callback_listener(
-        done: { _, callback, _time in
-            wl_callback_destroy(callback)
-            WaylandEvents.send(.frame)
-        }
-    )
 
     static var wmBaseListener = xdg_wm_base_listener(
         ping: { _, base, serial in
