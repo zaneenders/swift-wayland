@@ -1,3 +1,10 @@
-import CClient
+@main
+struct SwiftWayland {
+    static func main() async {
+        Wayland.setupWayland()
 
-start()
+        while Wayland.stillRunning {
+            Wayland.drawFrame(word: "Scribe")
+        }
+    }
+}
