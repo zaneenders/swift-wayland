@@ -519,7 +519,7 @@ internal enum Wayland {
         unsafe wl_surface_commit(surface)
 
         end = ContinuousClock.now
-        print(#function, end - start)
+        // print(#function, end - start)
         start = ContinuousClock.now
     }
 

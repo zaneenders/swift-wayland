@@ -17,7 +17,7 @@ struct SwiftWayland {
             }
         }
 
-        // Read why the final state
+        // Read the final state
         switch Wayland.state {
         case .error(let reason):
             print("error: \(reason)")
