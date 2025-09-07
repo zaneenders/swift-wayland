@@ -5,6 +5,9 @@ import CWaylandEGL
 import CXDGShell
 import Foundation
 
+/// There is alot of global state here to setup and conform to Wayland's patterns.
+/// Their might be better ways to abstract this and clean it up a bit. But it's
+/// working for now.
 @MainActor
 internal enum Wayland {
 
@@ -29,6 +32,21 @@ internal enum Wayland {
         -1.0, -1.0,  // BL
         1.0, -1.0,  // BR
     ]
+
+    enum State {
+        case running
+        case error(reason: String)
+        case exit
+
+        var isRunning: Bool {
+            switch self {
+            case .running: true
+            case .error, .exit: false
+            }
+        }
+    }
+
+    static var state: State = .running
 
     static let glyphW = 5
     static let glyphH = 7
@@ -70,12 +88,16 @@ internal enum Wayland {
     static var toplevel: OpaquePointer!
     static var keyboard: OpaquePointer!
 
-    static func initEGL() {
+    static func initEGL() throws(WaylandError) {
         unsafe eglDisplay = eglGetDisplay(EGLNativeDisplayType(display))
-        guard unsafe eglDisplay != nil else { fatalError("eglGetDisplay failed") }
-        guard unsafe eglInitialize(eglDisplay, nil, nil) == EGL_TRUE else { fatalError("eglInitialize failed") }
+        guard unsafe eglDisplay != nil else { throw WaylandError.error(message: "eglGetDisplay failed") }
+        guard unsafe eglInitialize(eglDisplay, nil, nil) == EGL_TRUE else {
+            throw WaylandError.error(message: "eglInitialize failed")
+        }
 
-        guard eglBindAPI(EGLenum(EGL_OPENGL_ES_API)) == EGL_TRUE else { fatalError("eglBindAPI failed") }
+        guard eglBindAPI(EGLenum(EGL_OPENGL_ES_API)) == EGL_TRUE else {
+            throw WaylandError.error(message: "eglBindAPI failed")
+        }
 
         var cfg: EGLConfig?
         var num: EGLint = 0
@@ -88,22 +110,23 @@ internal enum Wayland {
         unsafe attrs.withUnsafeMutableBufferPointer { p in
             _ = unsafe eglChooseConfig(eglDisplay, p.baseAddress, &cfg, 1, &num)
         }
-        guard num > 0, unsafe cfg != nil else { fatalError("eglChooseConfig failed") }
+        guard num > 0, unsafe cfg != nil else { throw WaylandError.error(message: "eglChooseConfig failed") }
 
         var ctxAttrs: [EGLint] = [EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE]
         unsafe eglContext = ctxAttrs.withUnsafeMutableBufferPointer { p in
             unsafe eglCreateContext(eglDisplay, cfg, EGL_NO_CONTEXT, p.baseAddress)
         }
-        guard unsafe eglContext != EGL_NO_CONTEXT else { fatalError("eglCreateContext failed") }
+        guard unsafe eglContext != EGL_NO_CONTEXT else { throw WaylandError.error(message: "eglCreateContext failed") }
 
         unsafe eglWindow = wl_egl_window_create(surface, winW, winH)
-        guard unsafe eglWindow != nil else { fatalError("wl_egl_window_create failed") }
+        guard unsafe eglWindow != nil else { throw WaylandError.error(message: "wl_egl_window_create failed") }
 
         unsafe eglSurface = eglCreateWindowSurface(eglDisplay, cfg, EGLNativeWindowType(bitPattern: eglWindow), nil)
-        guard unsafe eglSurface != EGL_NO_SURFACE else { fatalError("eglCreateWindowSurface failed") }
-
+        guard unsafe eglSurface != EGL_NO_SURFACE else {
+            throw WaylandError.error(message: "eglCreateWindowSurface failed")
+        }
         guard unsafe eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext) == EGL_TRUE else {
-            fatalError("eglMakeCurrent failed")
+            throw WaylandError.error(message: "eglMakeCurrent failed")
         }
 
         _ = unsafe eglSwapInterval(eglDisplay, 1)
@@ -491,30 +514,30 @@ internal enum Wayland {
         glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(tcount))
 
         _ = unsafe eglSwapBuffers(eglDisplay, eglSurface)
+
+        unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
+        unsafe wl_surface_commit(surface)
+
         end = ContinuousClock.now
-        // print(#function, end - start)
+        print(#function, end - start)
         start = ContinuousClock.now
-        scheduleNextFrame()
     }
 
     static var start = ContinuousClock.now
     static var end = ContinuousClock.now
 
-    static func scheduleNextFrame() {
-        unsafe wl_callback_add_listener(wl_surface_frame(surface), &frameListener, nil)
-        unsafe wl_surface_commit(surface)
-    }
-
     static var frameListener = unsafe wl_callback_listener(
         done: { _, callback, _time in
             unsafe wl_callback_destroy(callback)
-            WaylandEvents.send(.frame)
+            print("Callback")
         }
     )
 
     static var xdgToplevelListener = unsafe xdg_toplevel_listener(
         configure: xdg_toplevel_configure_cb,
-        close: { _, _ in },
+        close: { _, _ in
+            state = .exit
+        },
         configure_bounds: { _, _, _, _ in },
         wm_capabilities: { _, _, _ in }
     )
@@ -542,14 +565,14 @@ internal enum Wayland {
         Task {
             unsafe display = wl_display_connect(nil)
             guard unsafe display != nil else {
-                print("Failed to connect to Wayland display.")
-                exit(1)
+                state = .error(reason: "Failed to connect to Wayland display.")
+                return
             }
             unsafe registry = wl_display_get_registry(display)
             unsafe wl_registry_add_listener(registry, &registryListener, nil)
             unsafe wl_display_roundtrip(display)
             guard unsafe compositor != nil, unsafe wmBase != nil && surface == nil else {
-                print("No compositor, wmBase")
+                state = .error(reason: "No compositor, wmBase")
                 return
             }
 
@@ -559,9 +582,18 @@ internal enum Wayland {
             unsafe toplevel = xdg_surface_get_toplevel(xdgSurface)
             unsafe xdg_toplevel_add_listener(toplevel, &xdgToplevelListener, nil)
             unsafe xdg_toplevel_set_title(toplevel, "Swift Wayland")
+            unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
             unsafe wl_surface_commit(surface)
 
-            initEGL()
+            do throws(WaylandError) {
+                try initEGL()
+            } catch let error {
+                switch error {
+                case .error(let message):
+                    state = .error(reason: message)
+                }
+                return
+            }
             initGL()
 
             DispatchQueue.global().async {
@@ -596,8 +628,6 @@ internal enum Wayland {
                 winH = height
                 if unsafe eglWindow != nil {
                     unsafe wl_egl_window_resize(eglWindow, winW, winH, 0, 0)
-                    glBindVertexArray(vao)
-                    glBindVertexArray(0)
                 }
             }
         }
@@ -659,15 +689,38 @@ enum WaylandEvent {
     case frame
 }
 
+/// I am using this event loop so that I can have async suspenion points in "user space"
+/// This is more of a hack to get around how the wayland-client library works. Because
+/// C doesn't have a notion of async dispatch queues are used which is why we need to call
+/// `wl_display_dispatch` on a background thread. I don't love this but this hack seems to
+/// work well enough for now. Writing our own stand alone client should fix this but I
+/// Don't feel like setting up the shared memory or EGL yet.
 @MainActor
 enum WaylandEvents {
     private static var continuation: AsyncStream<WaylandEvent>.Continuation?
+    private static var calledOnce = true
 
     static func events() -> AsyncStream<WaylandEvent> {
-        AsyncStream { cont in continuation = cont }
+        guard calledOnce else {
+            fatalError("Only call events once.")
+        }
+        calledOnce = true
+        Task {
+            // Render loop
+            while Wayland.state.isRunning {
+                try? await Task.sleep(for: .milliseconds(33))
+                WaylandEvents.send(.frame)
+            }
+            continuation?.finish()
+        }
+        return AsyncStream { cont in continuation = cont }
     }
 
     static func send(_ ev: WaylandEvent) {
         continuation?.yield(ev)
     }
+}
+
+enum WaylandError: Error {
+    case error(message: String)
 }

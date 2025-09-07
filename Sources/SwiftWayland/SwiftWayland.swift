@@ -11,10 +11,18 @@ struct SwiftWayland {
                 Wayland.drawFrame("Scribe", count: count)
             case .key(let code, let state):
                 if code == 1 {
-                    return
+                    Wayland.state = .exit
                 }
-                print(code, state)
+                print("Key:", code, state)
             }
+        }
+
+        // Read why the final state
+        switch Wayland.state {
+        case .error(let reason):
+            print("error: \(reason)")
+        case .running, .exit:
+            ()
         }
     }
 }
