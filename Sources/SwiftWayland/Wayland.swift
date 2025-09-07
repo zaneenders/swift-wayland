@@ -12,7 +12,7 @@ import Foundation
 internal enum Wayland {
 
     @MainActor
-    private struct Glyph {
+    struct Glyph {
         var rows: [String] = Array(repeating: "", count: glyphH)
     }
 
@@ -54,6 +54,8 @@ internal enum Wayland {
     static let firstChar: UInt8 = 32
     static let lastChar: UInt8 = 126
     static let charCount = Int(lastChar - firstChar + 1)
+    static var atlasW = charCount * (glyphW + glyphSpacing)
+    static var atlasH = glyphH
 
     static var winW: Int32 = 800
     static var winH: Int32 = 600
@@ -73,10 +75,6 @@ internal enum Wayland {
     static var whiteTex: GLuint = 0
     static var quadVBO: GLuint = 0
     static var instanceVBO: GLuint = 0
-
-    static var atlasW = 0
-    static var atlasH = 0
-    private static var font5x7 = Array(repeating: Glyph(), count: 128)
 
     nonisolated(unsafe) static var display: OpaquePointer!
     static var registry: OpaquePointer!
@@ -249,11 +247,11 @@ internal enum Wayland {
         glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_WRAP_S), GL_CLAMP_TO_EDGE)
         glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_WRAP_T), GL_CLAMP_TO_EDGE)
 
-        initFont()
         createFontAtlas()
     }
 
-    static func initFont() {
+    static func initFont() -> [Glyph] {
+        var font5x7 = Array(repeating: Glyph(), count: 128)
         func set(_ ch: Character, _ rows: [String]) {
             let i = Int(ch.unicodeScalars.first!.value)
             font5x7[i] = Glyph(rows: rows)
@@ -353,11 +351,12 @@ internal enum Wayland {
         set("|", ["00100", "00100", "00100", "00100", "00100", "00100", "00100"])
         set("}", ["01100", "00100", "00100", "00110", "00100", "00100", "01100"])
         set("~", ["01001", "10110", "00000", "00000", "00000", "00000", "00000"])
+
+        return font5x7
     }
 
     static func createFontAtlas() {
-        atlasW = charCount * (glyphW + glyphSpacing)
-        atlasH = glyphH
+        let font5x7 = initFont()
         let pixelsCount = atlasW * atlasH * 4
         let img = UnsafeMutablePointer<UInt8>.allocate(capacity: pixelsCount)
         unsafe img.initialize(repeating: 0, count: pixelsCount)
@@ -405,7 +404,46 @@ internal enum Wayland {
         return (u0, v0, u1, v1)
     }
 
+    static func drawQuad(_ quad: Quad) {
+        let rects = [quad]
+        unsafe rects.withUnsafeBytes { buf in
+            glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
+            unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, MemoryLayout<Quad>.stride, buf.baseAddress)
+        }
+        glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, 1)
+    }
+
+    static func drawText(_ text: String, at pos: (x: Float, y: Float), scale: Float) {
+        var rects: [Quad] = []
+        var penX = pos.x
+        let penY = pos.y
+
+        for c in Array(text.utf8) {
+            let (u0, v0, u1, v1) = glyphUV(c)
+            let w = Float(glyphW) * scale
+            let h = Float(glyphH) * scale
+
+            rects.append(
+                Quad(
+                    dst_p0: (GLfloat(penX), GLfloat(penY)),
+                    dst_p1: (GLfloat(penX + w), GLfloat(penY + h)),
+                    tex_tl: (u0, v0), tex_br: (u1, v1),
+                    color: Color(r: 1, g: 1, b: 1, a: 1)
+                ))
+            penX += w + Float(glyphSpacing) * scale
+        }
+
+        guard !rects.isEmpty else { return }
+
+        unsafe rects.withUnsafeBytes { buf in
+            glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
+            unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, rects.count * MemoryLayout<Quad>.stride, buf.baseAddress)
+        }
+        glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(rects.count))
+    }
+
     static func drawFrame(_ word: String, count: Int) {
+        start = ContinuousClock.now
         glViewport(0, 0, GLsizei(winW), GLsizei(winH))
         glClearColor(0, 0, 0, 1)
         glClear(GLbitfield(GL_COLOR_BUFFER_BIT))
@@ -417,110 +455,51 @@ internal enum Wayland {
         glUniform1i(uTex, 0)
 
         glBindVertexArray(vao)
-        var rects: [Quad] = Array(
-            repeating: Quad(
-                dst_p0: (0, 0), dst_p1: (0, 0), tex_tl: (0, 0), tex_br: (0, 0), color: Color(r: 1, g: 1, b: 1, a: 1)
-            ), count: 128)
-        var n = 0
 
-        rects[n] = Quad(
-            dst_p0: (0, 0), dst_p1: (GLfloat(winW), 200),
-            tex_tl: (0, 0), tex_br: (1, 1), color: Color(r: 0, g: 1, b: 1, a: 1)
-        )
-        n += 1
-
-        rects[n] = Quad(
-            dst_p0: (GLfloat(winW), GLfloat(winH - 200)), dst_p1: (0, GLfloat(winH)),
-            tex_tl: (0, 0), tex_br: (1, 1), color: Color(r: 0.5, g: 1, b: 0.5, a: 1)
-        )
-        n += 1
-
-        glActiveTexture(GLenum(GL_TEXTURE0))
+        // Draw quads
         glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
-        unsafe rects.withUnsafeBytes { buf in
-            glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-            unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, n * MemoryLayout<Quad>.stride, buf.baseAddress)
-        }
-        glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(n))
+        drawQuad(
+            Quad(
+                dst_p0: (0, 0),
+                dst_p1: (GLfloat(winW), 200),
+                tex_tl: (0, 0),
+                tex_br: (1, 1),
+                color: Color(r: 0, g: 1, b: 1, a: 1)
+            ))
 
+        drawQuad(
+            Quad(
+                dst_p0: (GLfloat(winW), GLfloat(winH - 200)),
+                dst_p1: (0, GLfloat(winH)),
+                tex_tl: (0, 0),
+                tex_br: (1, 1),
+                color: Color(r: 0.5, g: 1, b: 0.5, a: 1)
+            ))
+
+        // Draw Text
         glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
-
-        let msg = Array(word.utf8)
-
         let scale: Float = 12.0
-        var textW: Float = 0
-        for _ in msg { textW += Float(glyphW) * scale + Float(glyphSpacing) * scale }
-        textW -= Float(glyphSpacing) * scale
-        var textH = Float(glyphH) * scale
-        var penX = (Float(winW) - textW) * 0.5
-        var penY = (Float(winH) - textH) * 0.5 - 50
-
-        var tcount = 0
-        for c in msg {
-            if tcount >= 64 { break }
-            let (u0, v0, u1, v1) = glyphUV(c)
-            let w = Float(glyphW) * scale
-            let h = Float(glyphH) * scale
-            rects[tcount] = Quad(
-                dst_p0: (GLfloat(penX), GLfloat(penY)),
-                dst_p1: (GLfloat(penX + w), GLfloat(penY + h)),
-                tex_tl: (u0, v0), tex_br: (u1, v1),
-                color: Color(r: 1, g: 1, b: 1, a: 1)
-            )
-            tcount += 1
-            penX += w + Float(glyphSpacing) * scale
-        }
-        unsafe rects.withUnsafeBytes { buf in
-            glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-            unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, tcount * MemoryLayout<Quad>.stride, buf.baseAddress)
-        }
-        glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(tcount))
+        let textW = Float(word.count) * (Float(glyphW + glyphSpacing) * scale) - Float(glyphSpacing) * scale
+        let textH = Float(glyphH) * scale
+        let penX = (Float(winW) - textW) * 0.5
+        let penY = (Float(winH) - textH) * 0.5 - 50
+        drawText(word, at: (penX, penY), scale: scale)
 
         let asciiStart = 32
         let asciiEnd = 126
-        let asciiRange = asciiEnd - asciiStart + 1
-        let code = asciiStart + (count % asciiRange)
-        var cmsg = Array(Character(" ").utf8)
-        if let scalar = UnicodeScalar(code) {
-            cmsg = Array(Character(scalar).utf8)
-        }
-
-        textW = 0
-        for _ in cmsg { textW += Float(glyphW) * scale + Float(glyphSpacing) * scale }
-        textW -= Float(glyphSpacing) * scale
-        textH = Float(glyphH) * scale
-        penX = (Float(winW) - textW) * 0.5
-        penY = (Float(winH) - textH) * 0.5 + 50
-
-        tcount = 0
-        for c in cmsg {
-            if tcount >= 64 { break }
-            let (u0, v0, u1, v1) = glyphUV(c)
-            let w = Float(glyphW) * scale
-            let h = Float(glyphH) * scale
-            rects[tcount] = Quad(
-                dst_p0: (GLfloat(penX), GLfloat(penY)),
-                dst_p1: (GLfloat(penX + w), GLfloat(penY + h)),
-                tex_tl: (u0, v0), tex_br: (u1, v1),
-                color: Color(r: 1, g: 1, b: 1, a: 1)
-            )
-            tcount += 1
-            penX += w + Float(glyphSpacing) * scale
-        }
-        unsafe rects.withUnsafeBytes { buf in
-            glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-            unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, tcount * MemoryLayout<Quad>.stride, buf.baseAddress)
-        }
-        glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(tcount))
+        let code = asciiStart + (count % (asciiEnd - asciiStart + 1))
+        let cmsg = UnicodeScalar(code).map { String(Character($0)) } ?? " "
+        let charW = Float(cmsg.count) * (Float(glyphW + glyphSpacing) * scale) - Float(glyphSpacing) * scale
+        let penX2 = (Float(winW) - charW) * 0.5
+        let penY2 = (Float(winH) - textH) * 0.5 + 50
+        drawText(cmsg, at: (penX2, penY2), scale: scale)
 
         _ = unsafe eglSwapBuffers(eglDisplay, eglSurface)
-
         unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
         unsafe wl_surface_commit(surface)
 
         end = ContinuousClock.now
-        // print(#function, end - start)
-        start = ContinuousClock.now
+        print(end - start)
     }
 
     static var start = ContinuousClock.now
