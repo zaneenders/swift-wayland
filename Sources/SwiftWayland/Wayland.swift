@@ -56,6 +56,7 @@ internal enum Wayland {
     static let charCount = Int(lastChar - firstChar + 1)
     static var atlasW = charCount * (glyphW + glyphSpacing)
     static var atlasH = glyphH
+    static let scale: Float = 12.0
 
     static var winW: Int32 = 800
     static var winH: Int32 = 600
@@ -413,8 +414,10 @@ internal enum Wayland {
         glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, 1)
     }
 
-    static func drawText(_ text: String, at pos: (x: Float, y: Float), scale: Float) {
-        var rects: [Quad] = []
+    static func drawText(
+        _ text: String, at pos: (x: Float, y: Float), scale: Float, color: Color = Color(r: 1, g: 1, b: 1, a: 1)
+    ) {
+        var symbols: [Quad] = []
         var penX = pos.x
         let penY = pos.y
 
@@ -423,27 +426,30 @@ internal enum Wayland {
             let w = Float(glyphW) * scale
             let h = Float(glyphH) * scale
 
-            rects.append(
+            symbols.append(
                 Quad(
                     dst_p0: (GLfloat(penX), GLfloat(penY)),
                     dst_p1: (GLfloat(penX + w), GLfloat(penY + h)),
-                    tex_tl: (u0, v0), tex_br: (u1, v1),
-                    color: Color(r: 1, g: 1, b: 1, a: 1)
+                    tex_tl: (u0, v0),
+                    tex_br: (u1, v1),
+                    color: color
                 ))
             penX += w + Float(glyphSpacing) * scale
         }
 
-        guard !rects.isEmpty else { return }
+        guard !symbols.isEmpty else { return }
 
-        unsafe rects.withUnsafeBytes { buf in
+        unsafe symbols.withUnsafeBytes { buf in
             glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-            unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, rects.count * MemoryLayout<Quad>.stride, buf.baseAddress)
+            unsafe glBufferSubData(
+                GLenum(GL_ARRAY_BUFFER), 0, symbols.count * MemoryLayout<Quad>.stride, buf.baseAddress)
         }
-        glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(rects.count))
+        glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(symbols.count))
     }
 
-    static func drawFrame(_ word: String, count: Int) {
+    static func drawFrame(_ words: [String]) {
         start = ContinuousClock.now
+
         glViewport(0, 0, GLsizei(winW), GLsizei(winH))
         glClearColor(0, 0, 0, 1)
         glClear(GLbitfield(GL_COLOR_BUFFER_BIT))
@@ -466,7 +472,6 @@ internal enum Wayland {
                 tex_br: (1, 1),
                 color: Color(r: 0, g: 1, b: 1, a: 1)
             ))
-
         drawQuad(
             Quad(
                 dst_p0: (GLfloat(winW), GLfloat(winH - 200)),
@@ -476,34 +481,35 @@ internal enum Wayland {
                 color: Color(r: 0.5, g: 1, b: 0.5, a: 1)
             ))
 
+        let space = Float(glyphSpacing) * scale
+        let textH = Float(glyphH) * scale
+        let total = (Float(words.count) * (textH + space)) - space
+        let startY = (Float(winH) - total) * 0.5
+
         // Draw Text
         glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
-        let scale: Float = 12.0
-        let textW = Float(word.count) * (Float(glyphW + glyphSpacing) * scale) - Float(glyphSpacing) * scale
-        let textH = Float(glyphH) * scale
-        let penX = (Float(winW) - textW) * 0.5
-        let penY = (Float(winH) - textH) * 0.5 - 50
-        drawText(word, at: (penX, penY), scale: scale)
 
-        let asciiStart = 32
-        let asciiEnd = 126
-        let code = asciiStart + (count % (asciiEnd - asciiStart + 1))
-        let cmsg = UnicodeScalar(code).map { String(Character($0)) } ?? " "
-        let charW = Float(cmsg.count) * (Float(glyphW + glyphSpacing) * scale) - Float(glyphSpacing) * scale
-        let penX2 = (Float(winW) - charW) * 0.5
-        let penY2 = (Float(winH) - textH) * 0.5 + 50
-        drawText(cmsg, at: (penX2, penY2), scale: scale)
+        for (i, word) in words.enumerated() {
+            let textW = Float(word.count) * (Float(glyphW + glyphSpacing) * scale) - space
+            let penX = (Float(winW) - textW) * 0.5
+            let penY = startY + (Float(i) * (textH + space))
+            drawText(word, at: (penX, penY), scale: scale)
+        }
+
+        end = ContinuousClock.now
+
+        drawText("\(elapsed)", at: (0, 0), scale: 2.0, color: Color(r: 1, g: 0, b: 0, a: 1))
 
         _ = unsafe eglSwapBuffers(eglDisplay, eglSurface)
         unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
         unsafe wl_surface_commit(surface)
-
-        end = ContinuousClock.now
-        print(end - start)
     }
 
     static var start = ContinuousClock.now
     static var end = ContinuousClock.now
+    static var elapsed: Duration {
+        end - start
+    }
 
     static var frameListener = unsafe wl_callback_listener(
         done: { _, callback, _time in

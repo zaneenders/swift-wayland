@@ -20,7 +20,7 @@ let package = Package(
             ],
             swiftSettings: [
                 .strictMemorySafety(),
-                .treatAllWarnings(as: .error),
+                .treatAllWarnings(as: .error, .when(configuration: .release)),
             ]
         ),
         .systemLibrary(
