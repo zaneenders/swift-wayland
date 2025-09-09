@@ -19,7 +19,10 @@ Install Dependencies
 ## Run
 
 ```
+# Window Example
 swift run
+# Toolbar Example 
+swift run --traits Toolbar
 ```
 
 ## Note

@@ -481,8 +481,43 @@ internal enum Wayland {
         glUniform1i(uTex, 0)
 
         glBindVertexArray(vao)
+        #if !Toolbar
+        // Draw quads
+        glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
+        drawQuad(
+            Quad(
+                dst_p0: (0, 0),
+                dst_p1: (Float(winW), 200),
+                tex_tl: (0, 0),
+                tex_br: (1, 1),
+                color: Color(r: 0, g: 1, b: 1, a: 1)
+            ))
+        drawQuad(
+            Quad(
+                dst_p0: (Float(winW), Float(winH - 200)),
+                dst_p1: (0, Float(winH)),
+                tex_tl: (0, 0),
+                tex_br: (1, 1),
+                color: Color(r: 0.5, g: 1, b: 0.5, a: 1)
+            ))
+        #endif
 
+        // Draw Text
         glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
+        #if !Toolbar
+        let space = Float(glyphSpacing) * scale
+        let textH = Float(glyphH) * scale
+        let total = (Float(words.count) * (textH + space)) - space
+        let startY = (Float(winH) - total) * 0.5
+
+        for (i, word) in words.enumerated() {
+            let textW = Float(word.count) * (Float(glyphW + glyphSpacing) * scale) - space
+            let penX = (Float(winW) - textW) * 0.5
+            let penY = startY + (Float(i) * (textH + space))
+            drawText(word, at: (penX, penY), scale: scale)
+        }
+        #endif
+
         drawText("\(elapsed)", at: (0, 0), scale: 2.0, color: Color(r: 1, g: 0, b: 0, a: 1))
 
         end = ContinuousClock.now
@@ -496,6 +531,16 @@ internal enum Wayland {
     static var start = ContinuousClock.now
     static var end = ContinuousClock.now
     static var elapsed: Duration = end - start
+    #if !Toolbar
+    static var xdgToplevelListener = unsafe xdg_toplevel_listener(
+        configure: xdg_toplevel_configure_cb,
+        close: { _, _ in
+            state = .exit
+        },
+        configure_bounds: { _, _, _, _ in },
+        wm_capabilities: { _, _, _ in }
+    )
+    #endif
 
     static var frameListener = unsafe wl_callback_listener(
         done: { _, callback, _time in
@@ -504,6 +549,7 @@ internal enum Wayland {
         }
     )
 
+    #if !Toolbar
     static var keyboard_listener = unsafe wl_keyboard_listener(
         keymap: keyboard_keymap_cb,
         enter: { _, _, _, _, _ in },
@@ -512,6 +558,7 @@ internal enum Wayland {
         modifiers: { _, _, _, _, _, _, _ in },
         repeat_info: { _, _, _, _ in }
     )
+    #endif
 
     static var seatListener = unsafe wl_seat_listener(
         capabilities: seat_capabilities_cb,
@@ -526,7 +573,6 @@ internal enum Wayland {
 
     static func setup() {
         Task {
-            #if Toolbar
             unsafe display = wl_display_connect(nil)
             guard unsafe display != nil else {
                 state = .error(reason: "Failed to connect to Wayland display.")
@@ -544,6 +590,7 @@ internal enum Wayland {
 
             unsafe surface = wl_compositor_create_surface(compositor)
 
+            #if Toolbar
             guard unsafe layerShell != nil else {
                 state = .error(reason: "Layer shell not available")
                 return
@@ -564,6 +611,14 @@ internal enum Wayland {
             )
             unsafe zwlr_layer_surface_v1_set_exclusive_zone(layerSurface, 35)
             unsafe zwlr_layer_surface_v1_add_listener(layerSurface, &layerSurfaceListener, nil)
+            #else
+            unsafe xdgSurface = xdg_wm_base_get_xdg_surface(wmBase, surface)
+            unsafe xdg_surface_add_listener(xdgSurface, &xdgSurfaceListener, nil)
+            unsafe toplevel = xdg_surface_get_toplevel(xdgSurface)
+            unsafe xdg_toplevel_add_listener(toplevel, &xdgToplevelListener, nil)
+            unsafe xdg_toplevel_set_title(toplevel, "Swift Wayland")
+            unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
+            #endif
             unsafe wl_surface_commit(surface)
 
             do throws(WaylandError) {
@@ -582,9 +637,27 @@ internal enum Wayland {
             }
 
             WaylandEvents.send(.frame)
-            #endif
         }
     }
+
+    #if !Toolbar
+    static let xdg_toplevel_configure_cb:
+        @convention(c) (
+            _ data: UnsafeMutableRawPointer?,
+            _ toplevel: OpaquePointer?,
+            _ width: Int32,
+            _ height: Int32,
+            _ states: UnsafeMutablePointer<wl_array>?
+        ) -> Void = { data, toplevel, width, height, states in
+            if width > 0 && height > 0 {
+                winW = UInt32(width)
+                winH = UInt32(height)
+                if unsafe eglWindow != nil {
+                    unsafe wl_egl_window_resize(eglWindow, width, height, 0, 0)
+                }
+            }
+        }
+    #endif
 
     static var wmBaseListener = unsafe xdg_wm_base_listener(
         ping: { _, base, serial in
@@ -650,6 +723,7 @@ internal enum Wayland {
             }
         }
 
+    #if !Toolbar
     static let keyboard_keymap_cb:
         @convention(c) (
             UnsafeMutableRawPointer?, OpaquePointer?, UInt32, Int32, UInt32
@@ -663,16 +737,19 @@ internal enum Wayland {
         ) -> Void = { _, _, _, _, key, state in
             WaylandEvents.send(.key(code: key, state: state))
         }
+    #endif
 
     static let seat_capabilities_cb:
         @convention(c) (
             UnsafeMutableRawPointer?, OpaquePointer?, UInt32
         ) -> Void = { _, s, caps in
+            #if !Toolbar
             let WL_SEAT_CAPABILITY_KEYBOARD: UInt32 = 1  // bit 0
             if unsafe (caps & WL_SEAT_CAPABILITY_KEYBOARD) != 0 && keyboard == nil {
                 unsafe keyboard = wl_seat_get_keyboard(s)
                 unsafe wl_keyboard_add_listener(keyboard, &keyboard_listener, nil)
             }
+            #endif
         }
 }
 

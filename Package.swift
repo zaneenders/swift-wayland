@@ -6,7 +6,7 @@ let package = Package(
     name: "swift-wayland",
     traits: [
         "Toolbar",
-        .default(enabledTraits: ["Toolbar"]),
+        .default(enabledTraits: []),
     ],
     targets: [
         .executableTarget(
