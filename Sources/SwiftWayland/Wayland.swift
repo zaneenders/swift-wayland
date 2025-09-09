@@ -5,6 +5,14 @@ import CWaylandEGL
 import CXDGShell
 import Foundation
 
+internal struct Quad {
+    var dst_p0: (Float, Float)
+    var dst_p1: (Float, Float)
+    var tex_tl: (Float, Float)
+    var tex_br: (Float, Float)
+    var color: Color
+}
+
 /// There is alot of global state here to setup and conform to Wayland's patterns.
 /// Their might be better ways to abstract this and clean it up a bit. But it's
 /// working for now.
@@ -14,18 +22,6 @@ internal enum Wayland {
     @MainActor
     struct Glyph {
         var rows: [String] = Array(repeating: "", count: glyphH)
-    }
-
-    struct Color {
-        var r, g, b, a: Float
-    }
-
-    struct Quad {
-        var dst_p0: (Float, Float)
-        var dst_p1: (Float, Float)
-        var tex_tl: (Float, Float)
-        var tex_br: (Float, Float)
-        var color: Color
     }
 
     static let quadVerts: [Float] = [
@@ -417,8 +413,8 @@ internal enum Wayland {
         return (u0, v0, u1, v1)
     }
 
-    static func drawQuad(_ quad: Quad) {
-        let rects: InlineArray<1, Quad> = [quad]
+    static func drawRect(_ rect: Rect) {
+        let rects: InlineArray<1, Quad> = [rect.quad]
         unsafe rects.span.withUnsafeBytes { buf in
             glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
             unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, MemoryLayout<Quad>.stride, buf.baseAddress)
@@ -426,9 +422,7 @@ internal enum Wayland {
         glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, 1)
     }
 
-    static func drawText(
-        _ text: String, at pos: (x: Float, y: Float), scale: Float, color: Color = Color(r: 1, g: 1, b: 1, a: 1)
-    ) {
+    static func drawText(_ text: Text) {
         var symbols = ContiguousArray<Quad>(
             repeating:
                 Quad(
@@ -436,24 +430,24 @@ internal enum Wayland {
                     dst_p1: (0, 0),
                     tex_tl: (0, 0),
                     tex_br: (0, 0),
-                    color: color
-                ), count: text.length)
+                    color: text.color
+                ), count: text.text.length)
 
-        var penX = pos.x
-        let penY = pos.y
+        var penX = text.pos.x
+        let penY = text.pos.y
 
-        for (i, c) in text.utf8.enumerated() {
+        for (i, c) in text.text.utf8.enumerated() {
             let (u0, v0, u1, v1) = glyphUV(c)
-            let w = Float(glyphW) * scale
-            let h = Float(glyphH) * scale
+            let w = Float(glyphW) * text.scale
+            let h = Float(glyphH) * text.scale
             symbols[i] = Quad(
                 dst_p0: (Float(penX), Float(penY)),
                 dst_p1: (Float(penX + w), Float(penY + h)),
                 tex_tl: (u0, v0),
                 tex_br: (u1, v1),
-                color: color
+                color: text.color
             )
-            penX += w + Float(glyphSpacing) * scale
+            penX += w + Float(glyphSpacing) * text.scale
         }
 
         guard !symbols.isEmpty else { return }
@@ -466,7 +460,7 @@ internal enum Wayland {
         glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(symbols.count))
     }
 
-    static func drawFrame(_ words: [String]) {
+    static func drawFrame(_ words: [Text], _ rects: [Rect]) {
         /*
         Still some performace wins to be made here.
         - Send all data to the GPU once perframe instead of for each Quad/Text object.
@@ -484,44 +478,20 @@ internal enum Wayland {
         glUniform1i(uTex, 0)
 
         glBindVertexArray(vao)
-        #if !Toolbar
         // Draw quads
         glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
-        drawQuad(
-            Quad(
-                dst_p0: (0, 0),
-                dst_p1: (Float(winW), 200),
-                tex_tl: (0, 0),
-                tex_br: (1, 1),
-                color: Color(r: 0, g: 1, b: 1, a: 1)
-            ))
-        drawQuad(
-            Quad(
-                dst_p0: (Float(winW), Float(winH - 200)),
-                dst_p1: (0, Float(winH)),
-                tex_tl: (0, 0),
-                tex_br: (1, 1),
-                color: Color(r: 0.5, g: 1, b: 0.5, a: 1)
-            ))
-        #endif
+        for rect in rects {
+            drawRect(rect)
+        }
 
         // Draw Text
         glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
-        #if !Toolbar
-        let space = Float(glyphSpacing) * scale
-        let textH = Float(glyphH) * scale
-        let total = (Float(words.count) * (textH + space)) - space
-        let startY = (Float(winH) - total) * 0.5
-
-        for (i, word) in words.enumerated() {
-            let textW = Float(word.count) * (Float(glyphW + glyphSpacing) * scale) - space
-            let penX = (Float(winW) - textW) * 0.5
-            let penY = startY + (Float(i) * (textH + space))
-            drawText(word, at: (penX, penY), scale: scale)
+        for word in words {
+            drawText(word)
         }
-        #endif
 
-        drawText("\(elapsed)", at: (0, 0), scale: 2.0, color: Color(r: 1, g: 0, b: 0, a: 1))
+        let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2.0, color: Color(r: 1, g: 0, b: 0, a: 1))
+        drawText(elapsed_text)
 
         end = ContinuousClock.now
         elapsed = end - start
@@ -640,7 +610,7 @@ internal enum Wayland {
                 while unsafe wl_display_dispatch(display) != -1 {}
             }
 
-            WaylandEvents.send(.frame)
+            send(.frame(height: winH, width: winW))
         }
     }
 
@@ -737,7 +707,7 @@ internal enum Wayland {
         @convention(c) (
             UnsafeMutableRawPointer?, OpaquePointer?, UInt32, UInt32, UInt32, UInt32
         ) -> Void = { _, _, _, _, key, state in
-            WaylandEvents.send(.key(code: key, state: state))
+            send(.key(code: key, state: state))
         }
     #endif
 
@@ -753,21 +723,13 @@ internal enum Wayland {
             }
             #endif
         }
-}
 
-enum WaylandEvent {
-    case key(code: UInt32, state: UInt32)
-    case frame
-}
-
-/// I am using this event loop so that I can have async suspenion points in "user space"
-/// This is more of a hack to get around how the wayland-client library works. Because
-/// C doesn't have a notion of async dispatch queues are used which is why we need to call
-/// `wl_display_dispatch` on a background thread. I don't love this but this hack seems to
-/// work well enough for now. Writing our own stand alone client should fix this but I
-/// Don't feel like setting up the shared memory or EGL yet.
-@MainActor
-enum WaylandEvents {
+    /// I am using this event loop so that I can have async suspenion points in "user space"
+    /// This is more of a hack to get around how the wayland-client library works. Because
+    /// C doesn't have a notion of async dispatch queues are used which is why we need to call
+    /// `wl_display_dispatch` on a background thread. I don't love this but this hack seems to
+    /// work well enough for now. Writing our own stand alone client should fix this but I
+    /// Don't feel like setting up the shared memory or EGL yet.
     private static var continuation: AsyncStream<WaylandEvent>.Continuation?
     private static var calledOnce = true
 
@@ -780,16 +742,21 @@ enum WaylandEvents {
             // Render loop
             while Wayland.state.isRunning {
                 try? await Task.sleep(for: .milliseconds(33))
-                WaylandEvents.send(.frame)
+                send(.frame(height: winH, width: winW))
             }
             continuation?.finish()
         }
         return AsyncStream { cont in continuation = cont }
     }
 
-    static func send(_ ev: WaylandEvent) {
+    private static func send(_ ev: WaylandEvent) {
         continuation?.yield(ev)
     }
+}
+
+enum WaylandEvent {
+    case key(code: UInt32, state: UInt32)
+    case frame(height: UInt32, width: UInt32)
 }
 
 enum WaylandError: Error {
