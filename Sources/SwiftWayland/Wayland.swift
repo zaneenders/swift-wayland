@@ -60,13 +60,15 @@ internal enum Wayland {
     static var atlasH = glyphH
     static let scale: Float = 12.0
 
-    static var winW: Int32 = 800
-    static var winH: Int32 = 600
+    static var winW: UInt32 = 800
+    static var winH: UInt32 = 600
 
     static var eglDisplay: EGLDisplay?
     static var eglContext: EGLContext?
     static var eglSurface: EGLSurface?
     static var eglWindow: OpaquePointer?
+    static var layerShell: OpaquePointer?
+    static var layerSurface: OpaquePointer?
 
     static let EGL_NO_CONTEXT: EGLContext? = unsafe EGLContext(bitPattern: 0)
     static let EGL_NO_DISPLAY: EGLDisplay? = unsafe EGLDisplay(bitPattern: 0)
@@ -121,7 +123,7 @@ internal enum Wayland {
         }
         guard unsafe eglContext != EGL_NO_CONTEXT else { throw WaylandError.error(message: "eglCreateContext failed") }
 
-        unsafe eglWindow = wl_egl_window_create(surface, winW, winH)
+        unsafe eglWindow = wl_egl_window_create(surface, Int32(winW), Int32(winH))
         guard unsafe eglWindow != nil else { throw WaylandError.error(message: "wl_egl_window_create failed") }
 
         unsafe eglSurface = eglCreateWindowSurface(eglDisplay, cfg, EGLNativeWindowType(bitPattern: eglWindow), nil)
@@ -480,40 +482,7 @@ internal enum Wayland {
 
         glBindVertexArray(vao)
 
-        // Draw quads
-        glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
-        drawQuad(
-            Quad(
-                dst_p0: (0, 0),
-                dst_p1: (Float(winW), 200),
-                tex_tl: (0, 0),
-                tex_br: (1, 1),
-                color: Color(r: 0, g: 1, b: 1, a: 1)
-            ))
-        drawQuad(
-            Quad(
-                dst_p0: (Float(winW), Float(winH - 200)),
-                dst_p1: (0, Float(winH)),
-                tex_tl: (0, 0),
-                tex_br: (1, 1),
-                color: Color(r: 0.5, g: 1, b: 0.5, a: 1)
-            ))
-
-        let space = Float(glyphSpacing) * scale
-        let textH = Float(glyphH) * scale
-        let total = (Float(words.count) * (textH + space)) - space
-        let startY = (Float(winH) - total) * 0.5
-
-        // Draw Text
         glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
-
-        for (i, word) in words.enumerated() {
-            let textW = Float(word.count) * (Float(glyphW + glyphSpacing) * scale) - space
-            let penX = (Float(winW) - textW) * 0.5
-            let penY = startY + (Float(i) * (textH + space))
-            drawText(word, at: (penX, penY), scale: scale)
-        }
-
         drawText("\(elapsed)", at: (0, 0), scale: 2.0, color: Color(r: 1, g: 0, b: 0, a: 1))
 
         end = ContinuousClock.now
@@ -535,15 +504,6 @@ internal enum Wayland {
         }
     )
 
-    static var xdgToplevelListener = unsafe xdg_toplevel_listener(
-        configure: xdg_toplevel_configure_cb,
-        close: { _, _ in
-            state = .exit
-        },
-        configure_bounds: { _, _, _, _ in },
-        wm_capabilities: { _, _, _ in }
-    )
-
     static var keyboard_listener = unsafe wl_keyboard_listener(
         keymap: keyboard_keymap_cb,
         enter: { _, _, _, _, _ in },
@@ -561,30 +521,49 @@ internal enum Wayland {
     static var _wl_seat_interface: wl_interface = unsafe wl_seat_interface
     static var _wl_compositor_interface: wl_interface = unsafe wl_compositor_interface
     static var _xdg_wm_base_interface: wl_interface = unsafe xdg_wm_base_interface
+    static var _zwlr_layer_shell_v1_interface: wl_interface = unsafe zwlr_layer_shell_v1_interface
     static var registryListener = unsafe wl_registry_listener(global: onGlobal, global_remove: { _, _, _ in })
 
     static func setup() {
         Task {
+            #if Toolbar
             unsafe display = wl_display_connect(nil)
             guard unsafe display != nil else {
                 state = .error(reason: "Failed to connect to Wayland display.")
                 return
             }
+
             unsafe registry = wl_display_get_registry(display)
             unsafe wl_registry_add_listener(registry, &registryListener, nil)
             unsafe wl_display_roundtrip(display)
-            guard unsafe compositor != nil, unsafe wmBase != nil && surface == nil else {
-                state = .error(reason: "No compositor, wmBase")
+
+            guard unsafe compositor != nil, unsafe wmBase != nil else {
+                state = .error(reason: "No compositor or wmBase")
                 return
             }
 
             unsafe surface = wl_compositor_create_surface(compositor)
-            unsafe xdgSurface = xdg_wm_base_get_xdg_surface(wmBase, surface)
-            unsafe xdg_surface_add_listener(xdgSurface, &xdgSurfaceListener, nil)
-            unsafe toplevel = xdg_surface_get_toplevel(xdgSurface)
-            unsafe xdg_toplevel_add_listener(toplevel, &xdgToplevelListener, nil)
-            unsafe xdg_toplevel_set_title(toplevel, "Swift Wayland")
-            unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
+
+            guard unsafe layerShell != nil else {
+                state = .error(reason: "Layer shell not available")
+                return
+            }
+
+            unsafe layerSurface = zwlr_layer_shell_v1_get_layer_surface(
+                layerShell,
+                surface,
+                nil,
+                2,
+                "my_app_namespace"
+            )
+
+            unsafe zwlr_layer_surface_v1_set_size(layerSurface, 0, 35)
+            unsafe zwlr_layer_surface_v1_set_anchor(
+                layerSurface,
+                LayerSurfaceAnchor.top.union(.left).union(.right).rawValue
+            )
+            unsafe zwlr_layer_surface_v1_set_exclusive_zone(layerSurface, 35)
+            unsafe zwlr_layer_surface_v1_add_listener(layerSurface, &layerSurfaceListener, nil)
             unsafe wl_surface_commit(surface)
 
             do throws(WaylandError) {
@@ -601,7 +580,9 @@ internal enum Wayland {
             DispatchQueue.global().async {
                 while unsafe wl_display_dispatch(display) != -1 {}
             }
+
             WaylandEvents.send(.frame)
+            #endif
         }
     }
 
@@ -617,22 +598,24 @@ internal enum Wayland {
         }
     )
 
-    static let xdg_toplevel_configure_cb:
-        @convention(c) (
-            _ data: UnsafeMutableRawPointer?,
-            _ toplevel: OpaquePointer?,
-            _ width: Int32,
-            _ height: Int32,
-            _ states: UnsafeMutablePointer<wl_array>?
-        ) -> Void = { data, toplevel, width, height, states in
-            if width > 0 && height > 0 {
-                winW = width
-                winH = height
-                if unsafe eglWindow != nil {
-                    unsafe wl_egl_window_resize(eglWindow, winW, winH, 0, 0)
-                }
+    #if Toolbar
+    static var layerSurfaceListener = unsafe zwlr_layer_surface_v1_listener(
+        configure: { data, _surface, serial, width, height in
+            winW = width
+            winH = height
+            unsafe zwlr_layer_surface_v1_ack_configure(_surface, serial)
+
+            if let eglWin = unsafe eglWindow {
+                unsafe wl_egl_window_resize(eglWin, Int32(winW), Int32(winH), 0, 0)
             }
+
+            glViewport(0, 0, GLsizei(winW), GLsizei(winH))
+        },
+        closed: { data, _surface in
+            print("Layer surface closed")
         }
+    )
+    #endif
 
     static let onGlobal:
         @convention(c) (
@@ -655,6 +638,13 @@ internal enum Wayland {
                     wl_registry_bind(registry, id, &_wl_seat_interface, min(version, 5))
                 )
                 unsafe wl_seat_add_listener(seat, &seatListener, nil)
+            #if Toolbar
+            case "zwlr_layer_shell_v1":
+                unsafe layerShell = OpaquePointer(
+                    wl_registry_bind(registry, id, &_zwlr_layer_shell_v1_interface, min(version, 4))
+                )
+                unsafe zwlr_layer_surface_v1_add_listener(layerShell, &layerSurfaceListener, nil)
+            #endif
             default:
                 ()
             }
@@ -726,3 +716,14 @@ enum WaylandEvents {
 enum WaylandError: Error {
     case error(message: String)
 }
+
+#if Toolbar
+struct LayerSurfaceAnchor: OptionSet {
+    let rawValue: UInt32
+
+    static let top = LayerSurfaceAnchor(rawValue: 1 << 0)
+    static let bottom = LayerSurfaceAnchor(rawValue: 1 << 1)
+    static let left = LayerSurfaceAnchor(rawValue: 1 << 2)
+    static let right = LayerSurfaceAnchor(rawValue: 1 << 3)
+}
+#endif

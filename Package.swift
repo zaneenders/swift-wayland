@@ -4,6 +4,10 @@ import PackageDescription
 
 let package = Package(
     name: "swift-wayland",
+    traits: [
+        "Toolbar",
+        .default(enabledTraits: ["Toolbar"]),
+    ],
     targets: [
         .executableTarget(
             name: "SwiftWayland",
@@ -21,7 +25,7 @@ let package = Package(
             swiftSettings: [
                 .strictMemorySafety(),
                 .treatAllWarnings(as: .error, .when(configuration: .release)),
-            ]
+            ],
         ),
         .systemLibrary(
             name: "CWaylandClient",
@@ -53,7 +57,6 @@ let package = Package(
         ),
         .target(
             name: "CXDGShell",
-            path: "Sources/CXDGShell",
             publicHeadersPath: "include",
         ),
     ]
