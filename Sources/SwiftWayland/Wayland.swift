@@ -67,8 +67,6 @@ internal enum Wayland {
     static var eglContext: EGLContext?
     static var eglSurface: EGLSurface?
     static var eglWindow: OpaquePointer?
-    static var layerShell: OpaquePointer?
-    static var layerSurface: OpaquePointer?
 
     static let EGL_NO_CONTEXT: EGLContext? = unsafe EGLContext(bitPattern: 0)
     static let EGL_NO_DISPLAY: EGLDisplay? = unsafe EGLDisplay(bitPattern: 0)
@@ -89,9 +87,14 @@ internal enum Wayland {
     static var wmBase: OpaquePointer!
     static var seat: OpaquePointer!
     static var surface: OpaquePointer!
-    static var xdgSurface: OpaquePointer!
     static var toplevel: OpaquePointer!
     static var keyboard: OpaquePointer!
+    #if Toolbar
+    static var layerShell: OpaquePointer?
+    static var layerSurface: OpaquePointer?
+    #else
+    static var xdgSurface: OpaquePointer!
+    #endif
 
     static func initEGL() throws(WaylandError) {
         unsafe eglDisplay = eglGetDisplay(EGLNativeDisplayType(display))
@@ -531,16 +534,6 @@ internal enum Wayland {
     static var start = ContinuousClock.now
     static var end = ContinuousClock.now
     static var elapsed: Duration = end - start
-    #if !Toolbar
-    static var xdgToplevelListener = unsafe xdg_toplevel_listener(
-        configure: xdg_toplevel_configure_cb,
-        close: { _, _ in
-            state = .exit
-        },
-        configure_bounds: { _, _, _, _ in },
-        wm_capabilities: { _, _, _ in }
-    )
-    #endif
 
     static var frameListener = unsafe wl_callback_listener(
         done: { _, callback, _time in
@@ -550,6 +543,15 @@ internal enum Wayland {
     )
 
     #if !Toolbar
+    static var xdgToplevelListener = unsafe xdg_toplevel_listener(
+        configure: xdg_toplevel_configure_cb,
+        close: { _, _ in
+            state = .exit
+        },
+        configure_bounds: { _, _, _, _ in },
+        wm_capabilities: { _, _, _ in }
+    )
+
     static var keyboard_listener = unsafe wl_keyboard_listener(
         keymap: keyboard_keymap_cb,
         enter: { _, _, _, _, _ in },
@@ -568,7 +570,9 @@ internal enum Wayland {
     static var _wl_seat_interface: wl_interface = unsafe wl_seat_interface
     static var _wl_compositor_interface: wl_interface = unsafe wl_compositor_interface
     static var _xdg_wm_base_interface: wl_interface = unsafe xdg_wm_base_interface
+    #if Toolbar
     static var _zwlr_layer_shell_v1_interface: wl_interface = unsafe zwlr_layer_shell_v1_interface
+    #endif
     static var registryListener = unsafe wl_registry_listener(global: onGlobal, global_remove: { _, _, _ in })
 
     static func setup() {
@@ -640,6 +644,12 @@ internal enum Wayland {
         }
     }
 
+    static var wmBaseListener = unsafe xdg_wm_base_listener(
+        ping: { _, base, serial in
+            unsafe xdg_wm_base_pong(base, serial)
+        }
+    )
+
     #if !Toolbar
     static let xdg_toplevel_configure_cb:
         @convention(c) (
@@ -657,21 +667,13 @@ internal enum Wayland {
                 }
             }
         }
-    #endif
-
-    static var wmBaseListener = unsafe xdg_wm_base_listener(
-        ping: { _, base, serial in
-            unsafe xdg_wm_base_pong(base, serial)
-        }
-    )
 
     static var xdgSurfaceListener = unsafe xdg_surface_listener(
         configure: { _, surface, serial in
             unsafe xdg_surface_ack_configure(surface, serial)
         }
     )
-
-    #if Toolbar
+    #else
     static var layerSurfaceListener = unsafe zwlr_layer_surface_v1_listener(
         configure: { data, _surface, serial, width, height in
             winW = width
