@@ -88,6 +88,8 @@ internal enum Wayland {
     #if Toolbar
     static var layerShell: OpaquePointer?
     static var layerSurface: OpaquePointer?
+
+    static let toolbar_height: UInt32 = 20
     #else
     static var xdgSurface: OpaquePointer!
     #endif
@@ -578,12 +580,12 @@ internal enum Wayland {
                 "my_app_namespace"
             )
 
-            unsafe zwlr_layer_surface_v1_set_size(layerSurface, 0, 35)
+            unsafe zwlr_layer_surface_v1_set_size(layerSurface, 0, toolbar_height)
             unsafe zwlr_layer_surface_v1_set_anchor(
                 layerSurface,
                 LayerSurfaceAnchor.top.union(.left).union(.right).rawValue
             )
-            unsafe zwlr_layer_surface_v1_set_exclusive_zone(layerSurface, 35)
+            unsafe zwlr_layer_surface_v1_set_exclusive_zone(layerSurface, Int32(toolbar_height))
             unsafe zwlr_layer_surface_v1_add_listener(layerSurface, &layerSurfaceListener, nil)
             #else
             unsafe xdgSurface = xdg_wm_base_get_xdg_surface(wmBase, surface)
@@ -755,7 +757,9 @@ internal enum Wayland {
 }
 
 enum WaylandEvent {
+    #if !Toolbar
     case key(code: UInt32, state: UInt32)
+    #endif
     case frame(height: UInt32, width: UInt32)
 }
 
