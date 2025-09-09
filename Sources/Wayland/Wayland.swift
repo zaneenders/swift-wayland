@@ -488,9 +488,10 @@ public enum Wayland {
         for word in words {
             drawText(word)
         }
-
+        #if FrameInfo
         let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2.0, color: Color.red)
         drawText(elapsed_text)
+        #endif
 
         end = ContinuousClock.now
         elapsed = end - start

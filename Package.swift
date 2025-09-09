@@ -9,6 +9,7 @@ let package = Package(
     ],
     traits: [
         "Toolbar",
+        "FrameInfo",
         .default(enabledTraits: []),
     ],
     targets: [
