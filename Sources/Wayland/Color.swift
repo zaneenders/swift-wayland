@@ -23,6 +23,9 @@ extension Color {
     public static var green: Color {
         Color(r: 0.5, g: 1, b: 0.5, a: 1)
     }
+    public static var orange: Color {
+        Color(r: 1, g: 0.5, b: 0, a: 1)
+    }
     public static var red: Color {
         Color(r: 1, g: 0, b: 0, a: 1)
     }

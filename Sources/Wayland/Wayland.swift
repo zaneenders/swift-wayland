@@ -545,7 +545,10 @@ public enum Wayland {
     #endif
     static var registryListener = unsafe wl_registry_listener(global: onGlobal, global_remove: { _, _, _ in })
 
-    public static func setup() {
+    static var refresh_rate: Duration = .milliseconds(33)
+
+    public static func setup(_ refresh_rate: Duration = .milliseconds(33)) {
+        self.refresh_rate = refresh_rate
         Task {
             unsafe display = wl_display_connect(nil)
             guard unsafe display != nil else {
@@ -741,7 +744,7 @@ public enum Wayland {
         Task {
             // Render loop
             while Wayland.state.isRunning {
-                try? await Task.sleep(for: .milliseconds(33))
+                try? await Task.sleep(for: refresh_rate)
                 send(.frame(height: winH, width: winW))
             }
             continuation?.finish()
