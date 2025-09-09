@@ -33,11 +33,6 @@ as Windowed.
 .package(url: "https://github.com/zaneenders/swift-wayland.git", branch: "main", traits: ["Toolbar"])
 ```
 
-## Note
-
-Currently I am using `wayland-client` to get this up and running but ideally 
-this will be down without this dependency.
-
 ## Dev
 
 ### Setup
@@ -55,7 +50,7 @@ sudo dnf install -y wayland-devel wayland-protocols-devel mesa-libEGL-devel mesa
 
 ### Wayland Protocol
 
-Currently we are using `wayland-clint.h`. To regenerate the protocol imports 
+Currently we are using `wayland-client.h`. To regenerate the protocol imports 
 you can run the following commands.
 
 Basic Windowing support
@@ -72,6 +67,14 @@ wayland-scanner client-header < protocols/wlr-layer-shell-unstable-v1.xml > Sour
 wayland-scanner private-code < protocols/wlr-layer-shell-unstable-v1.xml > Sources/CXDGShell/layer-shell-protocol.c
 ```
 
+## Feature Direction
+
+Currently I am using `wayland-client.h` to get this up and running but ideally 
+this will be down without this dependency. The goal of removing this dependency
+is for 
+[static cross complication](https://www.swift.org/documentation/articles/static-linux-getting-started.html)
+.
+
 # Bugs
 
-- [ ] Not actually using GPU
+- [ ] Not actually using the GPU.
