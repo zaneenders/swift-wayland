@@ -19,7 +19,10 @@ Install Dependencies
 ## Run
 
 ```
+# Window Example
 swift run
+# Toolbar Example 
+swift run --traits Toolbar
 ```
 
 ## Note
@@ -38,6 +41,9 @@ sudo dnf install -y wayland-devel wayland-protocols-devel mesa-libEGL-devel mesa
 Generate xdg-shell files from `protocols/xdg-shell.xml`
 
 ```console
-wayland-scanner client-header < xdg-shell.xml > xdg-shell-client-protocol.h
-wayland-scanner private-code < xdg-shell.xml > xdg-shell-protocol.c
+wayland-scanner client-header < protocols/xdg-shell.xml > Sources/CXDGShell/include/xdg-shell-client-protocol.h
+wayland-scanner private-code < protocols/xdg-shell.xml > Sources/CXDGShell/xdg-shell-protocol.c
+
+wayland-scanner client-header < protocols/wlr-layer-shell-unstable-v1.xml > Sources/CXDGShell/include/layer-shell-client-protocol.h
+wayland-scanner private-code < protocols/wlr-layer-shell-unstable-v1.xml > Sources/CXDGShell/layer-shell-protocol.c
 ```
