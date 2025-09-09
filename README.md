@@ -8,21 +8,29 @@ A minimal dependency graphics client using Wayland.
 - [x] Render colored rectangles
 - [x] ASCII 5x7 character rendering
 - [x] Swift concurrency support
+- [x] Toolbar and Windowed Applications.
 
-## Setup
-
-Install Dependencies
-
-- Wayland compositor ([Hyprland](https://hypr.land/))
-- [Swift](https://www.swift.org/install)
-
-## Run
+## Example
 
 ```
 # Window Example
 swift run
 # Toolbar Example 
 swift run --traits Toolbar
+```
+
+## Library
+
+You can import `Wayland` as a package dependency to build your own Wayland 
+clients.
+
+Optional include `"Toolbar"` 
+[trait](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0450-swiftpm-package-traits.md)
+ if you would like to build your client as a Toolbar. By default apps are built
+as Windowed.
+
+```swift
+.package(url: "https://github.com/zaneenders/swift-wayland.git", branch: "main", traits: ["Toolbar"])
 ```
 
 ## Note
@@ -32,18 +40,38 @@ this will be down without this dependency.
 
 ## Dev
 
-Install wayland headers
+### Setup
+
+Install Dependencies
+
+- Wayland compositor ([Hyprland](https://hypr.land/))
+- [Swift](https://www.swift.org/install)
+
+Install Wayland headers
 
 ```console
 sudo dnf install -y wayland-devel wayland-protocols-devel mesa-libEGL-devel mesa-libGLES-devel
 ```
 
-Generate xdg-shell files from `protocols/xdg-shell.xml`
+### Wayland Protocol
+
+Currently we are using `wayland-clint.h`. To regenerate the protocol imports 
+you can run the following commands.
+
+Basic Windowing support
 
 ```console
 wayland-scanner client-header < protocols/xdg-shell.xml > Sources/CXDGShell/include/xdg-shell-client-protocol.h
 wayland-scanner private-code < protocols/xdg-shell.xml > Sources/CXDGShell/xdg-shell-protocol.c
+```
 
+Toolbar support headers
+
+```console
 wayland-scanner client-header < protocols/wlr-layer-shell-unstable-v1.xml > Sources/CXDGShell/include/layer-shell-client-protocol.h
 wayland-scanner private-code < protocols/wlr-layer-shell-unstable-v1.xml > Sources/CXDGShell/layer-shell-protocol.c
 ```
+
+# Bugs
+
+- [ ] Not actually using GPU
