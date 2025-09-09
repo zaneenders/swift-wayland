@@ -2,18 +2,25 @@
 @MainActor
 struct SwiftWayland {
     static func main() async {
+
         let state = AsyncState()
         Wayland.setup()
         event_loop: for await ev in WaylandEvents.events() {
-            let count = await state.getCount()
             switch ev {
             case .frame:
-                Wayland.drawFrame("Scribe", count: count)
-            case .key(let code, let state):
+                let snapShot = await state.view()
+                let asciiStart = 32
+                let asciiEnd = 126
+                let code = asciiStart + (snapShot.tick % (asciiEnd - asciiStart + 1))
+                let cmsg = UnicodeScalar(code).map { String(Character($0)) } ?? " "
+                Wayland.drawFrame(["Scribe", cmsg, "\(snapShot.count)"])
+            case .key(let code, let keyState):
                 if code == 1 {
                     Wayland.state = .exit
                 }
-                print("Key:", code, state)
+                if keyState == 1 {
+                    await state.bump()
+                }
             }
         }
 
@@ -27,7 +34,13 @@ struct SwiftWayland {
     }
 }
 
+struct SnapShot {
+    let tick: Int
+    let count: Int
+}
+
 actor AsyncState {
+    var tick = 0
     var count = 0
 
     init() {
@@ -40,12 +53,16 @@ actor AsyncState {
         Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(0.5))
-                self.count += 1
+                self.tick += 1
             }
         }
     }
 
-    func getCount() -> Int {
-        return count
+    func bump() {
+        count += 1
+    }
+
+    func view() -> SnapShot {
+        SnapShot(tick: tick, count: count)
     }
 }

@@ -2,7 +2,7 @@
 
 A minimal dependency graphics client using Wayland.
 
-## Features 
+## Features
 
 - [x] Expose keyboard events
 - [x] Render colored rectangles
