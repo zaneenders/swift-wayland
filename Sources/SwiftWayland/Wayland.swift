@@ -653,6 +653,8 @@ internal enum Wayland {
                     wl_registry_bind(registry, id, &_wl_seat_interface, min(version, 5))
                 )
                 unsafe wl_seat_add_listener(seat, &seatListener, nil)
+            case "wl_drm", "zwp_linux_dmabuf_v1":  // TODO: setup these interfaces
+                print(iface)
             default:
                 ()
             }
