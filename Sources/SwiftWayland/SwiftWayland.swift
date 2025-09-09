@@ -9,9 +9,10 @@ struct SwiftWayland {
         #if Toolbar
         let formatter = DateFormatter()
         formatter.dateFormat = "yy-MM-dd HH:mm:ss"
+        #else
+        let state = AsyncState()
         #endif
 
-        let state = AsyncState()
         Wayland.setup()
         event_loop: for await ev in Wayland.events() {
             switch ev {
@@ -75,6 +76,7 @@ struct SwiftWayland {
                     ))
                 #endif
                 Wayland.drawFrame(texts, rects)
+            #if !Toolbar
             case .key(let code, let keyState):
                 if code == 1 {
                     Wayland.state = .exit
@@ -82,6 +84,7 @@ struct SwiftWayland {
                 if keyState == 1 {
                     await state.bump()
                 }
+            #endif
             }
         }
 
@@ -95,6 +98,7 @@ struct SwiftWayland {
     }
 }
 
+#if !Toolbar
 struct SnapShot {
     let tick: Int
     let count: Int
@@ -127,3 +131,4 @@ actor AsyncState {
         SnapShot(tick: tick, count: count)
     }
 }
+#endif
