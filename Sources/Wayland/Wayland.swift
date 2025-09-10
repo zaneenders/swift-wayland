@@ -13,7 +13,7 @@ public enum Wayland {
 
     @MainActor
     struct Glyph {
-        var rows: [String] = Array(repeating: "", count: glyphH)
+        var rows: [String] = Array(repeating: "", count: Int(glyphH))
     }
 
     public enum State {
@@ -35,16 +35,16 @@ public enum Wayland {
         state = .exit
     }
 
-    public static let glyphW = 5
-    public static let glyphH = 7
-    public static let glyphSpacing = 1
-    public static let scale: Float = 12.0
+    public static let glyphW: UInt = 5
+    public static let glyphH: UInt = 7
+    public static let glyphSpacing: UInt = 1
+    public static let scale: UInt = 12
 
     static let firstChar: UInt8 = 32
     static let lastChar: UInt8 = 126
-    static let charCount = Int(lastChar - firstChar + 1)
-    static var atlasW = charCount * (glyphW + glyphSpacing)
-    static var atlasH = glyphH
+    static let charCount = UInt(lastChar - firstChar + 1)
+    static var atlasW = Int(charCount * (glyphW + glyphSpacing))
+    static var atlasH = Int(glyphH)
 
     static var winW: UInt32 = 800
     #if Toolbar
@@ -368,20 +368,20 @@ public enum Wayland {
 
     static func createFontAtlas() {
         let font5x7 = initFont()
-        let pixelsCount = atlasW * atlasH * 4
+        let pixelsCount = Int(atlasW * atlasH * 4)
         let img = UnsafeMutablePointer<UInt8>.allocate(capacity: pixelsCount)
         unsafe img.initialize(repeating: 0, count: pixelsCount)
         defer { unsafe img.deallocate() }
 
         for c in Int(firstChar)...Int(lastChar) {
             let g = font5x7[c]
-            let xoff = (c - Int(firstChar)) * (glyphW + glyphSpacing)
+            let xoff = Int(c - Int(firstChar)) * Int(glyphW + glyphSpacing)
             if !g.rows[0].isEmpty {
-                for y in 0..<glyphH {
+                for y in 0..<Int(glyphH) {
                     let row = Array(g.rows[y])
-                    for x in 0..<glyphW {
+                    for x in 0..<Int(glyphW) {
                         let bit = row[x] == "1"
-                        let idx = (y * atlasW + xoff + x) * 4
+                        let idx = Int(y * atlasW + xoff + x) * 4
                         unsafe img[idx + 0] = 255
                         unsafe img[idx + 1] = 255
                         unsafe img[idx + 2] = 255
@@ -407,9 +407,9 @@ public enum Wayland {
         var ch = c
         if ch < firstChar || ch > lastChar { ch = 32 }
         let idx = Int(ch - firstChar)
-        let xoff = idx * (glyphW + glyphSpacing)
+        let xoff = idx * (Int(glyphW) + Int(glyphSpacing))
         let u0 = Float(xoff) / Float(atlasW)
-        let u1 = Float(xoff + glyphW) / Float(atlasW)
+        let u1 = Float(xoff + Int(glyphW)) / Float(atlasW)
         let v0 = Float(1.0) - Float(glyphH) / Float(atlasH)
         let v1 = Float(1.0)
         return (u0, v0, u1, v1)
@@ -446,16 +446,16 @@ public enum Wayland {
 
         for (i, c) in text.text.utf8.enumerated() {
             let (u0, v0, u1, v1) = glyphUV(c)
-            let w = Float(glyphW) * text.scale
-            let h = Float(glyphH) * text.scale
+            let w = glyphW * text.scale
+            let h = glyphH * text.scale
             symbols[i] = Quad(
-                dst_p0: (Float(penX), Float(penY)),
-                dst_p1: (Float(penX + w), Float(penY + h)),
+                dst_p0: (penX, penY),
+                dst_p1: (penX + w, penY + h),
                 tex_tl: (u0, v0),
                 tex_br: (u1, v1),
                 color: text.color
             )
-            penX += w + Float(glyphSpacing) * text.scale
+            penX += w + glyphSpacing * text.scale
         }
 
         guard !symbols.isEmpty else { return }
@@ -468,7 +468,7 @@ public enum Wayland {
         glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(symbols.count))
     }
 
-    public static func drawFrame(_ dim: (height: UInt32, width: UInt32), _ block: some Block) {
+    public static func drawFrame(_ dim: (height: UInt, width: UInt), _ block: some Block) {
 
         start = ContinuousClock.now
 
@@ -482,16 +482,17 @@ public enum Wayland {
 
         glBindVertexArray(vao)
 
-        let mid = Float(dim.width) / 2
+        let mid = UInt(dim.width / 2)
         drawQuad(
             Quad(
                 dst_p0: (mid - 1, 0),
-                dst_p1: (mid + 1, Float(dim.height)),
+                dst_p1: (mid + 1, dim.height),
                 color: Color.red))
+
         var renderer = Renderer(dim, drawQuad, drawText)
         renderer.draw(block: block)
 
-        let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2.0, color: Color.red)
+        let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2, color: Color.red)
         drawText(elapsed_text)
 
         end = ContinuousClock.now
@@ -654,7 +655,7 @@ public enum Wayland {
                 while unsafe wl_display_dispatch(display) != -1 {}
             }
 
-            send(.frame(height: winH, width: winW))
+            send(.frame(height: UInt(winH), width: UInt(winW)))
         }
     }
 
@@ -751,7 +752,7 @@ public enum Wayland {
         @convention(c) (
             UnsafeMutableRawPointer?, OpaquePointer?, UInt32, UInt32, UInt32, UInt32
         ) -> Void = { _, _, _, _, key, state in
-            send(.key(code: key, state: state))
+            send(.key(code: UInt(key), state: UInt(state)))
         }
     #endif
 
@@ -786,7 +787,7 @@ public enum Wayland {
             // Render loop
             while Wayland.state.isRunning {
                 try? await Task.sleep(for: refresh_rate)
-                send(.frame(height: winH, width: winW))
+                send(.frame(height: UInt(winH), width: UInt(winW)))
             }
             continuation?.finish()
         }

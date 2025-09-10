@@ -2,7 +2,7 @@
 struct Renderer: ~Copyable {
 
     init(
-        _ dim: (height: UInt32, width: UInt32),
+        _ dim: (height: UInt, width: UInt),
         _ drawQuad: @escaping (Quad) -> Void,
         _ drawText: @escaping (Text) -> Void
     ) {
@@ -14,8 +14,8 @@ struct Renderer: ~Copyable {
 
     let _drawQuad: (Quad) -> Void
     let _drawText: (Text) -> Void
-    let height: UInt32
-    let width: UInt32
+    let height: UInt
+    let width: UInt
     var layers: [Consumed] = []
     var up: Bool = false
 
@@ -26,6 +26,11 @@ struct Renderer: ~Copyable {
             consume(word: word)
         } else if let group = block as? BlockGroup {
             pushLayer()
+            /*
+            let count = group.children.count
+            let block = group.children[count / 2]
+            draw(any: block)
+            */
             for block in group.children {
                 draw(block: block)
             }
@@ -33,6 +38,10 @@ struct Renderer: ~Copyable {
         } else {
             draw(block: block.layer)
         }
+    }
+
+    mutating func draw(any: any Block) {
+        draw(block: any)
     }
 
     private mutating func pushLayer() {
@@ -45,36 +54,31 @@ struct Renderer: ~Copyable {
         up = true
     }
 
-    private mutating func consume(height: UInt32) {
-        layers[layers.count - 1].height += Int(height)
+    private mutating func consume(height: UInt) {
+        layers[layers.count - 1].height += height
     }
 
-    private mutating func consume(width: UInt32) {
-        layers[layers.count - 1].width += Int(width)
+    private mutating func consume(width: UInt) {
+        layers[layers.count - 1].width += width
     }
 
     private mutating func consume(word: Word) {
         let h = layers[layers.count - 1].height
         let w = layers[layers.count - 1].width
-        _drawText(
-            word.render(
-                at: (
-                    y: UInt32(h),
-                    x: UInt32(width / 2) - UInt32(word.width / 2)
-                )
-            ))
-        consume(height: UInt32(word.height))
-        consume(width: UInt32(word.width))
+        let text = word.render(at: (y: h, x: w))
+        _drawText(text)
+        consume(height: word.height)
+        consume(width: word.width)
     }
 
     private mutating func consume(quad: Quad) {
-        consume(height: UInt32(quad.height))
-        consume(width: UInt32(quad.width))
         _drawQuad(quad)
+        consume(height: quad.height)
+        consume(width: quad.width)
     }
 }
 
 struct Consumed {
-    var height = 0
-    var width = 0
+    var height: UInt = 0
+    var width: UInt = 0
 }

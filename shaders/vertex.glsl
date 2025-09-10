@@ -13,7 +13,7 @@ out vec4 v_color;
 
 vec2 px_to_ndc(vec2 p) {
     float x = (p.x / uRes.x) * 2.0 - 1.0;
-    float y = 1.0 - (p.y / uRes.y) * 2.0;   // <-- only geometry Y flipped
+    float y = 1.0 - (p.y / uRes.y) * 2.0;
     return vec2(x, y);
 }
 
