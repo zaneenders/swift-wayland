@@ -16,13 +16,6 @@ public enum Wayland {
         var rows: [String] = Array(repeating: "", count: glyphH)
     }
 
-    static let quadVerts: [Float] = [
-        -1.0, 1.0,  // TL
-        1.0, 1.0,  // TR
-        -1.0, -1.0,  // BL
-        1.0, -1.0,  // BR
-    ]
-
     public enum State {
         case running
         case error(reason: String)
@@ -188,6 +181,12 @@ public enum Wayland {
     }
 
     static func initGL() {
+        let quadVerts: [Float] = [
+            -1.0, 1.0,  // TL
+            1.0, 1.0,  // TR
+            -1.0, -1.0,  // BL
+            1.0, -1.0,  // BR
+        ]
         let vs = compileShader(GLenum(GL_VERTEX_SHADER), loadText(resource: "vertex.glsl"))
         let fs = compileShader(GLenum(GL_FRAGMENT_SHADER), loadText(resource: "fragment.glsl"))
         program = linkProgram(vs: vs, fs: fs)
@@ -417,7 +416,12 @@ public enum Wayland {
     }
 
     static func drawRect(_ rect: Rect) {
-        let rects: InlineArray<1, Quad> = [rect.quad]
+        drawQuad(rect.quad)
+    }
+
+    static func drawQuad(_ quad: Quad) {
+        glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
+        let rects: InlineArray<1, Quad> = [quad]
         unsafe rects.span.withUnsafeBytes { buf in
             glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
             unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, MemoryLayout<Quad>.stride, buf.baseAddress)
@@ -426,6 +430,7 @@ public enum Wayland {
     }
 
     static func drawText(_ text: Text) {
+        glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
         var symbols = ContiguousArray<Quad>(
             repeating:
                 Quad(
@@ -463,7 +468,41 @@ public enum Wayland {
         glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(symbols.count))
     }
 
-    public static func drawFrame(_ words: [Text], _ rects: [Rect]) {
+    public static func drawFrame(_ dim: (height: UInt32, width: UInt32), _ block: some Block) {
+
+        start = ContinuousClock.now
+
+        glViewport(0, 0, GLsizei(winW), GLsizei(winH))
+        glClearColor(0, 0, 0, 1)
+        glClear(GLbitfield(GL_COLOR_BUFFER_BIT))
+
+        glUseProgram(program)
+        glUniform2f(uRes, Float(winW), Float(winH))
+        glUniform1i(uTex, 0)
+
+        glBindVertexArray(vao)
+
+        let mid = Float(dim.width) / 2
+        drawQuad(
+            Quad(
+                dst_p0: (mid - 1, 0),
+                dst_p1: (mid + 1, Float(dim.height)),
+                color: Color.red))
+        var renderer = Renderer(dim, drawQuad, drawText)
+        renderer.draw(block: block)
+
+        let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2.0, color: Color.red)
+        drawText(elapsed_text)
+
+        end = ContinuousClock.now
+        elapsed = end - start
+
+        _ = unsafe eglSwapBuffers(eglDisplay, eglSurface)
+        unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
+        unsafe wl_surface_commit(surface)
+    }
+
+    public static func drawFrame(_ dim: (height: UInt32, width: UInt32), _ words: [Text], _ rects: [Rect]) {
         /*
         Still some performace wins to be made here.
         - Send all data to the GPU once perframe instead of for each Quad/Text object.
@@ -482,13 +521,11 @@ public enum Wayland {
 
         glBindVertexArray(vao)
         // Draw quads
-        glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
         for rect in rects {
             drawRect(rect)
         }
 
         // Draw Text
-        glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
         for word in words {
             drawText(word)
         }

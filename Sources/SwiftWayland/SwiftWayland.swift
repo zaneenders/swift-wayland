@@ -4,10 +4,33 @@ import Wayland
 import Foundation
 #endif
 
+struct Screen: Block {
+    let words = [
+        "apple", "banana", "orange", "grape", "strawberry",
+        "blueberry", "raspberry", "watermelon", "pineapple", "kiwi",
+        "mango", "peach", "plum", "cherry", "apricot", "nectarine",
+        "date", "fig", "pomegranate", "cranberry", "gooseberry",
+        "avocado", "coconut", "cashew", "almond", "walnut",
+        "pecan", "hazelnut", "pistachio", "macadamia", "brazil nut",
+        "chocolate", "coffee", "tea", "water", "milk", "juice",
+        "bread", "rice", "pasta", "quinoa", "couscous",
+        "chicken", "beef", "pork", "fish", "tofu", "beans",
+        "salad", "soup", "pizza", "sandwich", "steak", "salmon",
+        "eggs", "cheese", "yogurt", "nuts", "seeds", "oil", "vinegar", "salt", "pepper", "sugar",
+    ]
+    //    let words = ["Zane", "Was", "Here"]
+    var layer: some Block {
+        for word in words {
+            Word(word).scale(4.0)
+        }
+    }
+}
+
 @main
 @MainActor
 struct SwiftWayland {
     static func main() async {
+        let screen = Screen()
         #if Toolbar
         let formatter = DateFormatter()
         formatter.dateFormat = "yy-MM-dd HH:mm:ss"
@@ -79,7 +102,8 @@ struct SwiftWayland {
                         color: Color.green
                     ))
                 #endif
-                Wayland.drawFrame(texts, rects)
+                Wayland.drawFrame((height: winH, width: winW), screen)
+                //Wayland.drawFrame((height: winH, width: winW), texts, rects)
                 texts = []
                 rects = []
             #if !Toolbar
