@@ -54,7 +54,11 @@ public enum Wayland {
     static var atlasH = glyphH
 
     static var winW: UInt32 = 800
+    #if Toolbar
+    static var winH: UInt32 = toolbar_height
+    #else
     static var winH: UInt32 = 600
+    #endif
 
     static var eglDisplay: EGLDisplay?
     static var eglContext: EGLContext?
