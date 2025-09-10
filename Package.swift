@@ -67,5 +67,9 @@ let package = Package(
             name: "CWaylandProtocols",
             publicHeadersPath: "include",
         ),
+
+        .testTarget(
+            name: "WaylandTests",
+            dependencies: ["Wayland"]),
     ]
 )
