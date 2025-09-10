@@ -20,8 +20,10 @@ struct Screen: Block {
     ]
     //    let words = ["Zane", "Was", "Here"]
     var layer: some Block {
-        for word in words {
-            Word(word).scale(4)
+        Group(.vertical) {
+            for word in words {
+                Word(word).scale(4)
+            }
         }
     }
 }

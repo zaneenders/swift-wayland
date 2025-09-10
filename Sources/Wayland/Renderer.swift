@@ -18,6 +18,7 @@ struct Renderer: ~Copyable {
     let width: UInt
     var layers: [Consumed] = []
     var up: Bool = false
+    var orientation: Orientation = .vertical
 
     mutating func draw(block: some Block) {
         if let rect = block as? Solid {
@@ -64,7 +65,13 @@ struct Renderer: ~Copyable {
 
     private mutating func consume(word: Word) {
         let h = layers[layers.count - 1].height
-        let w = layers[layers.count - 1].width
+        let w: UInt =
+            switch orientation {
+            case .horizontal:
+                layers[layers.count - 1].width
+            case .vertical:
+                0
+            }
         let text = word.render(at: (y: h, x: w))
         _drawText(text)
         consume(height: word.height)
