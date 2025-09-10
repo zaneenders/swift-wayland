@@ -1,3 +1,5 @@
+import Wayland
+
 #if Toolbar
 import Foundation
 #endif
@@ -14,11 +16,11 @@ struct SwiftWayland {
         #endif
 
         Wayland.setup()
+        var texts: [Text] = []
+        var rects: [Rect] = []
         event_loop: for await ev in Wayland.events() {
             switch ev {
             case .frame(let winH, let winW):
-                var texts: [Text] = []
-                var rects: [Rect] = []
                 /*
                 This is a mess well I figure out a more declaritive way of writing this code.
                 It may be usefull to expose the current window height and wdith but I want layout
@@ -32,16 +34,18 @@ struct SwiftWayland {
                 let today_total = (Float(today.count) * (today_textW + today_space))
                 let text_y = Float(
                     (Double(Wayland.toolbar_height) / 2.0) - ((Double(Wayland.glyphH) * Double(today_scale)) / 2.0))
-                texts.append(
-                    Text(
+                let clock = (
+                    text: Text(
                         today, at: (Float(winW) - today_total, text_y), scale: today_scale,
-                        color: Color(r: 0, g: 0, b: 0, a: 1)))
-                rects.append(
-                    Rect(
+                        color: Color.black),
+                    rect: Rect(
                         dst_p0: (Float(winW) - today_total, 0),
                         dst_p1: (Float(winW), Float(winH)),
-                        color: Color(r: 0, g: 1, b: 1, a: 1)
-                    ))
+                        color: Color.teal
+                    )
+                )
+                texts.append(clock.text)
+                rects.append(clock.rect)
                 #else
                 let snapShot = await state.view()
                 let asciiStart = 32
@@ -66,20 +70,22 @@ struct SwiftWayland {
                     Rect(
                         dst_p0: (0, 0),
                         dst_p1: (Float(winW), 200),
-                        color: Color(r: 0, g: 1, b: 1, a: 1)
+                        color: Color.teal
                     ))
                 rects.append(
                     Rect(
                         dst_p0: (Float(winW), Float(winH - 200)),
                         dst_p1: (0, Float(winH)),
-                        color: Color(r: 0.5, g: 1, b: 0.5, a: 1)
+                        color: Color.green
                     ))
                 #endif
                 Wayland.drawFrame(texts, rects)
+                texts = []
+                rects = []
             #if !Toolbar
             case .key(let code, let keyState):
                 if code == 1 {
-                    Wayland.state = .exit
+                    Wayland.exit()
                 }
                 if keyState == 1 {
                     await state.bump()

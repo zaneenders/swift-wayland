@@ -4,19 +4,27 @@ import PackageDescription
 
 let package = Package(
     name: "swift-wayland",
+    products: [
+        .library(name: "Wayland", targets: ["Wayland"])
+    ],
     traits: [
         "Toolbar",
+        "FrameInfo",
         .default(enabledTraits: []),
     ],
     targets: [
         .executableTarget(
             name: "SwiftWayland",
+            dependencies: ["Wayland"],
+        ),
+        .target(
+            name: "Wayland",
             dependencies: [
                 "CWaylandClient",
                 "CWaylandEGL",
                 "CEGL",
                 "CGLES3",
-                "CXDGShell",
+                "CWaylandProtocols",
             ],
             resources: [
                 .process("../../shaders/vertex.glsl"),
@@ -56,7 +64,7 @@ let package = Package(
             ]
         ),
         .target(
-            name: "CXDGShell",
+            name: "CWaylandProtocols",
             publicHeadersPath: "include",
         ),
     ]

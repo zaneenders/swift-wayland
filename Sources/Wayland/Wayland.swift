@@ -2,22 +2,14 @@ import CEGL
 import CGLES3
 import CWaylandClient
 import CWaylandEGL
-import CXDGShell
+import CWaylandProtocols
 import Foundation
-
-internal struct Quad {
-    var dst_p0: (Float, Float)
-    var dst_p1: (Float, Float)
-    var tex_tl: (Float, Float)
-    var tex_br: (Float, Float)
-    var color: Color
-}
 
 /// There is alot of global state here to setup and conform to Wayland's patterns.
 /// Their might be better ways to abstract this and clean it up a bit. But it's
 /// working for now.
 @MainActor
-internal enum Wayland {
+public enum Wayland {
 
     @MainActor
     struct Glyph {
@@ -31,7 +23,7 @@ internal enum Wayland {
         1.0, -1.0,  // BR
     ]
 
-    enum State {
+    public enum State {
         case running
         case error(reason: String)
         case exit
@@ -44,20 +36,29 @@ internal enum Wayland {
         }
     }
 
-    static var state: State = .running
+    public internal(set) static var state: State = .running
 
-    static let glyphW = 5
-    static let glyphH = 7
-    static let glyphSpacing = 1
+    public static func exit() {
+        state = .exit
+    }
+
+    public static let glyphW = 5
+    public static let glyphH = 7
+    public static let glyphSpacing = 1
+    public static let scale: Float = 12.0
+
     static let firstChar: UInt8 = 32
     static let lastChar: UInt8 = 126
     static let charCount = Int(lastChar - firstChar + 1)
     static var atlasW = charCount * (glyphW + glyphSpacing)
     static var atlasH = glyphH
-    static let scale: Float = 12.0
 
     static var winW: UInt32 = 800
+    #if Toolbar
+    static var winH: UInt32 = toolbar_height
+    #else
     static var winH: UInt32 = 600
+    #endif
 
     static var eglDisplay: EGLDisplay?
     static var eglContext: EGLContext?
@@ -89,7 +90,7 @@ internal enum Wayland {
     static var layerShell: OpaquePointer?
     static var layerSurface: OpaquePointer?
 
-    static let toolbar_height: UInt32 = 20
+    public static let toolbar_height: UInt32 = 20
     #else
     static var xdgSurface: OpaquePointer!
     #endif
@@ -272,7 +273,7 @@ internal enum Wayland {
         set("\"", ["01010", "01010", "01010", "00000", "00000", "00000", "00000"])
         set("#", ["01010", "01010", "11111", "01010", "11111", "01010", "01010"])
         set("$", ["00100", "01111", "10100", "01110", "00101", "11110", "00100"])
-        set("%", ["11001", "11010", "00100", "01000", "10110", "00110", "10011"])
+        set("%", ["11000", "11001", "00010", "00100", "01000", "10011", "00011"])
         set("&", ["01100", "10010", "10100", "01000", "10101", "10010", "01101"])
         set("'", ["00100", "00100", "00100", "00000", "00000", "00000", "00000"])
         set("(", ["00010", "00100", "01000", "01000", "01000", "00100", "00010"])
@@ -462,7 +463,7 @@ internal enum Wayland {
         glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(symbols.count))
     }
 
-    static func drawFrame(_ words: [Text], _ rects: [Rect]) {
+    public static func drawFrame(_ words: [Text], _ rects: [Rect]) {
         /*
         Still some performace wins to be made here.
         - Send all data to the GPU once perframe instead of for each Quad/Text object.
@@ -491,9 +492,10 @@ internal enum Wayland {
         for word in words {
             drawText(word)
         }
-
-        let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2.0, color: Color(r: 1, g: 0, b: 0, a: 1))
+        #if FrameInfo
+        let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2.0, color: Color.red)
         drawText(elapsed_text)
+        #endif
 
         end = ContinuousClock.now
         elapsed = end - start
@@ -547,7 +549,10 @@ internal enum Wayland {
     #endif
     static var registryListener = unsafe wl_registry_listener(global: onGlobal, global_remove: { _, _, _ in })
 
-    static func setup() {
+    static var refresh_rate: Duration = .milliseconds(33)
+
+    public static func setup(_ refresh_rate: Duration = .milliseconds(33)) {
+        self.refresh_rate = refresh_rate
         Task {
             unsafe display = wl_display_connect(nil)
             guard unsafe display != nil else {
@@ -735,7 +740,7 @@ internal enum Wayland {
     private static var continuation: AsyncStream<WaylandEvent>.Continuation?
     private static var calledOnce = true
 
-    static func events() -> AsyncStream<WaylandEvent> {
+    public static func events() -> AsyncStream<WaylandEvent> {
         guard calledOnce else {
             fatalError("Only call events once.")
         }
@@ -743,7 +748,7 @@ internal enum Wayland {
         Task {
             // Render loop
             while Wayland.state.isRunning {
-                try? await Task.sleep(for: .milliseconds(33))
+                try? await Task.sleep(for: refresh_rate)
                 send(.frame(height: winH, width: winW))
             }
             continuation?.finish()
@@ -755,25 +760,3 @@ internal enum Wayland {
         continuation?.yield(ev)
     }
 }
-
-enum WaylandEvent {
-    #if !Toolbar
-    case key(code: UInt32, state: UInt32)
-    #endif
-    case frame(height: UInt32, width: UInt32)
-}
-
-enum WaylandError: Error {
-    case error(message: String)
-}
-
-#if Toolbar
-struct LayerSurfaceAnchor: OptionSet {
-    let rawValue: UInt32
-
-    static let top = LayerSurfaceAnchor(rawValue: 1 << 0)
-    static let bottom = LayerSurfaceAnchor(rawValue: 1 << 1)
-    static let left = LayerSurfaceAnchor(rawValue: 1 << 2)
-    static let right = LayerSurfaceAnchor(rawValue: 1 << 3)
-}
-#endif
