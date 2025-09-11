@@ -53,19 +53,19 @@ struct SwiftWayland {
                 */
                 #if Toolbar
                 let today = formatter.string(from: Date())
-                let today_scale: Float = 2.0
-                let today_space = Float(Wayland.glyphSpacing) * today_scale
-                let today_textW = Float(Wayland.glyphW) * today_scale
-                let today_total = (Float(today.count) * (today_textW + today_space))
-                let text_y = Float(
-                    (Double(Wayland.toolbar_height) / 2.0) - ((Double(Wayland.glyphH) * Double(today_scale)) / 2.0))
+                let today_scale: UInt = 2
+                let today_space = Wayland.glyphSpacing * today_scale
+                let today_textW = Wayland.glyphW * today_scale
+                let today_total = (UInt(today.count) * (today_textW + today_space))
+                let text_y =
+                    (Wayland.toolbar_height / 2) - ((Wayland.glyphH * today_scale) / 2)
                 let clock = (
                     text: Text(
-                        today, at: (Float(winW) - today_total, text_y), scale: today_scale,
+                        today, at: (winW - today_total, text_y), scale: today_scale,
                         color: Color.black),
                     rect: Rect(
-                        dst_p0: (Float(winW) - today_total, 0),
-                        dst_p1: (Float(winW), Float(winH)),
+                        dst_p0: (winW - today_total, 0),
+                        dst_p1: (winW, winH),
                         color: Color.teal
                     )
                 )

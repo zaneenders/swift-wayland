@@ -48,7 +48,7 @@ public enum Wayland {
 
     static var winW: UInt32 = 800
     #if Toolbar
-    static var winH: UInt32 = toolbar_height
+    static var winH: UInt32 = UInt32(toolbar_height)
     #else
     static var winH: UInt32 = 600
     #endif
@@ -83,7 +83,7 @@ public enum Wayland {
     static var layerShell: OpaquePointer?
     static var layerSurface: OpaquePointer?
 
-    public static let toolbar_height: UInt32 = 20
+    public static let toolbar_height: UInt = 20
     #else
     static var xdgSurface: OpaquePointer!
     #endif
@@ -626,7 +626,7 @@ public enum Wayland {
                 "my_app_namespace"
             )
 
-            unsafe zwlr_layer_surface_v1_set_size(layerSurface, 0, toolbar_height)
+            unsafe zwlr_layer_surface_v1_set_size(layerSurface, 0, UInt32(toolbar_height))
             unsafe zwlr_layer_surface_v1_set_anchor(
                 layerSurface,
                 LayerSurfaceAnchor.top.union(.left).union(.right).rawValue
