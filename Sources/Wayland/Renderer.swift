@@ -23,18 +23,24 @@ struct Renderer: ~Copyable {
     mutating func draw(block: some Block) {
         if let rect = block as? Solid {
             consume(quad: rect.quad)
+        } else if let orientation = block as? OrientationBlock {
+            self.orientation = orientation.orientation
+            draw(block: block.layer)
         } else if let word = block as? Word {
             consume(word: word)
         } else if let group = block as? BlockGroup {
             pushLayer()
-            /*
-            let count = group.children.count
-            let block = group.children[count / 2]
-            draw(any: block)
-            */
             for block in group.children {
                 draw(block: block)
             }
+            #if FrameInfo
+            let w = layers[layers.count - 1].width
+            _drawQuad(
+                Quad(
+                    dst_p0: (w - 1, 0),
+                    dst_p1: (w + 1, height),
+                    color: Color.red))
+            #endif
             popLayer()
         } else {
             draw(block: block.layer)
@@ -64,18 +70,22 @@ struct Renderer: ~Copyable {
     }
 
     private mutating func consume(word: Word) {
-        let h = layers[layers.count - 1].height
-        let w: UInt =
-            switch orientation {
-            case .horizontal:
-                layers[layers.count - 1].width
-            case .vertical:
-                0
-            }
+        let h: UInt
+        let w: UInt
+        switch orientation {
+        case .horizontal:
+            h = 0
+            w = layers[layers.count - 1].width
+            layers[layers.count - 1].height = max(layers[layers.count - 1].height, word.height)
+            consume(width: word.width + Wayland.scale)
+        case .vertical:
+            w = 0
+            h = layers[layers.count - 1].height
+            layers[layers.count - 1].width = max(layers[layers.count - 1].width, word.width)
+            consume(height: word.height + Wayland.scale)
+        }
         let text = word.render(at: (y: h, x: w))
         _drawText(text)
-        consume(height: word.height)
-        consume(width: word.width)
     }
 
     private mutating func consume(quad: Quad) {

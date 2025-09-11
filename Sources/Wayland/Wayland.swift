@@ -482,18 +482,21 @@ public enum Wayland {
 
         glBindVertexArray(vao)
 
+        #if FrameInfo
         let mid = UInt(dim.width / 2)
         drawQuad(
             Quad(
                 dst_p0: (mid - 1, 0),
                 dst_p1: (mid + 1, dim.height),
                 color: Color.red))
-
+        #endif
         var renderer = Renderer(dim, drawQuad, drawText)
         renderer.draw(block: block)
 
+        #if FrameInfo
         let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2, color: Color.red)
         drawText(elapsed_text)
+        #endif
 
         end = ContinuousClock.now
         elapsed = end - start
@@ -531,7 +534,7 @@ public enum Wayland {
             drawText(word)
         }
         #if FrameInfo
-        let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2.0, color: Color.red)
+        let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2, color: Color.red)
         drawText(elapsed_text)
         #endif
 
