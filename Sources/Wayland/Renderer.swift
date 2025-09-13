@@ -16,7 +16,7 @@ struct Renderer: ~Copyable {
     let _drawText: (Text) -> Void
     let height: UInt
     let width: UInt
-    var layers: [Consumed] = []
+    var layers: [Consumed] = [Consumed()]
     var up: Bool = false
     var orientation: Orientation = .vertical
 
@@ -34,12 +34,22 @@ struct Renderer: ~Copyable {
                 draw(block: block)
             }
             #if FrameInfo
-            let w = layers[layers.count - 1].width
-            _drawQuad(
-                Quad(
-                    dst_p0: (w - 1, 0),
-                    dst_p1: (w + 1, height),
-                    color: Color.red))
+            switch orientation {
+            case .vertical:
+                let w = layers[layers.count - 1].width
+                _drawQuad(
+                    Quad(
+                        dst_p0: (w - 1, 0),
+                        dst_p1: (w + 1, height),
+                        color: Color.red))
+            case .horizontal:
+                let h = layers[layers.count - 1].height
+                _drawQuad(
+                    Quad(
+                        dst_p0: (0, h - 1),
+                        dst_p1: (width, h + 1),
+                        color: Color.red))
+            }
             #endif
             popLayer()
         } else {
