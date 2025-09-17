@@ -11,8 +11,7 @@ import Foundation
 @MainActor
 public enum Wayland {
 
-    @MainActor
-    struct Glyph {
+    @MainActor struct Glyph {
         var rows: [String] = Array(repeating: "", count: Int(glyphH))
     }
 
@@ -415,11 +414,11 @@ public enum Wayland {
         return (u0, v0, u1, v1)
     }
 
-    static func drawRect(_ rect: Rect) {
-        drawQuad(rect.quad)
+    static func drawRect(_ rect: Rect, _ r: borrowing Renderer? = nil) {
+        drawQuad(rect.quad, r)
     }
 
-    static func drawQuad(_ quad: Quad) {
+    static func drawQuad(_ quad: Quad, _ r: borrowing Renderer? = nil) {
         glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
         let rects: InlineArray<1, Quad> = [quad]
         unsafe rects.span.withUnsafeBytes { buf in
@@ -429,7 +428,7 @@ public enum Wayland {
         glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, 1)
     }
 
-    static func drawText(_ text: Text) {
+    static func drawText(_ text: Text, _ r: borrowing Renderer? = nil) {
         glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
         var symbols = ContiguousArray<Quad>(
             repeating:
@@ -481,7 +480,7 @@ public enum Wayland {
         glUniform1i(uTex, 0)
 
         glBindVertexArray(vao)
-
+        /*
         #if FrameInfo
         let mid = UInt(dim.width / 2)
         drawQuad(
@@ -490,6 +489,7 @@ public enum Wayland {
                 dst_p1: (mid + 1, dim.height),
                 color: Color.red))
         #endif
+        */
         var renderer = Renderer(dim, drawQuad, drawText)
         renderer.draw(block: block)
 

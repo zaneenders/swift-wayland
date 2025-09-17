@@ -20,7 +20,7 @@ public struct Word: Block {
         Wayland.glyphH * self.scale
     }
 
-    func render(at: (y: UInt, x: UInt)) -> Text {
+    func draw(at: (y: UInt, x: UInt)) -> Text {
         return Text(label, at: (at.x, at.y), scale: self.scale, color: Color.white)
     }
 }
