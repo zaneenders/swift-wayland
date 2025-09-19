@@ -83,3 +83,4 @@ is for
 # Bugs
 
 - [ ] Not actually using the GPU.
+- [ ] Use static Linux sdk.

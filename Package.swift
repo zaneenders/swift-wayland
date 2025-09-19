@@ -16,6 +16,7 @@ let package = Package(
         .executableTarget(
             name: "SwiftWayland",
             dependencies: ["Wayland"],
+            swiftSettings: swiftSettings
         ),
         .target(
             name: "Wayland",
@@ -30,10 +31,7 @@ let package = Package(
                 .process("../../shaders/vertex.glsl"),
                 .process("../../shaders/fragment.glsl"),
             ],
-            swiftSettings: [
-                .strictMemorySafety(),
-                .treatAllWarnings(as: .error, .when(configuration: .release)),
-            ],
+            swiftSettings: swiftSettings
         ),
         .systemLibrary(
             name: "CWaylandClient",
@@ -66,9 +64,19 @@ let package = Package(
         .target(
             name: "CWaylandProtocols",
             publicHeadersPath: "include",
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "WaylandTests",
-            dependencies: ["Wayland", "SwiftWayland"]),
+            dependencies: ["Wayland", "SwiftWayland"],
+            swiftSettings: swiftSettings),
     ]
 )
+
+let swiftSettings: [SwiftSetting] = [
+    .strictMemorySafety(.when(configuration: .release)),
+    .treatAllWarnings(as: .error, .when(configuration: .release)),
+    .enableUpcomingFeature("ExistentialAny"),
+    .enableExperimentalFeature("LifetimeDependence"),
+    .enableExperimentalFeature("Span"),
+]
