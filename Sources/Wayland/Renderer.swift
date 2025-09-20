@@ -70,12 +70,14 @@ struct Renderer: ~Copyable {
         let y: UInt = layers[layers.count - 1].startY
         let h: UInt = layers[layers.count - 1].height
         let w: UInt = layers[layers.count - 1].width
-        switch o {
-        case .horizontal:
-            layers.append(Consumed(startX: x + w, startY: y, orientation: o))
-        case .vertical:
-            layers.append(Consumed(startX: x, startY: y + h, orientation: o))
-        }
+        let c =
+            switch o {
+            case .horizontal:
+                Consumed(startX: x + w, startY: y, orientation: o)
+            case .vertical:
+                Consumed(startX: x, startY: y + h, orientation: o)
+            }
+        layers.append(c)
     }
 
     private mutating func popLayer() {
@@ -103,7 +105,7 @@ struct Renderer: ~Copyable {
     }
 }
 
-struct Consumed {
+struct Consumed: Equatable {
     let startX: UInt
     let startY: UInt
     let orientation: Orientation

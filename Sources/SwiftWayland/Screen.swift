@@ -1,6 +1,7 @@
 import Wayland
 
 struct Screen: Block {
+    let o: Orientation
     let words = [
         "apple", "banana", "orange", "grape", "strawberry",
         "blueberry", "raspberry", "watermelon", "pineapple", "kiwi",
@@ -15,7 +16,7 @@ struct Screen: Block {
         "eggs", "cheese", "yogurt", "nuts", "seeds", "oil", "vinegar", "salt", "pepper", "sugar",
     ]
     var layer: some Block {
-        Group(.vertical) {
+        Group(o) {
             for word in words {
                 Word(word).scale(4)
             }

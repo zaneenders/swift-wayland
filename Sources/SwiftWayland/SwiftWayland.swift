@@ -8,7 +8,8 @@ import Foundation
 @MainActor
 struct SwiftWayland {
     static func main() async {
-        let screen = Screen()
+        let screen = Screen(o: .vertical)
+        //let screen = Test1(o: .vertical)
         #if Toolbar
         let formatter = DateFormatter()
         formatter.dateFormat = "yy-MM-dd HH:mm:ss"
