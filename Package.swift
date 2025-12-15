@@ -74,9 +74,11 @@ let package = Package(
 )
 
 let swiftSettings: [SwiftSetting] = [
-    .strictMemorySafety(.when(configuration: .release)),
-    .treatAllWarnings(as: .error, .when(configuration: .release)),
+    .strictMemorySafety(),
+    .treatAllWarnings(as: .error),
     .enableUpcomingFeature("ExistentialAny"),
     .enableExperimentalFeature("LifetimeDependence"),
     .enableExperimentalFeature("Span"),
+    .enableUpcomingFeature("MemberImportVisibility"),
+    .enableUpcomingFeature("InternalImportsByDefault"),
 ]
