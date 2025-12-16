@@ -415,10 +415,6 @@ public enum Wayland {
     return (u0, v0, u1, v1)
   }
 
-  static func drawRect(_ rect: Rect, _ r: borrowing Renderer? = nil) {
-    drawQuad(rect.quad, r)
-  }
-
   static func drawQuad(_ quad: Quad, _ r: borrowing Renderer? = nil) {
     glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
     let rects: InlineArray<1, Quad> = [quad]
@@ -531,7 +527,7 @@ public enum Wayland {
     unsafe wl_surface_commit(surface)
   }
 
-  public static func drawFrame(_ dim: (height: UInt32, width: UInt32), _ words: [Text], _ rects: [Rect]) {
+  public static func drawFrame(_ dim: (height: UInt32, width: UInt32), _ words: [Text], _ rects: [Quad]) {
     /*
     Still some performace wins to be made here.
     - Send all data to the GPU once perframe instead of for each Quad/Text object.
@@ -550,8 +546,8 @@ public enum Wayland {
 
     glBindVertexArray(vao)
     // Draw quads
-    for rect in rects {
-      drawRect(rect)
+    for quad in rects {
+      drawQuad(quad)
     }
 
     // Draw Text
