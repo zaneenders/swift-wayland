@@ -430,6 +430,31 @@ public enum Wayland {
   }
 
   static func drawText(_ text: Text, _ r: borrowing Renderer? = nil) {
+    var penX = text.pos.x
+    let penY = text.pos.y
+
+    var totalWidth: UInt = 0
+    for _ in text.text {
+      let w = glyphW * text.scale
+      totalWidth += w + glyphSpacing * text.scale
+    }
+    if !text.text.isEmpty {
+      totalWidth -= glyphSpacing * text.scale
+    }
+
+    let textHeight = glyphH * text.scale
+
+    drawQuad(
+      Quad(
+        dst_p0: (penX, penY),
+        dst_p1: (penX + totalWidth, penY + textHeight),
+        tex_tl: (0, 0),
+        tex_br: (1, 1),
+        color: text.background
+      )
+    )
+
+    // Draw text
     glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
     var symbols = ContiguousArray<Quad>(
       repeating:
@@ -438,11 +463,10 @@ public enum Wayland {
           dst_p1: (0, 0),
           tex_tl: (0, 0),
           tex_br: (0, 0),
-          color: text.color
+          color: text.forground
         ), count: text.text.length)
 
-    var penX = text.pos.x
-    let penY = text.pos.y
+    penX = text.pos.x
 
     for (i, c) in text.text.utf8.enumerated() {
       let (u0, v0, u1, v1) = glyphUV(c)
@@ -453,7 +477,7 @@ public enum Wayland {
         dst_p1: (penX + w, penY + h),
         tex_tl: (u0, v0),
         tex_br: (u1, v1),
-        color: text.color
+        color: text.forground
       )
       penX += w + glyphSpacing * text.scale
     }

@@ -1,4 +1,4 @@
-public struct Color: BitwiseCopyable {
+public struct Color: BitwiseCopyable, Sendable, Equatable {
 
   public var r, g, b, a: Float
 
@@ -11,12 +11,12 @@ public struct Color: BitwiseCopyable {
 }
 
 extension Color {
+  private static let allColors: [Color] = [
+    .white, .black, .teal, .blue, .green,
+    .orange, .yellow, .red, .purple, .pink,
+    .brown, .gray, .cyan, .magenta,
+  ]
   public static var random: Color {
-    let allColors: [Color] = [
-      .white, .black, .teal, .blue, .green,
-      .orange, .yellow, .red, .purple, .pink,
-      .brown, .gray, .cyan, .magenta,
-    ]
     return allColors.randomElement()!
   }
 }

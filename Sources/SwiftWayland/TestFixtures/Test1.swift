@@ -6,7 +6,9 @@ struct Test1: Block {
   var layer: some Block {
     Group(o) {
       Word(names[0]).scale(4)
+        .forground(.yellow)
       Word(names[1]).scale(4)
+        .background(.pink)
     }
   }
 }

@@ -3,7 +3,8 @@ public struct Word: Block {
   var v: VLayout = .center
   var h: HLayout = .center
   var scale: UInt = UInt(Wayland.scale)
-  var color: Color = .white
+  var forground: Color = .white
+  var background: Color = .black
 
   public init(_ text: String) {
     self.label = text
@@ -15,9 +16,15 @@ public struct Word: Block {
     return copy
   }
 
+  public func background(_ color: Color) -> Self {
+    var copy = self
+    copy.background = color
+    return copy
+  }
+
   public func forground(_ color: Color) -> Self {
     var copy = self
-    copy.color = color
+    copy.forground = color
     return copy
   }
 
@@ -31,7 +38,7 @@ public struct Word: Block {
   }
 
   func draw(at: (y: UInt, x: UInt)) -> Text {
-    return Text(label, at: (at.x, at.y), scale: self.scale, color: self.color)
+    return Text(label, at: (at.x, at.y), scale: self.scale, forground: self.forground, background: self.background)
   }
 }
 

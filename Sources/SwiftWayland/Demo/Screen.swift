@@ -17,9 +17,13 @@ struct Screen: Block {
   ]
   var layer: some Block {
     Group(o) {
-      Word("Demo").forground(.green)
+      Word("Demo")
+        .forground(.green)
+        .background(.purple)
       for word in words {
         Word(word).scale(4)
+          .forground(.white)
+          .background(.random)
       }
     }
   }
