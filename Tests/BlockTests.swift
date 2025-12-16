@@ -6,6 +6,10 @@ import Testing
 let baseHeight: UInt = 600
 let baseWidth: UInt = 800
 
+/*
+These tests are kinda gross but they are better than nothing.
+I will aim to improve them as this project takes more shape.
+*/
 @MainActor @Test
 func horizontalTest1() {
   let tb = Test1(o: .horizontal)
@@ -22,6 +26,10 @@ func horizontalTest1() {
       Issue.record(#function)
     },
     { t, r in
+      let expectedBackground = count == 0 ? Color.black : Color.pink
+      let expectedForeground = count == 0 ? Color.yellow : Color.white
+      #expect(t.background == expectedBackground)
+      #expect(t.forground == expectedForeground)
       #expect(t.text == tb.names[count])
       #expect(r.layers[1] == expectedLayers[count])
       #expect(t.pos == expectedPos[count])
@@ -42,6 +50,10 @@ func verticalTest1() {
       Issue.record(#function)
     },
     { t, r in
+      let expectedBackground = count == 0 ? Color.black : Color.pink
+      let expectedForeground = count == 0 ? Color.yellow : Color.white
+      #expect(t.background == expectedBackground)
+      #expect(t.forground == expectedForeground)
       #expect(t.text == tb.names[count])
       #expect(t.pos == expectedPos[count])
       count += 1
