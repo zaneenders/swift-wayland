@@ -5,7 +5,7 @@
   "indentConditionalCompilationBlocks" : false,
   "indentSwitchCaseLabels" : false,
   "indentation" : {
-    "spaces" : 4
+    "spaces" : 2
   },
   "lineBreakAroundMultilineExpressionChainComponents" : false,
   "lineBreakBeforeControlFlowKeywords" : false,
@@ -21,11 +21,7 @@
     ]
   },
   "prioritizeKeepingFunctionOutputTogether" : false,
-  "reflowMultilineStringLiterals" : {
-    "never" : {
-
-    }
-  },
+  "reflowMultilineStringLiterals" : "never",
   "respectsExistingLineBreaks" : true,
   "rules" : {
     "AllPublicDeclarationsHaveDocumentation" : false,
@@ -71,6 +67,7 @@
     "UseTripleSlashForDocumentationComments" : true,
     "UseWhereClausesInForLoops" : false,
     "ValidateDocumentationComments" : false,
+    "indentConditionalCompilationBlocks" : false,
     "lineBreakBeforeEachArgument" : true
   },
   "spacesAroundRangeFormationOperators" : false,
