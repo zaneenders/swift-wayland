@@ -1,6 +1,6 @@
 public enum WaylandEvent: Sendable {
     #if !Toolbar
-    case key(code: UInt32, state: UInt32)
+    case key(code: UInt, state: UInt)
     #endif
-    case frame(height: UInt32, width: UInt32)
+    case frame(height: UInt, width: UInt)
 }

@@ -8,6 +8,8 @@ import Foundation
 @MainActor
 struct SwiftWayland {
     static func main() async {
+        let screen = Screen(o: .vertical)
+        //let screen = Test1(o: .vertical)
         #if Toolbar
         let formatter = DateFormatter()
         formatter.dateFormat = "yy-MM-dd HH:mm:ss"
@@ -28,19 +30,19 @@ struct SwiftWayland {
                 */
                 #if Toolbar
                 let today = formatter.string(from: Date())
-                let today_scale: Float = 2.0
-                let today_space = Float(Wayland.glyphSpacing) * today_scale
-                let today_textW = Float(Wayland.glyphW) * today_scale
-                let today_total = (Float(today.count) * (today_textW + today_space))
-                let text_y = Float(
-                    (Double(Wayland.toolbar_height) / 2.0) - ((Double(Wayland.glyphH) * Double(today_scale)) / 2.0))
+                let today_scale: UInt = 2
+                let today_space = Wayland.glyphSpacing * today_scale
+                let today_textW = Wayland.glyphW * today_scale
+                let today_total = (UInt(today.count) * (today_textW + today_space))
+                let text_y =
+                    (Wayland.toolbar_height / 2) - ((Wayland.glyphH * today_scale) / 2)
                 let clock = (
                     text: Text(
-                        today, at: (Float(winW) - today_total, text_y), scale: today_scale,
+                        today, at: (winW - today_total, text_y), scale: today_scale,
                         color: Color.black),
                     rect: Rect(
-                        dst_p0: (Float(winW) - today_total, 0),
-                        dst_p1: (Float(winW), Float(winH)),
+                        dst_p0: (winW - today_total, 0),
+                        dst_p1: (winW, winH),
                         color: Color.teal
                     )
                 )
@@ -54,32 +56,33 @@ struct SwiftWayland {
                 let cmsg = UnicodeScalar(code).map { String(Character($0)) } ?? " "
                 let words = ["Scribe", cmsg, "\(snapShot.count)"]
 
-                let space = Float(Wayland.glyphSpacing) * Wayland.scale
-                let textH = Float(Wayland.glyphH) * Wayland.scale
-                let total = (Float(words.count) * (textH + space)) - space
-                let startY = (Float(winH) - total) * 0.5
+                let space = Wayland.glyphSpacing * Wayland.scale
+                let textH = Wayland.glyphH * Wayland.scale
+                let total = (UInt(words.count) * (textH + space)) - space
+                let startY = (UInt(winH) - total) / 2
                 for (i, word) in words.enumerated() {
                     let textW =
-                        Float(word.count) * (Float(Wayland.glyphW + Wayland.glyphSpacing) * Wayland.scale) - space
-                    let penX = (Float(winW) - textW) * 0.5
-                    let penY = startY + (Float(i) * (textH + space))
+                        UInt(word.count) * (UInt(Wayland.glyphW + Wayland.glyphSpacing) * Wayland.scale) - space
+                    let penX = (winW - textW) / 2
+                    let penY = startY + (UInt(i) * (textH + space))
                     let text = Text(word, at: (penX, penY), scale: Wayland.scale)
                     texts.append(text)
                 }
                 rects.append(
                     Rect(
                         dst_p0: (0, 0),
-                        dst_p1: (Float(winW), 200),
+                        dst_p1: (winW, 200),
                         color: Color.teal
                     ))
                 rects.append(
                     Rect(
-                        dst_p0: (Float(winW), Float(winH - 200)),
-                        dst_p1: (0, Float(winH)),
+                        dst_p0: (winW, winH - 200),
+                        dst_p1: (0, winH),
                         color: Color.green
                     ))
                 #endif
-                Wayland.drawFrame(texts, rects)
+                Wayland.drawFrame((height: winH, width: winW), screen)
+                //Wayland.drawFrame((height: winH, width: winW), texts, rects)
                 texts = []
                 rects = []
             #if !Toolbar
