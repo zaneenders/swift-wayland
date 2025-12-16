@@ -1,3 +1,3 @@
 enum WaylandError: Error {
-    case error(message: String)
+  case error(message: String)
 }
