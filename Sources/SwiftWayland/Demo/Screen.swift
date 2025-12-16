@@ -17,6 +17,7 @@ struct Screen: Block {
   ]
   var layer: some Block {
     Group(o) {
+      Word("Demo").forground(.green)
       for word in words {
         Word(word).scale(4)
       }
