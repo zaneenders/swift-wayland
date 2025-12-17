@@ -32,6 +32,8 @@ struct Renderer: ~Copyable {
       if chagned {
         popLayer()
       }
+    } else if let rect = block as? Rect {
+      consume(rect: rect)
     } else if let word = block as? Word {
       consume(word: word)
     } else if let group = block as? BlockGroup {
@@ -82,6 +84,29 @@ struct Renderer: ~Copyable {
 
   private mutating func popLayer() {
     _ = layers.popLast()
+  }
+
+  private mutating func consume(rect: Rect) {
+    let x: UInt = layers[layers.count - 1].startX
+    let y: UInt = layers[layers.count - 1].startY
+    let h: UInt = layers[layers.count - 1].height
+    let w: UInt = layers[layers.count - 1].width
+    let o: Orientation = layers[layers.count - 1].orientation
+    let quadH: UInt = rect.height * rect.scale
+    let quadW: UInt = rect.width * rect.scale
+    let quad = Quad(
+      dst_p0: (y + h, x + w),
+      dst_p1: (y + h + quadH, x + w + quadW),
+      tex_tl: (0, 0), tex_br: (1, 1), color: rect.color)
+    switch o {
+    case .horizontal:
+      layers[layers.count - 1].height = max(layers[layers.count - 1].height, quadH)
+      layers[layers.count - 1].width += quadW + rect.scale
+    case .vertical:
+      layers[layers.count - 1].height += quadH + rect.scale
+      layers[layers.count - 1].width = max(layers[layers.count - 1].width, quadW)
+    }
+    _drawQuad(quad, self)
   }
 
   private mutating func consume(word: Word) {

@@ -60,3 +60,28 @@ func verticalTest1() {
     })
   renderer.draw(block: tb)
 }
+
+@MainActor @Test
+func rectTest() {
+  let rect = Rect(width: 100, height: 50, color: .blue, scale: 1)
+  var quadDrawn = false
+
+  var renderer = Renderer(
+    (height: baseHeight, width: baseWidth),
+    { q, r in
+      #expect(q.dst_p0.0 == 0.0)
+      #expect(q.dst_p0.1 == 0.0)
+      #expect(q.dst_p1.0 == 50.0)
+      #expect(q.dst_p1.1 == 100.0)
+      #expect(q.width == 100)
+      #expect(q.height == 50)
+      #expect(q.color == Color.blue)
+      quadDrawn = true
+    },
+    { t, r in
+      Issue.record(#function)
+    })
+
+  renderer.draw(block: rect)
+  #expect(quadDrawn)
+}

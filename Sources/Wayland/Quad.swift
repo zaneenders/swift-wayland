@@ -1,4 +1,4 @@
-internal struct Quad: BitwiseCopyable {
+public struct Quad: BitwiseCopyable {
   var dst_p0: (Float, Float)
   var dst_p1: (Float, Float)
   var tex_tl: (Float, Float)
@@ -12,7 +12,7 @@ internal struct Quad: BitwiseCopyable {
     UInt(abs(dst_p0.1 - dst_p1.1))
   }
 
-  init(
+  public init(
     dst_p0: (UInt, UInt), dst_p1: (UInt, UInt),
     tex_tl: (Float, Float) = (0, 0),
     tex_br: (Float, Float) = (1, 1),
