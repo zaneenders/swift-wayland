@@ -12,7 +12,7 @@ public struct Quad: BitwiseCopyable {
     UInt(abs(dst_p0.1 - dst_p1.1))
   }
 
-  init(
+  public init(
     dst_p0: (UInt, UInt), dst_p1: (UInt, UInt),
     tex_tl: (Float, Float) = (0, 0),
     tex_br: (Float, Float) = (1, 1),

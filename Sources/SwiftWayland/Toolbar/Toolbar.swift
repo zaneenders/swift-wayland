@@ -9,7 +9,7 @@ func runToolbar() async {
 
   Wayland.setup()
   var texts: [Text] = []
-  var rects: [Rect] = []
+  var quads: [Quad] = []
   event_loop: for await ev in Wayland.events() {
     switch ev {
     case .frame(let winH, let winW):
@@ -28,18 +28,20 @@ func runToolbar() async {
       let clock = (
         text: Text(
           today, at: (winW - today_total, text_y), scale: today_scale,
-          color: Color.black),
-        rect: Rect(
+          forground: Color.black, background: Color.teal),
+        quad: Quad(
           dst_p0: (winW - today_total, 0),
           dst_p1: (winW, winH),
+          tex_tl: (0, 0),
+          tex_br: (1, 1),
           color: Color.teal
         )
       )
       texts.append(clock.text)
-      rects.append(clock.rect)
-      Wayland.drawFrame((height: UInt32(winH), width: UInt32(winW)), texts, rects)
+      quads.append(clock.quad)
+      Wayland.drawFrame((height: UInt32(winH), width: UInt32(winW)), texts, quads)
       texts = []
-      rects = []
+      quads = []
     }
   }
 
