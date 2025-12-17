@@ -82,5 +82,22 @@ is for
 
 # Bugs
 
-- [ ] Not actually using the GPU.
-- [ ] Use static Linux sdk.
+## Not actually using the GPU.
+
+For Asahi linux adding the following lines to the `.config/hypr/hyprland.conf` 
+does fix the error with running on the GPU but is sluggish. I assume this is 
+because the driver isn’t as optimize because this is a very unbeaten path.
+
+```
+env = MESA_LOADER_DRIVER_OVERRIDE,asahi
+env = WLR_RENDERER,vulkan
+```
+
+## Use static Linux sdk.
+
+Currently we are linking against a few wayland libraries to handle sending 
+messages to the wayland compositor. This can be switched out for our own 
+server. I have had some success getting 
+[swift-nio](https://github.com/apple/swift-nio/pull/3316) working but my
+implementation broke and decided to spend the time getting a working project
+and figured I could come back to the feature.
