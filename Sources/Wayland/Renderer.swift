@@ -1,24 +1,34 @@
+import Logging
+
 @MainActor
 struct Renderer: ~Copyable {
+
   init(
     _ dim: (height: UInt, width: UInt),
     _ drawQuad: @escaping (Quad, borrowing Self) -> Void,
     _ drawText: @escaping (Text, borrowing Self) -> Void
   ) {
+    self.logger = {
+      var _logger = Logger(label: "Renderer")
+      _logger.logLevel = .trace
+      return _logger
+    }()
     self.height = dim.height
     self.width = dim.width
     self._drawQuad = drawQuad
     self._drawText = drawText
     self.orientation = .vertical
     self.layers = [Consumed(startX: 0, startY: 0, orientation: self.orientation)]
+    selected = 0
   }
-
+  let logger: Logger
   let _drawQuad: (Quad, borrowing Self) -> Void
   let _drawText: (Text, borrowing Self) -> Void
   let height: UInt
   let width: UInt
   var orientation: Orientation
   var layers: [Consumed]
+  var selected: Hash
 
   func frameInfo() {
     #if FrameInfo
@@ -58,6 +68,12 @@ struct Renderer: ~Copyable {
 
   mutating func popLayer() {
     _ = layers.popLast()
+  }
+
+  mutating func select(_ hash: Hash) {
+    let prev = self.selected
+    self.selected = hash
+    logger.notice("Hash set: \(hash), was: \(prev)")
   }
 
   mutating func consume(rect: Rect) {

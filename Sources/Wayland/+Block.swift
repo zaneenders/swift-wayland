@@ -1,5 +1,8 @@
 extension Block {
   func draw(_ renderer: inout Renderer) {
+    if renderer.selected == 0 {
+      renderer.select(hash(#function + "\(self)"))
+    }
     if let orientation = self as? OrientationBlock {
       let chagned = renderer.orientation != orientation.orientation
       if chagned {

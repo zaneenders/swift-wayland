@@ -1,5 +1,7 @@
 import XXH3
 
-func hash(_ string: String) -> UInt64 {
+typealias Hash = UInt64
+
+func hash(_ string: String) -> Hash {
   XXH3.hash(string, seed: 42069)
 }
