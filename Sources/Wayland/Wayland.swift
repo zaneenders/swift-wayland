@@ -502,7 +502,7 @@ public enum Wayland {
 
     glBindVertexArray(vao)
     var renderer = Renderer(dim, drawQuad, drawText)
-    renderer.draw(block: block)
+    block.draw(&renderer)
 
     #if FrameInfo
     let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2, forground: .red, background: .black)

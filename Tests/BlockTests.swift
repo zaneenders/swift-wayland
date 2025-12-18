@@ -35,7 +35,7 @@ func horizontalTest1() {
       #expect(t.pos == expectedPos[count])
       count += 1
     })
-  renderer.draw(block: tb)
+  tb.draw(&renderer)
 }
 
 @MainActor @Test
@@ -58,7 +58,7 @@ func verticalTest1() {
       #expect(t.pos == expectedPos[count])
       count += 1
     })
-  renderer.draw(block: tb)
+  tb.draw(&renderer)
 }
 
 @MainActor @Test
@@ -81,7 +81,6 @@ func rectTest() {
     { t, r in
       Issue.record(#function)
     })
-
-  renderer.draw(block: rect)
+  rect.draw(&renderer)
   #expect(quadDrawn)
 }

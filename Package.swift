@@ -13,7 +13,8 @@ let package = Package(
     .default(enabledTraits: []),
   ],
   dependencies: [
-    .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.30.0")
+    .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.30.0"),
+    .package(url: "https://github.com/swift-cloud/swift-xxh3", from: "1.0.0"),
   ],
   targets: [
     .executableTarget(
@@ -32,6 +33,7 @@ let package = Package(
         "CEGL",
         "CGLES3",
         "CWaylandProtocols",
+        .product(name: "XXH3", package: "swift-xxh3"),
       ],
       resources: [
         .process("../../shaders/vertex.glsl"),

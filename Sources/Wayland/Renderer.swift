@@ -1,6 +1,5 @@
 @MainActor
 struct Renderer: ~Copyable {
-
   init(
     _ dim: (height: UInt, width: UInt),
     _ drawQuad: @escaping (Quad, borrowing Self) -> Void,
@@ -21,53 +20,28 @@ struct Renderer: ~Copyable {
   var orientation: Orientation
   var layers: [Consumed]
 
-  mutating func draw(block: some Block) {
-    if let orientation = block as? OrientationBlock {
-      let chagned = self.orientation != orientation.orientation
-      if chagned {
-        self.orientation = orientation.orientation
-        pushLayer(self.orientation)
-      }
-      draw(block: block.layer)
-      if chagned {
-        popLayer()
-      }
-    } else if let rect = block as? Rect {
-      consume(rect: rect)
-    } else if let word = block as? Word {
-      consume(word: word)
-    } else if let group = block as? BlockGroup {
-      for block in group.children {
-        draw(block: block)
-      }
-      #if FrameInfo
-      switch orientation {
-      case .vertical:
-        let w = layers[layers.count - 1].width
-        _drawQuad(
-          Quad(
-            dst_p0: (w - 1, 0),
-            dst_p1: (w + 1, height),
-            color: Color.red), self)
-      case .horizontal:
-        let h = layers[layers.count - 1].height
-        _drawQuad(
-          Quad(
-            dst_p0: (0, h - 1),
-            dst_p1: (width, h + 1),
-            color: Color.red), self)
-      }
-      #endif
-    } else {
-      draw(block: block.layer)
+  func frameInfo() {
+    #if FrameInfo
+    switch orientation {
+    case .vertical:
+      let w = layers[layers.count - 1].width
+      _drawQuad(
+        Quad(
+          dst_p0: (w - 1, 0),
+          dst_p1: (w + 1, height),
+          color: Color.red), self)
+    case .horizontal:
+      let h = layers[layers.count - 1].height
+      _drawQuad(
+        Quad(
+          dst_p0: (0, h - 1),
+          dst_p1: (width, h + 1),
+          color: Color.red), self)
     }
+    #endif
   }
 
-  mutating func draw(any: any Block) {
-    draw(block: any)
-  }
-
-  private mutating func pushLayer(_ o: Orientation) {
+  mutating func pushLayer(_ o: Orientation) {
     let x: UInt = layers[layers.count - 1].startX
     let y: UInt = layers[layers.count - 1].startY
     let h: UInt = layers[layers.count - 1].height
@@ -82,11 +56,11 @@ struct Renderer: ~Copyable {
     layers.append(c)
   }
 
-  private mutating func popLayer() {
+  mutating func popLayer() {
     _ = layers.popLast()
   }
 
-  private mutating func consume(rect: Rect) {
+  mutating func consume(rect: Rect) {
     let x: UInt = layers[layers.count - 1].startX
     let y: UInt = layers[layers.count - 1].startY
     let h: UInt = layers[layers.count - 1].height
@@ -109,7 +83,7 @@ struct Renderer: ~Copyable {
     _drawQuad(quad, self)
   }
 
-  private mutating func consume(word: Word) {
+  mutating func consume(word: Word) {
     let x: UInt = layers[layers.count - 1].startX
     let y: UInt = layers[layers.count - 1].startY
     let h: UInt = layers[layers.count - 1].height
