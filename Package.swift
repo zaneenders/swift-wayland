@@ -43,8 +43,10 @@ let package = Package(
       name: "WaylandTests",
       dependencies: ["Wayland", "SwiftWayland"],
       swiftSettings: swiftSettings),
+    // Linked Libraries
     .systemLibrary(
       name: "CWaylandClient",
+      path: "Sources/LinkedLibraries/CWaylandClient",
       pkgConfig: "wayland-client",
       providers: [
         .yum(["wayland-devel"])
@@ -52,13 +54,15 @@ let package = Package(
     ),
     .systemLibrary(
       name: "CWaylandEGL",
+      path: "Sources/LinkedLibraries/CWaylandEGL",
       pkgConfig: "wayland-egl",
       providers: [
         .yum(["wayland-protocols", "wayland-devel"])
-      ]
+      ],
     ),
     .systemLibrary(
       name: "CEGL",
+      path: "Sources/LinkedLibraries/CEGL",
       pkgConfig: "egl",
       providers: [
         .yum(["mesa-libEGL-devel"])
@@ -66,6 +70,7 @@ let package = Package(
     ),
     .systemLibrary(
       name: "CGLES3",
+      path: "Sources/LinkedLibraries/CGLES3",
       pkgConfig: "glesv3",
       providers: [
         .yum(["mesa-libGLES-devel"])
@@ -73,6 +78,7 @@ let package = Package(
     ),
     .target(
       name: "CWaylandProtocols",
+      path: "Sources/LinkedLibraries/CWaylandProtocols",
       publicHeadersPath: "include",
       swiftSettings: swiftSettings
     ),
