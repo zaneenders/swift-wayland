@@ -9,7 +9,6 @@ let package = Package(
   ],
   traits: [
     "Toolbar",
-    "FrameInfo",
     .default(enabledTraits: []),
   ],
   dependencies: [
@@ -94,6 +93,7 @@ let swiftSettings: [SwiftSetting] = [
   .treatAllWarnings(as: .error),
   .enableUpcomingFeature("ExistentialAny"),
   .enableExperimentalFeature("LifetimeDependence"),
+  .enableExperimentalFeature("Lifetimes"),
   .enableExperimentalFeature("Span"),
   .enableUpcomingFeature("MemberImportVisibility"),
   .enableUpcomingFeature("InternalImportsByDefault"),

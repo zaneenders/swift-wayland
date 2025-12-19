@@ -1,5 +1,5 @@
 extension Block {
-  func draw(_ renderer: inout Renderer) {
+  public func draw(_ renderer: inout Renderer) {
     if renderer.selected == 0 {
       renderer.select(hash(#function + "\(self)"))
     }
@@ -21,7 +21,6 @@ extension Block {
       for block in group.children {
         block.draw(&renderer)
       }
-      renderer.frameInfo()
     } else {
       self.layer.draw(&renderer)
     }

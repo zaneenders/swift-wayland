@@ -9,7 +9,7 @@ import Foundation
 /// Their might be better ways to abstract this and clean it up a bit. But it's
 /// working for now.
 @MainActor
-public enum Wayland {
+public enum Wayland: Drawer {
 
   @MainActor struct Glyph {
     var rows: [String] = Array(repeating: "", count: Int(glyphH))
@@ -415,7 +415,7 @@ public enum Wayland {
     return (u0, v0, u1, v1)
   }
 
-  static func drawQuad(_ quad: Quad, _ r: borrowing Renderer? = nil) {
+  public static func drawQuad(_ quad: Quad) {
     glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
     let rects: InlineArray<1, Quad> = [quad]
     unsafe rects.span.withUnsafeBytes { buf in
@@ -425,7 +425,7 @@ public enum Wayland {
     glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, 1)
   }
 
-  static func drawText(_ text: Text, _ r: borrowing Renderer? = nil) {
+  public static func drawText(_ text: Text) {
     var penX = text.pos.x
     let penY = text.pos.y
 
@@ -488,8 +488,7 @@ public enum Wayland {
     glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(symbols.count))
   }
 
-  public static func drawFrame(_ dim: (height: UInt, width: UInt), _ block: some Block) {
-
+  public static func preDraw() {
     start = ContinuousClock.now
 
     glViewport(0, 0, GLsizei(winW), GLsizei(winH))
@@ -501,14 +500,9 @@ public enum Wayland {
     glUniform1i(uTex, 0)
 
     glBindVertexArray(vao)
-    var renderer = Renderer(dim, drawQuad, drawText)
-    block.draw(&renderer)
+  }
 
-    #if FrameInfo
-    let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2, forground: .red, background: .black)
-    drawText(elapsed_text)
-    #endif
-
+  public static func postDraw() {
     end = ContinuousClock.now
     elapsed = end - start
 
@@ -544,10 +538,6 @@ public enum Wayland {
     for word in words {
       drawText(word)
     }
-    #if FrameInfo
-    let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2, forground: .red, background: .black)
-    drawText(elapsed_text)
-    #endif
 
     end = ContinuousClock.now
     elapsed = end - start

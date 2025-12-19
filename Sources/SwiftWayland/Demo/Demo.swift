@@ -9,8 +9,11 @@ func runDemo() async {
   event_loop: for await ev in Wayland.events() {
     switch ev {
     case .frame(let winH, let winW):
+      var renderer = Renderer(Wayland.self)
+      Wayland.preDraw()
       let screen = Screen(o: .vertical, ips: ips)
-      Wayland.drawFrame((height: winH, width: winW), screen)
+      screen.draw(&renderer)
+      Wayland.postDraw()
     case .key(let code, let keyState):
       if code == 1 {
         Wayland.exit()

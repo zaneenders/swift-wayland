@@ -1,55 +1,32 @@
 import Logging
 
 @MainActor
-struct Renderer: ~Copyable {
+public protocol Drawer {
+  static func drawQuad(_ quad: Quad)
+  static func drawText(_ text: Text)
+}
 
-  init(
-    _ dim: (height: UInt, width: UInt),
-    _ drawQuad: @escaping (Quad, borrowing Self) -> Void,
-    _ drawText: @escaping (Text, borrowing Self) -> Void
+@MainActor
+public struct Renderer: ~Copyable {
+
+  public init(
+    _ drawer: any Drawer.Type
   ) {
     self.logger = {
       var _logger = Logger(label: "Renderer")
       _logger.logLevel = .trace
       return _logger
     }()
-    self.height = dim.height
-    self.width = dim.width
-    self._drawQuad = drawQuad
-    self._drawText = drawText
+    self.drawer = drawer
     self.orientation = .vertical
     self.layers = [Consumed(startX: 0, startY: 0, orientation: self.orientation)]
     selected = 0
   }
+  let drawer: Drawer.Type
   let logger: Logger
-  let _drawQuad: (Quad, borrowing Self) -> Void
-  let _drawText: (Text, borrowing Self) -> Void
-  let height: UInt
-  let width: UInt
   var orientation: Orientation
   var layers: [Consumed]
   var selected: Hash
-
-  func frameInfo() {
-    #if FrameInfo
-    switch orientation {
-    case .vertical:
-      let w = layers[layers.count - 1].width
-      _drawQuad(
-        Quad(
-          dst_p0: (w - 1, 0),
-          dst_p1: (w + 1, height),
-          color: Color.red), self)
-    case .horizontal:
-      let h = layers[layers.count - 1].height
-      _drawQuad(
-        Quad(
-          dst_p0: (0, h - 1),
-          dst_p1: (width, h + 1),
-          color: Color.red), self)
-    }
-    #endif
-  }
 
   mutating func pushLayer(_ o: Orientation) {
     let x: UInt = layers[layers.count - 1].startX
@@ -96,7 +73,7 @@ struct Renderer: ~Copyable {
       layers[layers.count - 1].height += quadH + rect.scale
       layers[layers.count - 1].width = max(layers[layers.count - 1].width, quadW)
     }
-    _drawQuad(quad, self)
+    drawer.drawQuad(quad)
   }
 
   mutating func consume(word: Word) {
@@ -116,7 +93,7 @@ struct Renderer: ~Copyable {
       layers[layers.count - 1].height += word.height + word.scale
       layers[layers.count - 1].width = max(layers[layers.count - 1].width, word.width)
     }
-    _drawText(text, self)
+    drawer.drawText(text)
   }
 }
 
