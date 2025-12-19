@@ -1,47 +1,32 @@
+#if Toolbar
 import Foundation
 import Wayland
 
-#if Toolbar
+struct SystemClock: Block {
+  var time: String
+  var layer: some Block {
+    // TODO display to the right side of the screen
+    Word(time).scale(2)
+      .background(.black)
+      .forground(.teal)
+  }
+}
+
 @MainActor
 func runToolbar() async {
   let formatter = DateFormatter()
   formatter.dateFormat = "yy-MM-dd HH:mm:ss"
 
   Wayland.setup()
-  var texts: [Text] = []
-  var quads: [Quad] = []
   event_loop: for await ev in Wayland.events() {
     switch ev {
     case .frame(let winH, let winW):
-      /*
-      This is a mess well I figure out a more declaritive way of writing this code.
-      It may be usefull to expose the current window height and wdith but I want layout
-      logic to be more declaritive.
-      */
+      var renderer = Renderer(Wayland.self)
+      Wayland.preDraw()
       let today = formatter.string(from: Date())
-      let today_scale: UInt = 2
-      let today_space = Wayland.glyphSpacing * today_scale
-      let today_textW = Wayland.glyphW * today_scale
-      let today_total = (UInt(today.count) * (today_textW + today_space))
-      let text_y =
-        (Wayland.toolbar_height / 2) - ((Wayland.glyphH * today_scale) / 2)
-      let clock = (
-        text: Text(
-          today, at: (winW - today_total, text_y), scale: today_scale,
-          forground: Color.black, background: Color.teal),
-        quad: Quad(
-          dst_p0: (winW - today_total, 0),
-          dst_p1: (winW, winH),
-          tex_tl: (0, 0),
-          tex_br: (1, 1),
-          color: Color.teal
-        )
-      )
-      texts.append(clock.text)
-      quads.append(clock.quad)
-      Wayland.drawFrame((height: UInt32(winH), width: UInt32(winW)), texts, quads)
-      texts = []
-      quads = []
+      let view = SystemClock(time: today)
+        .draw(&renderer)
+      Wayland.postDraw()
     }
   }
 

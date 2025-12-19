@@ -511,42 +511,6 @@ public enum Wayland: Drawer {
     unsafe wl_surface_commit(surface)
   }
 
-  public static func drawFrame(_ dim: (height: UInt32, width: UInt32), _ words: [Text], _ rects: [Quad]) {
-    /*
-    Still some performace wins to be made here.
-    - Send all data to the GPU once perframe instead of for each Quad/Text object.
-    - Pre-allocate GPU memory to a max number of quads per draw call.
-    - Inline function calls.
-    */
-    start = ContinuousClock.now
-
-    glViewport(0, 0, GLsizei(winW), GLsizei(winH))
-    glClearColor(0, 0, 0, 1)
-    glClear(GLbitfield(GL_COLOR_BUFFER_BIT))
-
-    glUseProgram(program)
-    glUniform2f(uRes, Float(winW), Float(winH))
-    glUniform1i(uTex, 0)
-
-    glBindVertexArray(vao)
-    // Draw quads
-    for quad in rects {
-      drawQuad(quad)
-    }
-
-    // Draw Text
-    for word in words {
-      drawText(word)
-    }
-
-    end = ContinuousClock.now
-    elapsed = end - start
-
-    _ = unsafe eglSwapBuffers(eglDisplay, eglSurface)
-    unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
-    unsafe wl_surface_commit(surface)
-  }
-
   static var start = ContinuousClock.now
   static var end = ContinuousClock.now
   static var elapsed: Duration = end - start
