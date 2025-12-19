@@ -9,7 +9,7 @@ import Foundation
 /// Their might be better ways to abstract this and clean it up a bit. But it's
 /// working for now.
 @MainActor
-public enum Wayland: Drawer {
+public enum Wayland: Renderer {
 
   @MainActor struct Glyph {
     var rows: [String] = Array(repeating: "", count: Int(glyphH))
@@ -503,12 +503,11 @@ public enum Wayland: Drawer {
   }
 
   public static func postDraw() {
-    end = ContinuousClock.now
-    elapsed = end - start
-
     _ = unsafe eglSwapBuffers(eglDisplay, eglSurface)
     unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
     unsafe wl_surface_commit(surface)
+    end = ContinuousClock.now
+    elapsed = end - start
   }
 
   static var start = ContinuousClock.now

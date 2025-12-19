@@ -9,7 +9,7 @@ func runDemo() async {
   event_loop: for await ev in Wayland.events() {
     switch ev {
     case .frame(let winH, let winW):
-      var renderer = Renderer(Wayland.self)
+      var renderer = LayoutMachine(Wayland.self, .trace)
       Wayland.preDraw()
       let screen = Screen(o: .vertical, ips: ips)
       screen.draw(&renderer)

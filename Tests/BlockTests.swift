@@ -1,10 +1,11 @@
+import Logging
 import Testing
 
 @testable import SwiftWayland
 @testable import Wayland
 
 @MainActor
-enum TestWayland: Drawer {
+enum TestWayland: Renderer {
   static var texts: [Text] = []
   static var quads: [Quad] = []
 
@@ -22,11 +23,29 @@ enum TestWayland: Drawer {
   }
 }
 
-@MainActor @Test
-func idk() {
-  let tb = Test1(o: .horizontal)
-  var renderer = Renderer(TestWayland.self)
-  tb.draw(&renderer)
-  print(TestWayland.texts)
-  print(TestWayland.quads)
+@MainActor
+@Suite(.serialized)
+struct BlockTests: ~Copyable {
+
+  var renderer: LayoutMachine
+  init() {
+    self.renderer = LayoutMachine(TestWayland.self, .error)
+    TestWayland.reset()
+  }
+
+  @Test
+  mutating func test1() {
+    let tb = Test1(o: .horizontal)
+    tb.draw(&renderer)
+    #expect(TestWayland.texts.count == 2)
+    #expect(TestWayland.quads.count == 0)
+  }
+
+  @Test
+  mutating func screen() {
+    let screen = Screen(o: .vertical, ips: ["Zane"])
+    screen.draw(&renderer)
+    #expect(TestWayland.texts.count == 2)
+    #expect(TestWayland.quads.count == 1)
+  }
 }

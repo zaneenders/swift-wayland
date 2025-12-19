@@ -1,20 +1,21 @@
 import Logging
 
 @MainActor
-public protocol Drawer {
+public protocol Renderer {
   static func drawQuad(_ quad: Quad)
   static func drawText(_ text: Text)
 }
 
 @MainActor
-public struct Renderer: ~Copyable {
+public struct LayoutMachine: ~Copyable {
 
   public init(
-    _ drawer: any Drawer.Type
+    _ drawer: any Renderer.Type,
+    _ logLevel: Logger.Level
   ) {
     self.logger = {
       var _logger = Logger(label: "Renderer")
-      _logger.logLevel = .trace
+      _logger.logLevel = logLevel
       return _logger
     }()
     self.drawer = drawer
@@ -22,11 +23,19 @@ public struct Renderer: ~Copyable {
     self.layers = [Consumed(startX: 0, startY: 0, orientation: self.orientation)]
     selected = 0
   }
-  let drawer: Drawer.Type
+  let drawer: Renderer.Type
   let logger: Logger
   var orientation: Orientation
   var layers: [Consumed]
   var selected: Hash
+
+  mutating func select(hashing string: String) {
+    let prev = self.selected
+    let h = hash(string)
+    let hash = hash(prev ^ h)  // Not sure what operation to do here.
+    self.selected = hash
+    logger.notice("Hash set: \(hash), was: \(prev)")
+  }
 
   mutating func pushLayer(_ o: Orientation) {
     let x: UInt = layers[layers.count - 1].startX
@@ -45,12 +54,6 @@ public struct Renderer: ~Copyable {
 
   mutating func popLayer() {
     _ = layers.popLast()
-  }
-
-  mutating func select(_ hash: Hash) {
-    let prev = self.selected
-    self.selected = hash
-    logger.notice("Hash set: \(hash), was: \(prev)")
   }
 
   mutating func consume(rect: Rect) {
