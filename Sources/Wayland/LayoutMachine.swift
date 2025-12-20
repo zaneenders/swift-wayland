@@ -18,25 +18,39 @@ public struct LayoutMachine: ~Copyable {
     self.orientation = .vertical
     self.layers = [Consumed(startX: 0, startY: 0, orientation: self.orientation)]
     selected = 0
+    current = 0
   }
   let drawer: Renderer.Type
   let logger: Logger
   var orientation: Orientation
   var layers: [Consumed]
   var selected: Hash
+  var current: Hash
+
+  var currentSelected: Bool {
+    selected == current
+  }
 
   public mutating func reset() {
     self.orientation = .vertical
     self.layers = [Consumed(startX: 0, startY: 0, orientation: self.orientation)]
-    selected = 0
+    current = 0
   }
 
-  mutating func select(hashing string: String) {
+  mutating func selct(hashing string: String) {
     let prev = self.selected
     let h = hash(string)
     let hash = hash(prev ^ h)  // Not sure what operation to do here.
     self.selected = hash
-    logger.notice("Hash set: \(hash), was: \(prev)")
+    logger.notice("Selection set: \(hash), was: \(prev)")
+  }
+
+  mutating func current(hashing string: String) {
+    let prev = self.current
+    let h = hash(string)
+    let hash = hash(prev ^ h)  // Not sure what operation to do here.
+    self.current = hash
+    logger.notice("Hashing: \(string), Current set: \(hash), was: \(prev)")
   }
 
   mutating func pushLayer(_ o: Orientation) {
@@ -58,7 +72,7 @@ public struct LayoutMachine: ~Copyable {
     _ = layers.popLast()
   }
 
-  mutating func consume(rect: Rect) {
+  mutating func consume(rect: Rect, selected: Bool) {
     let x: UInt = layers[layers.count - 1].startX
     let y: UInt = layers[layers.count - 1].startY
     let h: UInt = layers[layers.count - 1].height
@@ -66,10 +80,16 @@ public struct LayoutMachine: ~Copyable {
     let o: Orientation = layers[layers.count - 1].orientation
     let quadH: UInt = rect.height * rect.scale
     let quadW: UInt = rect.width * rect.scale
+    let color: Color
+    if selected {
+      color = .cyan
+    } else {
+      color = rect.color
+    }
     let quad = Quad(
       dst_p0: (y + h, x + w),
       dst_p1: (y + h + quadH, x + w + quadW),
-      tex_tl: (0, 0), tex_br: (1, 1), color: rect.color)
+      tex_tl: (0, 0), tex_br: (1, 1), color: color)
     switch o {
     case .horizontal:
       layers[layers.count - 1].height = max(layers[layers.count - 1].height, quadH)
@@ -81,13 +101,13 @@ public struct LayoutMachine: ~Copyable {
     drawer.drawQuad(quad)
   }
 
-  mutating func consume(word: Word) {
+  mutating func consume(word: Word, selected: Bool) {
     let x: UInt = layers[layers.count - 1].startX
     let y: UInt = layers[layers.count - 1].startY
     let h: UInt = layers[layers.count - 1].height
     let w: UInt = layers[layers.count - 1].width
     let o: Orientation = layers[layers.count - 1].orientation
-    let text: Text
+    var text: Text
     switch o {
     case .horizontal:
       text = word.draw(at: (y: y, x: x + w))
@@ -97,6 +117,9 @@ public struct LayoutMachine: ~Copyable {
       text = word.draw(at: (y: y + h, x: x))
       layers[layers.count - 1].height += word.height + word.scale
       layers[layers.count - 1].width = max(layers[layers.count - 1].width, word.width)
+    }
+    if selected {
+      text.background = .cyan
     }
     drawer.drawText(text)
   }
