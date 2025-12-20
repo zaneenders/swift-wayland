@@ -98,6 +98,10 @@ env = WLR_RENDERER,vulkan
 Currently we are linking against a few wayland libraries to handle sending 
 messages to the wayland compositor. This can be switched out for our own 
 server. I have had some success getting 
-[swift-nio](https://github.com/apple/swift-nio/pull/3316) working but my
-implementation broke and decided to spend the time getting a working project
+[swift-nio](https://github.com/apple/swift-nio/pull/3316) working but my 
+implementation broke and decided to spend the time getting a working project 
 and figured I could come back to the feature.
+
+# TODO
+
+- [ ] Support adding boarders.

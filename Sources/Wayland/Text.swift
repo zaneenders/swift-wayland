@@ -2,8 +2,8 @@ public struct Text {
   public let text: String
   public let pos: (x: UInt, y: UInt)
   public let scale: UInt
-  public let forground: Color
-  public let background: Color
+  public var forground: Color
+  public var background: Color
 
   public init(
     _ text: String,

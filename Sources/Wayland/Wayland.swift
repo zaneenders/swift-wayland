@@ -9,7 +9,7 @@ import Foundation
 /// Their might be better ways to abstract this and clean it up a bit. But it's
 /// working for now.
 @MainActor
-public enum Wayland {
+public enum Wayland: Renderer {
 
   @MainActor struct Glyph {
     var rows: [String] = Array(repeating: "", count: Int(glyphH))
@@ -415,7 +415,7 @@ public enum Wayland {
     return (u0, v0, u1, v1)
   }
 
-  static func drawQuad(_ quad: Quad, _ r: borrowing Renderer? = nil) {
+  public static func drawQuad(_ quad: Quad) {
     glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
     let rects: InlineArray<1, Quad> = [quad]
     unsafe rects.span.withUnsafeBytes { buf in
@@ -425,7 +425,7 @@ public enum Wayland {
     glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, 1)
   }
 
-  static func drawText(_ text: Text, _ r: borrowing Renderer? = nil) {
+  public static func drawText(_ text: Text) {
     var penX = text.pos.x
     let penY = text.pos.y
 
@@ -488,8 +488,7 @@ public enum Wayland {
     glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(symbols.count))
   }
 
-  public static func drawFrame(_ dim: (height: UInt, width: UInt), _ block: some Block) {
-
+  public static func preDraw() {
     start = ContinuousClock.now
 
     glViewport(0, 0, GLsizei(winW), GLsizei(winH))
@@ -501,65 +500,19 @@ public enum Wayland {
     glUniform1i(uTex, 0)
 
     glBindVertexArray(vao)
-    var renderer = Renderer(dim, drawQuad, drawText)
-    renderer.draw(block: block)
-
-    #if FrameInfo
-    let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2, forground: .red, background: .black)
-    drawText(elapsed_text)
-    #endif
-
-    end = ContinuousClock.now
-    elapsed = end - start
-
-    _ = unsafe eglSwapBuffers(eglDisplay, eglSurface)
-    unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
-    unsafe wl_surface_commit(surface)
   }
 
-  public static func drawFrame(_ dim: (height: UInt32, width: UInt32), _ words: [Text], _ rects: [Quad]) {
-    /*
-    Still some performace wins to be made here.
-    - Send all data to the GPU once perframe instead of for each Quad/Text object.
-    - Pre-allocate GPU memory to a max number of quads per draw call.
-    - Inline function calls.
-    */
-    start = ContinuousClock.now
-
-    glViewport(0, 0, GLsizei(winW), GLsizei(winH))
-    glClearColor(0, 0, 0, 1)
-    glClear(GLbitfield(GL_COLOR_BUFFER_BIT))
-
-    glUseProgram(program)
-    glUniform2f(uRes, Float(winW), Float(winH))
-    glUniform1i(uTex, 0)
-
-    glBindVertexArray(vao)
-    // Draw quads
-    for quad in rects {
-      drawQuad(quad)
-    }
-
-    // Draw Text
-    for word in words {
-      drawText(word)
-    }
-    #if FrameInfo
-    let elapsed_text = Text("\(elapsed)", at: (0, 0), scale: 2, forground: .red, background: .black)
-    drawText(elapsed_text)
-    #endif
-
-    end = ContinuousClock.now
-    elapsed = end - start
-
+  public static func postDraw() {
     _ = unsafe eglSwapBuffers(eglDisplay, eglSurface)
     unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
     unsafe wl_surface_commit(surface)
+    end = ContinuousClock.now
+    elapsed = end - start
   }
 
   static var start = ContinuousClock.now
   static var end = ContinuousClock.now
-  static var elapsed: Duration = end - start
+  public internal(set) static var elapsed: Duration = end - start
 
   static var frameListener = unsafe wl_callback_listener(
     done: { _, callback, _time in
