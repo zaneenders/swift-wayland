@@ -24,7 +24,7 @@ func runDemo() async {
         Wayland.exit()
       }
       if keyState == 1 {
-        print("key: \(code)")
+        logger.trace("key: \(code)")
         ips = ["Loading..."]
         Task {
           let r = await getIps()
@@ -37,7 +37,7 @@ func runDemo() async {
   // Read the final state
   switch Wayland.state {
   case .error(let reason):
-    print("error: \(reason)")
+    logger.error("error: \(reason)")
   case .running, .exit:
     ()
   }
