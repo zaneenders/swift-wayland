@@ -14,7 +14,7 @@ struct Screen: Block {
       for ip in ips {
         Word(ip).scale(4)
           .forground(.white)
-          .background(.brown)
+          .background(.random)
       }
     }
   }
