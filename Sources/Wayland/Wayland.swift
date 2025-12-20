@@ -512,7 +512,7 @@ public enum Wayland: Renderer {
 
   static var start = ContinuousClock.now
   static var end = ContinuousClock.now
-  static var elapsed: Duration = end - start
+  public internal(set) static var elapsed: Duration = end - start
 
   static var frameListener = unsafe wl_callback_listener(
     done: { _, callback, _time in

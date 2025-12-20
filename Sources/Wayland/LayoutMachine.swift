@@ -13,11 +13,7 @@ public struct LayoutMachine: ~Copyable {
     _ drawer: any Renderer.Type,
     _ logLevel: Logger.Level
   ) {
-    self.logger = {
-      var _logger = Logger(label: "Renderer")
-      _logger.logLevel = logLevel
-      return _logger
-    }()
+    self.logger = Logger.create(logLevel: logLevel)
     self.drawer = drawer
     self.orientation = .vertical
     self.layers = [Consumed(startX: 0, startY: 0, orientation: self.orientation)]
@@ -28,6 +24,12 @@ public struct LayoutMachine: ~Copyable {
   var orientation: Orientation
   var layers: [Consumed]
   var selected: Hash
+
+  public mutating func reset() {
+    self.orientation = .vertical
+    self.layers = [Consumed(startX: 0, startY: 0, orientation: self.orientation)]
+    selected = 0
+  }
 
   mutating func select(hashing string: String) {
     let prev = self.selected
