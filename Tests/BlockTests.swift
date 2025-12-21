@@ -52,6 +52,26 @@ struct BlockTests: ~Copyable {
     #expect(TestWayland.quads[0].width == 40)  // 5 * 8 scale
     #expect(TestWayland.quads[0].height == 40)  // 5 * 8 scale
   }
+  @Test
+  mutating func moveInHash() {
+    #expect(renderer.current == 0)
+    let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
+    screen.draw(&renderer)
+    var moveIn = MoveIn(selected: renderer.selected, current: 0)
+    screen.moveIn(&moveIn)
+    #expect(renderer.current == moveIn.current)
+    #expect(renderer.selected == moveIn.selected)
+    print(moveIn)
+  }
+
+  @Test
+  mutating func moveIn() {
+    let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
+    screen.draw(&renderer)
+    let prev = renderer.selected
+    screen.moveIn(&renderer)
+    #expect(prev != renderer.selected)
+  }
 }
 
 @MainActor
