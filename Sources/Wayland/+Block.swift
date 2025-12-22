@@ -49,10 +49,11 @@ extension Block {
     move.next = id == move.selected && move.new == nil
     if self as? OrientationBlock != nil {
       self.layer.moveIn(&move)
-    } else if self as? Rect != nil {
+    } else if (self as? Rect != nil) || (self as? Word != nil) {
       // Leaf Node
-    } else if self as? Word != nil {
-      // Leaf Node
+      if move.new == nil {
+        move.new = move.selected
+      }
     } else if let group = self as? BlockGroup {
       for block in group.children {
         block.moveIn(&move)
