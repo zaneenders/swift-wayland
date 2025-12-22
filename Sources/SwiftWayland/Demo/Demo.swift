@@ -39,7 +39,8 @@ func runDemo() async {
         let screen = Screen(o: .vertical, ips: ips)
         screen.moveIn(&renderer)
       case (31, 1):  // S
-        ()
+        let screen = Screen(o: .vertical, ips: ips)
+        screen.moveOut(&renderer)
       case (_, 1):
         ips = ["Loading..."]
         Task {
