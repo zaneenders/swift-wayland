@@ -1,6 +1,8 @@
+import Logging
+
 extension Block {
   public func draw(_ renderer: inout LayoutMachine, selected: Bool = false) {
-    let id = #function + "\(type(of:self))"
+    let id = "\(type(of:self))"
     if renderer.selected == 0 {
       renderer.selct(hashing: id)
     }
@@ -27,5 +29,53 @@ extension Block {
     } else {
       self.layer.draw(&renderer, selected: selectedPath)
     }
+  }
+
+  public func moveIn(_ renderer: inout LayoutMachine) {
+    let logger = Logger.create(logLevel: .trace)
+    logger.notice("\(#function)")
+    var moveIn = MoveIn(selected: renderer.selected)
+    self.moveIn(&moveIn)
+    guard let new = moveIn.new else {
+      logger.warning("Did not move in")
+      return
+    }
+    renderer.selected = new
+  }
+
+  func moveIn(_ move: inout MoveIn) {
+    let id = "\(type(of:self))"
+    move.current(hashing: id)
+    if move.next {
+      move.new = move.current
+    }
+    move.next = move.current == move.selected && move.new == nil
+    if self as? OrientationBlock != nil {
+      self.layer.moveIn(&move)
+    } else if self as? Rect != nil {
+      // Leaf Node
+    } else if self as? Word != nil {
+      // Leaf Node
+    } else if let group = self as? BlockGroup {
+      for block in group.children {
+        block.moveIn(&move)
+      }
+    } else {
+      self.layer.moveIn(&move)
+    }
+  }
+}
+
+struct MoveIn {
+  let selected: Hash
+  var current: Hash = 0
+  var new: Hash?
+  var next = false
+
+  mutating func current(hashing string: String) {
+    let prev = self.current
+    let h = hash(string)
+    let hash = hash(prev ^ h)  // Not sure what operation to do here.
+    self.current = hash
   }
 }
