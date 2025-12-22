@@ -6,27 +6,27 @@ extension Block {
       renderer.selected = id
     }
     renderer.current = id
-    let selectedPath = renderer.currentSelected || selected
+    let isSelected = renderer.currentSelected || selected
     if let orientation = self as? OrientationBlock {
       let chagned = renderer.orientation != orientation.orientation
       if chagned {
         renderer.orientation = orientation.orientation
         renderer.pushLayer(renderer.orientation)
       }
-      self.layer.draw(&renderer, selected: selectedPath)
+      self.layer.draw(&renderer, selected: isSelected)
       if chagned {
         renderer.popLayer()
       }
     } else if let rect = self as? Rect {
-      renderer.consume(rect: rect, selected: selectedPath)
+      renderer.consume(rect: rect, selected: isSelected)
     } else if let word = self as? Word {
-      renderer.consume(word: word, selected: selectedPath)
+      renderer.consume(word: word, selected: isSelected)
     } else if let group = self as? BlockGroup {
       for block in group.children {
-        block.draw(&renderer, selected: selectedPath)
+        block.draw(&renderer, selected: isSelected)
       }
     } else {
-      self.layer.draw(&renderer, selected: selectedPath)
+      self.layer.draw(&renderer, selected: isSelected)
     }
   }
 
@@ -78,9 +78,7 @@ extension Block {
   func moveOut(_ move: inout MoveOut) {
     if self as? OrientationBlock != nil {
       self.layer.moveOut(&move)
-    } else if self as? Rect != nil {
-      // Leaf Node
-    } else if self as? Word != nil {
+    } else if (self as? Rect != nil) || (self as? Word != nil) {
       // Leaf Node
     } else if let group = self as? BlockGroup {
       for block in group.children {
