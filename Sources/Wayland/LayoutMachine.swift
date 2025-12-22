@@ -37,22 +37,6 @@ public struct LayoutMachine: ~Copyable {
     current = 0
   }
 
-  mutating func selct(hashing string: String) {
-    let prev = self.selected
-    let h = hash(string)
-    let hash = hash(prev ^ h)  // Not sure what operation to do here.
-    self.selected = hash
-    logger.notice("Selection set: \(hash), was: \(prev)")
-  }
-
-  mutating func current(hashing string: String) {
-    let prev = self.current
-    let h = hash(string)
-    let hash = hash(prev ^ h)  // Not sure what operation to do here.
-    self.current = hash
-    logger.notice("Hashing: \(string), Current set: \(hash), was: \(prev)")
-  }
-
   mutating func pushLayer(_ o: Orientation) {
     let x: UInt = layers[layers.count - 1].startX
     let y: UInt = layers[layers.count - 1].startY

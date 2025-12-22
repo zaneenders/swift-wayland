@@ -2,11 +2,10 @@ import Logging
 
 extension Block {
   public func draw(_ renderer: inout LayoutMachine, selected: Bool = false) {
-    let id = "\(type(of:self))"
     if renderer.selected == 0 {
-      renderer.selct(hashing: id)
+      renderer.selected = id
     }
-    renderer.current(hashing: id)
+    renderer.current = id
     let selectedPath = renderer.currentSelected || selected
     if let orientation = self as? OrientationBlock {
       let chagned = renderer.orientation != orientation.orientation
@@ -44,12 +43,10 @@ extension Block {
   }
 
   func moveIn(_ move: inout MoveIn) {
-    let id = "\(type(of:self))"
-    move.current(hashing: id)
     if move.next {
-      move.new = move.current
+      move.new = id
     }
-    move.next = move.current == move.selected && move.new == nil
+    move.next = id == move.selected && move.new == nil
     if self as? OrientationBlock != nil {
       self.layer.moveIn(&move)
     } else if self as? Rect != nil {
@@ -64,18 +61,52 @@ extension Block {
       self.layer.moveIn(&move)
     }
   }
+
+  public func moveOut(_ renderer: inout LayoutMachine) {
+    let logger = Logger.create(logLevel: .trace)
+    logger.notice("\(#function)")
+    var moveOut = MoveOut(selected: renderer.selected)
+    self.moveOut(&moveOut)
+    guard let new = moveOut.new else {
+      logger.warning("Did not move out")
+      return
+    }
+    renderer.selected = new
+  }
+
+  func moveOut(_ move: inout MoveOut) {
+    if self as? OrientationBlock != nil {
+      self.layer.moveOut(&move)
+    } else if self as? Rect != nil {
+      // Leaf Node
+    } else if self as? Word != nil {
+      // Leaf Node
+    } else if let group = self as? BlockGroup {
+      for block in group.children {
+        block.moveOut(&move)
+      }
+    } else {
+      self.layer.moveOut(&move)
+    }
+    if move.prev {
+      move.new = id
+    }
+    move.prev = id == move.selected && move.new == nil
+  }
+
+  var id: UInt64 {
+    hash("\(type(of: self))")
+  }
+}
+
+struct MoveOut {
+  let selected: Hash
+  var new: Hash?
+  var prev = false
 }
 
 struct MoveIn {
   let selected: Hash
-  var current: Hash = 0
   var new: Hash?
   var next = false
-
-  mutating func current(hashing string: String) {
-    let prev = self.current
-    let h = hash(string)
-    let hash = hash(prev ^ h)  // Not sure what operation to do here.
-    self.current = hash
-  }
 }

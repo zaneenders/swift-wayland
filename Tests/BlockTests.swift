@@ -57,9 +57,8 @@ struct BlockTests: ~Copyable {
     #expect(renderer.current == 0)
     let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
     screen.draw(&renderer)
-    var moveIn = MoveIn(selected: renderer.selected, current: 0)
+    var moveIn = MoveIn(selected: renderer.selected)
     screen.moveIn(&moveIn)
-    #expect(renderer.current == moveIn.current)
     #expect(renderer.selected == moveIn.selected)
     print(moveIn)
   }
@@ -71,6 +70,19 @@ struct BlockTests: ~Copyable {
     let prev = renderer.selected
     screen.moveIn(&renderer)
     #expect(prev != renderer.selected)
+  }
+
+  @Test
+  mutating func moveOut() {
+    let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
+    screen.draw(&renderer)
+    screen._display()
+    let prev = renderer.selected
+    screen.moveIn(&renderer)
+    screen._display()
+    screen.moveOut(&renderer)
+    screen._display()
+    #expect(prev == renderer.selected)
   }
 }
 
@@ -90,5 +102,24 @@ enum TestWayland: Renderer {
   static func reset() {
     texts = []
     quads = []
+  }
+}
+
+extension Block {
+  func _display() {
+    print(id)
+    if self as? OrientationBlock != nil {
+      self.layer._display()
+    } else if self as? Rect != nil {
+      // Leaf Node
+    } else if self as? Word != nil {
+      // Leaf Node
+    } else if let group = self as? BlockGroup {
+      for block in group.children {
+        block._display()
+      }
+    } else {
+      self.layer._display()
+    }
   }
 }
