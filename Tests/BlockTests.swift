@@ -52,6 +52,7 @@ struct BlockTests: ~Copyable {
     #expect(TestWayland.quads[0].width == 40)  // 5 * 8 scale
     #expect(TestWayland.quads[0].height == 40)  // 5 * 8 scale
   }
+
   @Test
   mutating func moveInHash() {
     #expect(renderer.current == 0)
@@ -70,6 +71,27 @@ struct BlockTests: ~Copyable {
     let prev = renderer.selected
     screen.moveIn(&renderer)
     #expect(prev != renderer.selected)
+  }
+
+  @Test
+  mutating func moveInNoWrapAround() {
+    let screen = Screen(o: .vertical, ips: ["Zane"])
+    screen.draw(&renderer)
+    var prev = renderer.selected
+    screen.moveIn(&renderer)
+    #expect(prev != renderer.selected)
+    prev = renderer.selected
+    screen.moveIn(&renderer)
+    #expect(prev != renderer.selected)
+    prev = renderer.selected
+    screen.moveIn(&renderer)
+    #expect(prev != renderer.selected)
+    prev = renderer.selected
+    screen.moveIn(&renderer)
+    #expect(prev != renderer.selected)
+    prev = renderer.selected
+    screen.moveIn(&renderer)
+    #expect(prev == renderer.selected)
   }
 
   @Test
