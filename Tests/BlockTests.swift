@@ -98,13 +98,29 @@ struct BlockTests: ~Copyable {
   mutating func moveOut() {
     let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
     screen.draw(&renderer)
-    screen._display()
     let prev = renderer.selected
     screen.moveIn(&renderer)
-    screen._display()
     screen.moveOut(&renderer)
-    screen._display()
     #expect(prev == renderer.selected)
+  }
+
+  @Test
+  mutating func moveDown() {
+    let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
+    screen.draw(&renderer)
+    screen._display()
+    screen.moveIn(&renderer)
+    print("Selected: ", renderer.selected)
+    screen.moveIn(&renderer)
+    print("Selected: ", renderer.selected)
+    screen.moveIn(&renderer)
+    print("Selected: ", renderer.selected)
+    screen.moveIn(&renderer)
+    print("Selected: ", renderer.selected)
+    screen.moveIn(&renderer)
+    print("Selected: ", renderer.selected)
+    screen.moveDown(&renderer)
+    screen._display()
   }
 }
 

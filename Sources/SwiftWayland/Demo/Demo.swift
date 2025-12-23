@@ -28,9 +28,11 @@ func runDemo() async {
       case (1, _):
         Wayland.exit()
       case (36, 1):  // J
-        ()
+        let screen = Screen(o: .vertical, ips: ips)
+        screen.moveDown(&renderer)
       case (33, 1):  // F
-        ()
+        let screen = Screen(o: .vertical, ips: ips)
+        screen.moveUp(&renderer)
       case (37, 1):  // K
         ()
       case (32, 1):  // D
