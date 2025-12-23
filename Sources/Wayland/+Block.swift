@@ -2,32 +2,31 @@ import Logging
 
 extension Block {
   public func draw(_ renderer: inout LayoutMachine, selected: Bool = false) {
-    let id = "\(type(of:self))"
     if renderer.selected == 0 {
-      renderer.selct(hashing: id)
+      renderer.selected = id
     }
-    renderer.current(hashing: id)
-    let selectedPath = renderer.currentSelected || selected
+    renderer.current = id
+    let isSelected = renderer.currentSelected || selected
     if let orientation = self as? OrientationBlock {
       let chagned = renderer.orientation != orientation.orientation
       if chagned {
         renderer.orientation = orientation.orientation
         renderer.pushLayer(renderer.orientation)
       }
-      self.layer.draw(&renderer, selected: selectedPath)
+      self.layer.draw(&renderer, selected: isSelected)
       if chagned {
         renderer.popLayer()
       }
     } else if let rect = self as? Rect {
-      renderer.consume(rect: rect, selected: selectedPath)
+      renderer.consume(rect: rect, selected: isSelected)
     } else if let word = self as? Word {
-      renderer.consume(word: word, selected: selectedPath)
+      renderer.consume(word: word, selected: isSelected)
     } else if let group = self as? BlockGroup {
       for block in group.children {
-        block.draw(&renderer, selected: selectedPath)
+        block.draw(&renderer, selected: isSelected)
       }
     } else {
-      self.layer.draw(&renderer, selected: selectedPath)
+      self.layer.draw(&renderer, selected: isSelected)
     }
   }
 
@@ -44,18 +43,17 @@ extension Block {
   }
 
   func moveIn(_ move: inout MoveIn) {
-    let id = "\(type(of:self))"
-    move.current(hashing: id)
     if move.next {
-      move.new = move.current
+      move.new = id
     }
-    move.next = move.current == move.selected && move.new == nil
+    move.next = id == move.selected && move.new == nil
     if self as? OrientationBlock != nil {
       self.layer.moveIn(&move)
-    } else if self as? Rect != nil {
+    } else if (self as? Rect != nil) || (self as? Word != nil) {
       // Leaf Node
-    } else if self as? Word != nil {
-      // Leaf Node
+      if move.new == nil {
+        move.new = move.selected
+      }
     } else if let group = self as? BlockGroup {
       for block in group.children {
         block.moveIn(&move)
@@ -64,18 +62,50 @@ extension Block {
       self.layer.moveIn(&move)
     }
   }
+
+  public func moveOut(_ renderer: inout LayoutMachine) {
+    let logger = Logger.create(logLevel: .trace)
+    logger.notice("\(#function)")
+    var moveOut = MoveOut(selected: renderer.selected)
+    self.moveOut(&moveOut)
+    guard let new = moveOut.new else {
+      logger.warning("Did not move out")
+      return
+    }
+    renderer.selected = new
+  }
+
+  func moveOut(_ move: inout MoveOut) {
+    if self as? OrientationBlock != nil {
+      self.layer.moveOut(&move)
+    } else if (self as? Rect != nil) || (self as? Word != nil) {
+      // Leaf Node
+    } else if let group = self as? BlockGroup {
+      for block in group.children {
+        block.moveOut(&move)
+      }
+    } else {
+      self.layer.moveOut(&move)
+    }
+    if move.prev {
+      move.new = id
+    }
+    move.prev = id == move.selected && move.new == nil
+  }
+
+  var id: UInt64 {
+    hash("\(type(of: self))")
+  }
+}
+
+struct MoveOut {
+  let selected: Hash
+  var new: Hash?
+  var prev = false
 }
 
 struct MoveIn {
   let selected: Hash
-  var current: Hash = 0
   var new: Hash?
   var next = false
-
-  mutating func current(hashing string: String) {
-    let prev = self.current
-    let h = hash(string)
-    let hash = hash(prev ^ h)  // Not sure what operation to do here.
-    self.current = hash
-  }
 }
