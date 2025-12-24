@@ -5,7 +5,7 @@ extension Block {
     let logger = Logger.create(logLevel: .trace)
     logger.notice("\(#function)")
     var moveIn = MoveIn(selected: renderer.selected)
-    self.moveIn(&moveIn)
+    self.moveIn(&moveIn, self.id())
     guard let new = moveIn.new else {
       logger.warning("Did not move in")
       return
@@ -13,27 +13,28 @@ extension Block {
     renderer.selected = new
   }
 
-  func moveIn(_ move: inout MoveIn) {
+  func moveIn(_ move: inout MoveIn, _ hash: UInt64) {
     if move.next {
-      move.new = id
+      move.new = hash
     }
-    move.next = id == move.selected && move.new == nil
+    move.next = hash == move.selected && move.new == nil
     if self as? OrientationBlock != nil {
-      self.layer.moveIn(&move)
+      self.layer.moveIn(&move, layer.id())
     } else if (self as? Rect != nil) || (self as? Word != nil) {
       // Leaf Node
       if move.new == nil {
         move.new = move.selected
       }
     } else if let group = self as? BlockGroup {
-      for block in group.children {
-        block.moveIn(&move)
+      for (i, block) in group.children.enumerated() {
+        block.moveIn(&move, block.id(i))
       }
     } else {
-      self.layer.moveIn(&move)
+      self.layer.moveIn(&move, self.layer.id())
     }
   }
 }
+
 struct MoveIn {
   let selected: Hash
   var new: Hash?

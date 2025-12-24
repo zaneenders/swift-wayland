@@ -1,15 +1,18 @@
 import Logging
 
 extension Block {
-  var id: UInt64 {
-    hash("\(type(of: self))")
+  func id(_ index: Int? = nil) -> UInt64 {
+    if let index {
+      return hash("\(type(of: self))\(index)")
+    }
+    return hash("\(type(of: self))")
   }
 
   public func draw(_ renderer: inout LayoutMachine, selected: Bool = false) {
     if renderer.selected == 0 {
-      renderer.selected = id
+      renderer.selected = id()
     }
-    renderer.current = id
+    renderer.current = id()
     let isSelected = renderer.currentSelected || selected
     if let orientation = self as? OrientationBlock {
       let chagned = renderer.orientation != orientation.orientation
