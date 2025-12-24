@@ -16,7 +16,7 @@ func runDemo() async {
     case .frame(let winH, let winW):
       let screen = Screen(o: .vertical, ips: ips)
       Wayland.preDraw()
-      screen.draw(&renderer)
+      screen.walk(with: &renderer)
       Wayland.postDraw()
       if Wayland.elapsed > Duration(.milliseconds(16)) {
         frameLogger.warning("\(Wayland.elapsed)")
@@ -30,11 +30,9 @@ func runDemo() async {
       case (1, _):
         Wayland.exit()
       case (36, 1):  // J
-        let screen = Screen(o: .vertical, ips: ips)
-        screen.moveDown(&renderer)
+        ()
       case (33, 1):  // F
-        let screen = Screen(o: .vertical, ips: ips)
-        screen.moveUp(&renderer)
+        ()
       case (37, 1):  // K
         ()
       case (32, 1):  // D
@@ -43,8 +41,7 @@ func runDemo() async {
         let screen = Screen(o: .vertical, ips: ips)
         screen.moveIn(&renderer)
       case (31, 1):  // S
-        let screen = Screen(o: .vertical, ips: ips)
-        screen.moveOut(&renderer)
+        ()
       case (_, 1):
         ips = ["Loading..."]
         Task {

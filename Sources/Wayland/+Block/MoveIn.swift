@@ -1,42 +1,37 @@
 import Logging
 
-extension Block {
-  public func moveIn(_ renderer: inout LayoutMachine) {
-    let logger = Logger.create(logLevel: .trace)
-    logger.notice("\(#function)")
-    var moveIn = MoveIn(selected: renderer.selected)
-    self.moveIn(&moveIn, self.id())
-    guard let new = moveIn.new else {
-      logger.warning("Did not move in")
-      return
-    }
-    renderer.selected = new
+struct MoveIn: Walker {
+  var currentId: Hash
+  let selected: Hash
+  var found: Bool
+  var new: Hash?
+
+  init(_ renderer: borrowing LayoutMachine) {
+    currentId = 0
+    selected = renderer.selected
+    found = false
   }
 
-  func moveIn(_ move: inout MoveIn, _ hash: UInt64) {
-    if move.next {
-      move.new = hash
+  mutating func before(_ block: some Block) {
+    if found {
+      new = currentId
     }
-    move.next = hash == move.selected && move.new == nil
-    if self as? OrientationBlock != nil {
-      self.layer.moveIn(&move, layer.id())
-    } else if (self as? Rect != nil) || (self as? Word != nil) {
-      // Leaf Node
-      if move.new == nil {
-        move.new = move.selected
-      }
-    } else if let group = self as? BlockGroup {
-      for (i, block) in group.children.enumerated() {
-        block.moveIn(&move, block.id(i))
-      }
-    } else {
-      self.layer.moveIn(&move, self.layer.id())
+    if currentId == selected {
+      found = true
     }
   }
+
+  mutating func after(_ block: some Block) {}
 }
 
-struct MoveIn {
-  let selected: Hash
-  var new: Hash?
-  var next = false
+extension Block {
+  public func moveIn(_ renderer: inout LayoutMachine) {
+    var moveIn = MoveIn(renderer)
+    self.walk(with: &moveIn)
+    if let new = moveIn.new {
+      renderer.selected = new
+    } else {
+      print("Did not move in")
+    }
+  }
 }

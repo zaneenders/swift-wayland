@@ -7,7 +7,22 @@ public protocol Renderer {
 }
 
 @MainActor
-public struct LayoutMachine: ~Copyable {
+public struct LayoutMachine: Walker {
+  public var currentId: Hash = 0
+
+  public mutating func before(_ block: some Block) {
+    if selected == 0 {
+      selected = block.id()
+    }
+    if let rect = block as? Rect {
+      consume(rect: rect, selected: isSelected)
+    }
+    if let word = block as? Word {
+      consume(word: word, selected: isSelected)
+    }
+  }
+
+  public mutating func after(_ block: some Block) {}
 
   public init(
     _ drawer: any Renderer.Type,
@@ -18,23 +33,21 @@ public struct LayoutMachine: ~Copyable {
     self.orientation = .vertical
     self.layers = [Consumed(startX: 0, startY: 0, orientation: self.orientation)]
     selected = 0
-    current = 0
   }
   let drawer: Renderer.Type
   let logger: Logger
   var orientation: Orientation
   var layers: [Consumed]
   var selected: Hash
-  var current: Hash
 
-  var currentSelected: Bool {
-    selected == current
+  var isSelected: Bool {
+    selected == currentId
   }
 
   public mutating func reset() {
     self.orientation = .vertical
     self.layers = [Consumed(startX: 0, startY: 0, orientation: self.orientation)]
-    current = 0
+    currentId = 0
   }
 
   mutating func pushLayer(_ o: Orientation) {

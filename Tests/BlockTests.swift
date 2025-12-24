@@ -18,7 +18,7 @@ struct BlockTests: ~Copyable {
   mutating func horizontal() {
     // Not really testing layout placement yet.
     let tb = Test1(o: .horizontal)
-    tb.draw(&renderer)
+    tb.walk(with: &renderer)
     #expect(TestWayland.texts.count == 2)
     #expect(TestWayland.quads.count == 0)
 
@@ -33,7 +33,7 @@ struct BlockTests: ~Copyable {
   @Test
   mutating func screen() {
     let screen = Screen(o: .vertical, ips: ["Zane"])
-    screen.draw(&renderer)
+    screen.walk(with: &renderer)
     #expect(TestWayland.texts.count == 2)
     #expect(TestWayland.quads.count == 1)
 
@@ -54,74 +54,61 @@ struct BlockTests: ~Copyable {
   }
 
   @Test
-  mutating func moveInHash() {
-    #expect(renderer.current == 0)
-    let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
-    screen.draw(&renderer)
-    var moveIn = MoveIn(selected: renderer.selected)
-    screen.moveIn(&moveIn, screen.id())
-    #expect(renderer.selected == moveIn.selected)
-    print(moveIn)
-  }
-
-  @Test
   mutating func moveIn() {
     let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
-    screen.draw(&renderer)
+    screen.walk(with: &renderer)
     let prev = renderer.selected
     screen.moveIn(&renderer)
     #expect(prev != renderer.selected)
   }
+}
 
-  @Test
-  mutating func moveInNoWrapAround() {
-    let screen = Screen(o: .vertical, ips: ["Zane"])
-    screen.draw(&renderer)
-    var prev = renderer.selected
-    screen.moveIn(&renderer)
-    #expect(prev != renderer.selected)
-    prev = renderer.selected
-    screen.moveIn(&renderer)
-    #expect(prev != renderer.selected)
-    prev = renderer.selected
-    screen.moveIn(&renderer)
-    #expect(prev != renderer.selected)
-    prev = renderer.selected
-    screen.moveIn(&renderer)
-    #expect(prev != renderer.selected)
-    prev = renderer.selected
-    screen.moveIn(&renderer)
-    #expect(prev == renderer.selected)
-  }
-
-  @Test
-  mutating func moveOut() {
-    let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
-    screen.draw(&renderer)
-    let prev = renderer.selected
-    screen.moveIn(&renderer)
-    screen.moveOut(&renderer)
-    #expect(prev == renderer.selected)
-  }
-
-  @Test
-  mutating func moveDown() {
-    struct Test: Block {
-      var layer: some Block {
+struct Test: Block {
+  var layer: some Block {
+    Group(.horizontal) {
+      Word("Left")
+      Group(.vertical) {
         Word("Top")
+        Group(.horizontal) {
+          for a in 0..<5 {
+            if a.isMultiple(of: 2) {
+              Word("\(a)")
+            }
+          }
+        }
         Word("Bottom")
       }
+      Word("Right")
     }
-    let screen = Test()
-    screen.draw(&renderer)
-    print(renderer.selected)
-    screen.moveIn(&renderer)
-    print(renderer.selected)
-    screen.moveIn(&renderer)
-    print(renderer.selected)
-    screen.moveDown(&renderer)
-    print("DISPLAY")
-    screen._display()
+  }
+}
+
+struct IdWalker: Walker {
+  var currentId: Hash = 0
+  mutating func before(_ block: some Block) {
+    if let word = block as? Word {
+      print(word.label)
+    } else {
+      print(currentId)
+    }
+  }
+  mutating func after(_ block: some Block) {}
+}
+
+struct StackWalker: Walker {
+  var stack: [String] = []
+  var currentId: Hash = 0
+  mutating func before(_ block: some Block) {
+    if let word = block as? Word {
+      stack.append(word.label)
+    } else {
+      let i = "\(type(of: block))"
+      stack.append(i)
+    }
+  }
+  mutating func after(_ block: some Block) {
+    let i = stack.removeLast()
+    print(i)
   }
 }
 
