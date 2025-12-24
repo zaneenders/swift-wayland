@@ -5,8 +5,8 @@ import Wayland
 @MainActor
 func runDemo() async {
   let level: Logger.Level = .trace
-  let frameLogger = Logger.create(logLevel: .error, label: "Frame")
-  let keyLogger = Logger.create(logLevel: level, label: "Frame")
+  let frameLogger = Logger.create(logLevel: .warning, label: "Frame")
+  let keyLogger = Logger.create(logLevel: level, label: "Key")
   var ips: [String] = []
 
   Wayland.setup()
@@ -18,7 +18,9 @@ func runDemo() async {
       Wayland.preDraw()
       screen.draw(&renderer)
       Wayland.postDraw()
-      frameLogger.trace("\(Wayland.elapsed)")
+      if Wayland.elapsed > Duration(.milliseconds(16)) {
+        frameLogger.warning("\(Wayland.elapsed)")
+      }
       renderer.reset()
     case .key(let code, let keyState):
       if keyState == 1 {
