@@ -59,7 +59,7 @@ struct BlockTests: ~Copyable {
     let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
     screen.draw(&renderer)
     var moveIn = MoveIn(selected: renderer.selected)
-    screen.moveIn(&moveIn)
+    screen.moveIn(&moveIn, screen.id())
     #expect(renderer.selected == moveIn.selected)
     print(moveIn)
   }
@@ -106,20 +106,21 @@ struct BlockTests: ~Copyable {
 
   @Test
   mutating func moveDown() {
-    let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
+    struct Test: Block {
+      var layer: some Block {
+        Word("Top")
+        Word("Bottom")
+      }
+    }
+    let screen = Test()
     screen.draw(&renderer)
-    screen._display()
+    print(renderer.selected)
     screen.moveIn(&renderer)
-    print("Selected: ", renderer.selected)
+    print(renderer.selected)
     screen.moveIn(&renderer)
-    print("Selected: ", renderer.selected)
-    screen.moveIn(&renderer)
-    print("Selected: ", renderer.selected)
-    screen.moveIn(&renderer)
-    print("Selected: ", renderer.selected)
-    screen.moveIn(&renderer)
-    print("Selected: ", renderer.selected)
+    print(renderer.selected)
     screen.moveDown(&renderer)
+    print("DISPLAY")
     screen._display()
   }
 }
@@ -144,8 +145,8 @@ enum TestWayland: Renderer {
 }
 
 extension Block {
-  func _display() {
-    print(id)
+  func _display(_ index: Int? = nil) {
+    print(id(index))
     if self as? OrientationBlock != nil {
       self.layer._display()
     } else if self as? Rect != nil {
@@ -153,9 +154,11 @@ extension Block {
     } else if self as? Word != nil {
       // Leaf Node
     } else if let group = self as? BlockGroup {
-      for block in group.children {
-        block._display()
+      print("Start: \(id())")
+      for (index, block) in group.children.enumerated() {
+        block._display(index)
       }
+      print("End:   \(id())")
     } else {
       self.layer._display()
     }
