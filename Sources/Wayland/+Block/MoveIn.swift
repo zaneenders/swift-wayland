@@ -7,21 +7,29 @@ struct MoveIn: Walker {
   var new: Hash?
 
   init(_ renderer: borrowing LayoutMachine) {
-    currentId = 0
+    print("MoveIn: \(renderer.selected)")
+    currentId = renderer.currentId
     selected = renderer.selected
     found = false
   }
 
   mutating func before(_ block: some Block) {
-    if found {
-      new = currentId
-    }
-    if currentId == selected {
+    if currentId == selected && found == false {
+      print("Found: \(type(of: block))")
       found = true
     }
   }
 
   mutating func after(_ block: some Block) {}
+
+  mutating func before(child block: some Block) {
+    if found && new == nil {
+      print("Selected: \(type(of: block))")
+      new = currentId
+    }
+  }
+
+  mutating func after(child block: some Block) {}
 }
 
 extension Block {

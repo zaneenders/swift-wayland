@@ -10,6 +10,8 @@ public protocol Walker {
   var currentId: Hash { get set }
   mutating func before(_ block: some Block)
   mutating func after(_ block: some Block)
+  mutating func before(child block: some Block)
+  mutating func after(child block: some Block)
 }
 
 extension Block {
@@ -20,34 +22,31 @@ extension Block {
     return hash("\(type(of: self))")
   }
 
-  public func walk(with walker: inout some Walker) {
-    let prev = walker.currentId
+  func _walk(with walker: inout some Walker) {
+    walker.before(self)
     if let o = self as? OrientationBlock {
-      walker.currentId = self.id()
-      walker.before(self)
       self.layer.walk(with: &walker)
-      walker.after(self)
     } else if let group = self as? BlockGroup {
       for (i, child) in group.children.enumerated() {
+        let prev = walker.currentId
         walker.currentId = child.id(i)
-        walker.before(self)
-        child.walk(with: &walker)
-        walker.after(self)
+        walker.before(child: child)
+        child._walk(with: &walker)
+        walker.after(child: child)
+        walker.currentId = prev
       }
     } else if let rect = self as? Rect {
-      walker.currentId = self.id()
-      walker.before(self)
-      walker.after(self)
     } else if let word = self as? Word {
-      walker.currentId = self.id()
-      walker.before(self)
-      walker.after(self)
     } else {  // Composed
-      walker.currentId = self.id()
-      walker.before(self)
       self.layer.walk(with: &walker)
-      walker.after(self)
     }
+    walker.after(self)
+  }
+
+  public func walk(with walker: inout some Walker) {
+    let prev = walker.currentId
+    walker.currentId = self.id()
+    _walk(with: &walker)
     walker.currentId = prev
   }
 }

@@ -12,7 +12,7 @@ public struct LayoutMachine: Walker {
 
   public mutating func before(_ block: some Block) {
     if selected == 0 {
-      selected = block.id()
+      selected = currentId
     }
     if let rect = block as? Rect {
       consume(rect: rect, selected: isSelected)
@@ -23,6 +23,8 @@ public struct LayoutMachine: Walker {
   }
 
   public mutating func after(_ block: some Block) {}
+  public mutating func before(child block: some Block) {}
+  public mutating func after(child block: some Block) {}
 
   public init(
     _ drawer: any Renderer.Type,
@@ -32,8 +34,9 @@ public struct LayoutMachine: Walker {
     self.drawer = drawer
     self.orientation = .vertical
     self.layers = [Consumed(startX: 0, startY: 0, orientation: self.orientation)]
-    selected = 0
+    self.selected = 0
   }
+
   let drawer: Renderer.Type
   let logger: Logger
   var orientation: Orientation

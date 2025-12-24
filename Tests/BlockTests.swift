@@ -53,13 +53,26 @@ struct BlockTests: ~Copyable {
     #expect(TestWayland.quads[0].height == 40)  // 5 * 8 scale
   }
 
+  @Test func hashing() {
+    var idWalker = IdWalker()
+    let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
+    screen.walk(with: &idWalker)
+    #expect(idWalker.currentId == 0)
+  }
+
   @Test
   mutating func moveIn() {
     let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
+    var idWalker = IdWalker()
     screen.walk(with: &renderer)
-    let prev = renderer.selected
+    screen.walk(with: &idWalker)
+    let p1 = renderer.selected
+    print("P1", p1)
     screen.moveIn(&renderer)
-    #expect(prev != renderer.selected)
+    #expect(p1 != renderer.selected)
+    let p2 = renderer.selected
+    screen.moveIn(&renderer)
+    #expect(p2 != renderer.selected)
   }
 }
 
@@ -87,12 +100,14 @@ struct IdWalker: Walker {
   var currentId: Hash = 0
   mutating func before(_ block: some Block) {
     if let word = block as? Word {
-      print(word.label)
+      print(currentId, word.label)
     } else {
       print(currentId)
     }
   }
   mutating func after(_ block: some Block) {}
+  mutating func before(child block: some Block) {}
+  mutating func after(child block: some Block) {}
 }
 
 struct StackWalker: Walker {
@@ -110,6 +125,8 @@ struct StackWalker: Walker {
     let i = stack.removeLast()
     print(i)
   }
+  mutating func before(child block: some Block) {}
+  mutating func after(child block: some Block) {}
 }
 
 @MainActor
