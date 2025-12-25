@@ -74,6 +74,20 @@ struct BlockTests: ~Copyable {
     screen.moveIn(&renderer)
     #expect(p2 != renderer.selected)
   }
+
+  @Test
+  mutating func moveOut() {
+    let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
+    var idWalker = IdWalker()
+    screen.walk(with: &renderer)
+    screen.walk(with: &idWalker)
+    let p1 = renderer.selected
+    screen.moveIn(&renderer)
+    #expect(p1 != renderer.selected)
+    let p2 = renderer.selected
+    screen.moveOut(&renderer)
+    #expect(p2 != renderer.selected)
+  }
 }
 
 struct Test: Block {
