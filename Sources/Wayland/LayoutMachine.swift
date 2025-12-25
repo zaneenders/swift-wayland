@@ -14,6 +14,9 @@ public struct LayoutMachine: Walker {
     if selected == 0 {
       selected = currentId
     }
+    if let o = block as? OrientationBlock {
+      pushLayer(o.orientation)
+    }
     if let rect = block as? Rect {
       consume(rect: rect, selected: isSelected)
     }
@@ -21,8 +24,11 @@ public struct LayoutMachine: Walker {
       consume(word: word, selected: isSelected)
     }
   }
-
-  public mutating func after(_ block: some Block) {}
+  public mutating func after(_ block: some Block) {
+    if block is OrientationBlock {
+      popLayer()
+    }
+  }
   public mutating func before(child block: some Block) {}
   public mutating func after(child block: some Block) {}
 

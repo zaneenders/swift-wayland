@@ -14,21 +14,22 @@ struct Test1: Block {
 }
 
 struct Test2: Block {
+  let scale: UInt = 8
   var layer: some Block {
     Group(.horizontal) {
-      Word("Left")
+      Word("Left").scale(scale)
       Group(.vertical) {
-        Word("Top")
+        Word("Top").scale(scale)
         Group(.horizontal) {
           for a in 0..<5 {
             if a.isMultiple(of: 2) {
-              Word("\(a)")
+              Word("\(a)").scale(scale)
             }
           }
         }
-        Word("Bottom")
+        Word("Bottom").scale(scale)
       }
-      Word("Right")
+      Word("Right").scale(scale)
     }
   }
 }
