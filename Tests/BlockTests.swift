@@ -55,8 +55,10 @@ struct BlockTests: ~Copyable {
 
   @Test func hashing() {
     var idWalker = IdWalker()
-    let screen = Screen(o: .vertical, ips: ["Zane", "Was", "Here"])
-    screen.walk(with: &idWalker)
+    let block = Test2()
+    var stack = StackWalker()
+    block.walk(with: &idWalker)
+    block.walk(with: &stack)
     #expect(idWalker.currentId == 0)
   }
 
@@ -87,26 +89,6 @@ struct BlockTests: ~Copyable {
     let p2 = renderer.selected
     screen.moveOut(&renderer)
     #expect(p2 != renderer.selected)
-  }
-}
-
-struct Test: Block {
-  var layer: some Block {
-    Group(.horizontal) {
-      Word("Left")
-      Group(.vertical) {
-        Word("Top")
-        Group(.horizontal) {
-          for a in 0..<5 {
-            if a.isMultiple(of: 2) {
-              Word("\(a)")
-            }
-          }
-        }
-        Word("Bottom")
-      }
-      Word("Right")
-    }
   }
 }
 

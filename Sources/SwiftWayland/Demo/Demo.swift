@@ -9,14 +9,18 @@ func runDemo() async {
   let keyLogger = Logger.create(logLevel: level, label: "Key")
   var ips: [String] = []
 
+  var block: some Block {
+    Screen(o: .vertical, ips: ips)
+    //Test2()
+  }
+
   Wayland.setup()
   var renderer = LayoutMachine(Wayland.self, .error)
   event_loop: for await ev in Wayland.events() {
     switch ev {
     case .frame(let winH, let winW):
-      let screen = Screen(o: .vertical, ips: ips)
       Wayland.preDraw()
-      screen.walk(with: &renderer)
+      block.walk(with: &renderer)
       Wayland.postDraw()
       if Wayland.elapsed > Duration(.milliseconds(16)) {
         frameLogger.warning("\(Wayland.elapsed)")
@@ -38,11 +42,9 @@ func runDemo() async {
       case (32, 1):  // D
         ()
       case (38, 1):  // L
-        let screen = Screen(o: .vertical, ips: ips)
-        screen.moveIn(&renderer)
+        block.moveIn(&renderer)
       case (31, 1):  // S
-        let screen = Screen(o: .vertical, ips: ips)
-        screen.moveOut(&renderer)
+        block.moveOut(&renderer)
       case (_, 1):
         ips = ["Loading..."]
         Task {
