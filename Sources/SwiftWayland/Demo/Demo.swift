@@ -11,7 +11,6 @@ func runDemo() async {
 
   var block: some Block {
     Screen(o: .vertical, ips: ips)
-    //Test2()
   }
 
   Wayland.setup()
