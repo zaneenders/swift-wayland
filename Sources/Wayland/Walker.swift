@@ -1,10 +1,5 @@
 import Logging
 
-struct InternalGroup: BlockGroup, OrientationBlock, Block {
-  let orientation: Orientation
-  let children: [any Block]
-}
-
 @MainActor
 public protocol Walker {
   var currentId: Hash { get set }
@@ -15,11 +10,12 @@ public protocol Walker {
 }
 
 extension Block {
-  func id(_ index: Int? = nil) -> UInt64 {
+  func id(current: Hash, _ index: Int? = nil) -> UInt64 {
+    // Not sure the best way to combine hashes together.
     if let index {
-      return hash("\(type(of: self))\(index)")
+      return hash(current | hash("\(type(of: self))\(index)"))
     }
-    return hash("\(type(of: self))")
+    return hash(current | hash("\(type(of: self))"))
   }
 
   func _walk(with walker: inout some Walker, _ orientation: Orientation) {
@@ -29,7 +25,7 @@ extension Block {
     } else if let group = self as? BlockGroup {
       for (i, child) in group.children.enumerated() {
         let prev = walker.currentId
-        walker.currentId = child.id(i)
+        walker.currentId = child.id(current: walker.currentId, i)
         walker.before(child: child)
         child._walk(with: &walker, orientation)
         walker.after(child: child)
@@ -45,7 +41,7 @@ extension Block {
 
   public func walk(with walker: inout some Walker, _ orientation: Orientation = .vertical) {
     let prev = walker.currentId
-    walker.currentId = self.id()
+    walker.currentId = self.id(current: walker.currentId)
     _walk(with: &walker, orientation)
     walker.currentId = prev
   }

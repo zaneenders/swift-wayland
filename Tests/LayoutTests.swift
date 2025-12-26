@@ -9,54 +9,30 @@ func layout() {
   var sizer = SizeWalker()
   let test = LayoutTest()
   test.walk(with: &sizer)
-}
-
-struct LayoutTest: Block {
-  let scale: UInt = 8
-  var layer: some Block {
-    Group(.horizontal) {
-      Word("Left").scale(scale)
-      Group(.vertical) {
-        Word("Top").scale(scale)
-        Group(.horizontal) {
-          for a in 0..<5 {
-            if a.isMultiple(of: 2) {
-              Word("\(a)").scale(scale)
-            }
-          }
-        }
-        Word("Bottom").scale(scale)
-      }
-      Word("Right").scale(scale)
-    }
-  }
+  print(sizer.sizes)
 }
 
 struct SizeWalker: Walker {
   var currentId: Hash = 0
-  var sizes: [Hash: (height: Int, width: Int)] = [:]
+  var sizes: [Hash: (height: UInt, width: UInt)] = [:]
 
   mutating func before(_ block: some Block) {
     if let rect = block as? Rect {
 
     } else if let text = block as? Word {
-      guard text.label.contains("\n") else {
+      guard !text.label.contains("\n") else {
         fatalError("New lines not supported yet")
       }
-      let charCount = text.label.count
+      print(currentId, text.label)
+      let width = UInt(text.label.count) * text.scale
+      let height = 1 * text.scale
+      sizes[currentId] = (height, width)
     }
-    print(#function)
   }
 
-  mutating func after(_ block: some Block) {
-    print(#function)
-  }
+  mutating func after(_ block: some Block) {}
 
-  mutating func before(child block: some Block) {
-    print(#function)
-  }
+  mutating func before(child block: some Block) {}
 
-  mutating func after(child block: some Block) {
-    print(#function)
-  }
+  mutating func after(child block: some Block) {}
 }

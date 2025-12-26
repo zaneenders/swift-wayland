@@ -1,7 +1,7 @@
 import Wayland
 
 struct LayoutTest: Block {
-  let scale: UInt = 8
+  let scale: UInt = 4
   var layer: some Block {
     Group(.horizontal) {
       Word("Left").scale(scale)
