@@ -10,7 +10,7 @@ func layout() {
   let test = LayoutTest()
   test.walk(with: &sizer)
   let root = sizer.tree[0]![0]
-  #expect(sizer.elements[root]! == .known(height: 84, width: 348, .vertical))
+  #expect(sizer.sizes[root]! == .known(height: 84, width: 348, .vertical))
 }
 
 enum Size: Equatable, CustomStringConvertible {
@@ -30,11 +30,13 @@ enum Size: Equatable, CustomStringConvertible {
 struct SizeWalker: Walker {
   var currentId: Hash = 0
   var parentId: Hash = 0
-  var elements: [Hash: Size] = [:]
+  var sizes: [Hash: Size] = [:]
   var parents: [Hash: Hash] = [:]
   var names: [Hash: String] = [:]
   var currentOrentation: Orientation = .vertical
   var tree: [Hash: [Hash]] = [:]
+  var words: [Hash: Word] = [:]
+  var quads: [Hash: Rect] = [:]
 
   mutating func connect(parent: Hash, current: Hash) {
     if var sibilings = tree[parent] {
@@ -52,39 +54,41 @@ struct SizeWalker: Walker {
     if let rect = block as? Rect {
       let width = rect.width * rect.scale
       let height = rect.height * rect.scale
-      elements[currentId] = .known(height: height, width: width, currentOrentation)
+      sizes[currentId] = .known(height: height, width: width, currentOrentation)
+      quads[currentId] = rect
     } else if let text = block as? Word {
       guard !text.label.contains("\n") else {
         fatalError("New lines not supported yet")
       }
-      elements[currentId] = .known(height: text.height, width: text.width, currentOrentation)
+      words[currentId] = text
+      sizes[currentId] = .known(height: text.height, width: text.width, currentOrentation)
     } else if let group = block as? BlockGroup {
       if group.children.count < 1 {
         // Handle empty groups from optional blocks.
-        elements[currentId] = .known(height: 0, width: 0, currentOrentation)
+        sizes[currentId] = .known(height: 0, width: 0, currentOrentation)
       } else {
-        elements[currentId] = .unknown(currentOrentation)
+        sizes[currentId] = .unknown(currentOrentation)
       }
     } else if let o = block as? OrientationBlock {
       currentOrentation = o.orientation
-      elements[currentId] = .unknown(currentOrentation)
+      sizes[currentId] = .unknown(currentOrentation)
     } else {
       // User defined composed
-      elements[currentId] = .unknown(currentOrentation)
+      sizes[currentId] = .unknown(currentOrentation)
     }
   }
 
   mutating func after(_ block: some Block) {
-    guard let p = elements[parentId], let me = elements[currentId] else { return }
+    guard let p = sizes[parentId], let me = sizes[currentId] else { return }
     switch (p, me) {
     case (.unknown(let o), .known(height: let mh, width: let mw, _)):
-      elements[parentId] = .known(height: mh, width: mw, o)
+      sizes[parentId] = .known(height: mh, width: mw, o)
     case (.known(height: let h, width: let w, let o), .known(height: let mh, width: let mw, _)):
       switch o {
       case .horizontal:
-        elements[parentId] = .known(height: max(mh, h), width: mw + w, o)
+        sizes[parentId] = .known(height: max(mh, h), width: mw + w, o)
       case .vertical:
-        elements[parentId] = .known(height: h + mh, width: max(mw, w), o)
+        sizes[parentId] = .known(height: h + mh, width: max(mw, w), o)
       }
     case (.unknown, .unknown), (.known, .unknown):
       fatalError("Invalid tree construction")
