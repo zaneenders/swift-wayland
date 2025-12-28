@@ -70,10 +70,24 @@ public struct LayoutMachine: ~Copyable {
     } else {
       color = rect.color
     }
+
+    // Compute position based on current accumulated offset
+    let posX: UInt
+    let posY: UInt
+    switch o {
+    case .horizontal:
+      posX = x + w
+      posY = y
+    case .vertical:
+      posX = x
+      posY = y + h
+    }
+
     let quad = Quad(
-      dst_p0: (y + h, x + w),
-      dst_p1: (y + h + quadH, x + w + quadW),
+      dst_p0: (posY, posX),
+      dst_p1: (posY + quadH, posX + quadW),
       tex_tl: (0, 0), tex_br: (1, 1), color: color)
+
     switch o {
     case .horizontal:
       layers[layers.count - 1].height = max(layers[layers.count - 1].height, quadH)

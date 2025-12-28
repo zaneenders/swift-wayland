@@ -10,6 +10,9 @@ func runLayout() async {
     LayoutTest()
   }
 
+  var sizer = SizeWalker()
+  block.walk(with: &sizer)
+
   event_loop: for await ev in Wayland.events() {
     switch ev {
     case .frame(let winH, let winW):
