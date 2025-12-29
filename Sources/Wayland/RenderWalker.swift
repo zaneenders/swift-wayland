@@ -1,3 +1,9 @@
+@MainActor
+public protocol Renderer {
+  static func drawText(_ text: Text)
+  static func drawQuad(_ quad: Quad)
+}
+
 public struct RenderWalker: Walker {
   public var currentId: Hash = 0
   public var parentId: Hash = 0
@@ -17,13 +23,7 @@ public struct RenderWalker: Walker {
       if let word = block as? Word {
         drawer.drawText(Text(word.label, at: pos, scale: word.scale))
       } else if let rect = block as? Rect {
-        let quad = Quad(
-          dst_p0: (pos.y, pos.x),
-          dst_p1: (pos.y + rect.height, pos.x + rect.width),
-          tex_tl: (0, 0), tex_br: (1, 1), color: rect.color)
-        drawer.drawQuad(quad)
-      } else {
-        // print(pos, type(of: block))
+        drawer.drawQuad(Quad(pos: pos, rect))
       }
     } else {
       print("No position for \(currentId)")

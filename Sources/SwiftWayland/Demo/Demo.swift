@@ -6,20 +6,23 @@ import Wayland
 func runDemo() async {
   let level: Logger.Level = .trace
   let frameLogger = Logger.create(logLevel: .error, label: "Frame")
-  let keyLogger = Logger.create(logLevel: level, label: "Frame")
+  let keyLogger = Logger.create(logLevel: level, label: "Key")
   var ips: [String] = []
 
   Wayland.setup()
-  var renderer = LayoutMachine(Wayland.self, .error)
   event_loop: for await ev in Wayland.events() {
     switch ev {
     case .frame(let winH, let winW):
       let screen = Screen(o: .vertical, ips: ips)
       Wayland.preDraw()
-      screen.draw(&renderer)
+      var sizer = SizeWalker()
+      screen.walk(with: &sizer)
+      var positioner = PositionWalker(sizes: sizer.sizes)
+      screen.walk(with: &positioner)
+      var renderer = RenderWalker(positions: positioner.positions, Wayland.self)
+      screen.walk(with: &renderer)
       Wayland.postDraw()
       frameLogger.trace("\(Wayland.elapsed)")
-      renderer.reset()
     case .key(let code, let keyState):
       if keyState == 1 {
         keyLogger.trace("key: \(code)")
@@ -27,20 +30,6 @@ func runDemo() async {
       switch (code, keyState) {
       case (1, _):
         Wayland.exit()
-      case (36, 1):  // J
-        ()
-      case (33, 1):  // F
-        ()
-      case (37, 1):  // K
-        ()
-      case (32, 1):  // D
-        ()
-      case (38, 1):  // L
-        let screen = Screen(o: .vertical, ips: ips)
-        screen.moveIn(&renderer)
-      case (31, 1):  // S
-        let screen = Screen(o: .vertical, ips: ips)
-        screen.moveOut(&renderer)
       case (_, 1):
         ips = ["Loading..."]
         Task {
