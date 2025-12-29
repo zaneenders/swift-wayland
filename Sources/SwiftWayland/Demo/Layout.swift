@@ -1,9 +1,9 @@
 import Wayland
 
-struct LayoutTest: Block {
-  let scale: UInt = 4
+struct Layout: Block {
+  let scale: UInt = 2
   var layer: some Block {
-    Group(.vertical) {  // TODO: This group should be implict
+    Group(.horizontal) {
       Rect(width: 25, height: 25, color: .yellow, scale: 5)
       Group(.horizontal) {
         Word("Left").scale(scale)

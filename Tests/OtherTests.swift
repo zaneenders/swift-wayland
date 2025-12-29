@@ -25,14 +25,14 @@ func fullMockRenderPass() {
   }
 
   var sizer = SizeWalker()
-  let test = LayoutTest()
+  let test = Layout()
   test.walk(with: &sizer)
 
   #expect(!sizer.sizes.isEmpty)
 
   let testStruct = sizer.tree[0]![0]
   let tupleBlock = sizer.tree[testStruct]![0]
-  #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 459, width: 348, orientation: .vertical)))
+  #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 167, width: 479, orientation: .horizontal)))
 
   var positioner = PositionWalker(sizes: sizer.sizes.convert())
   test.walk(with: &positioner)
@@ -56,7 +56,7 @@ func fullMockRenderPass() {
 
   #expect(
     TestRenderer.drawnTexts.allSatisfy { text in
-      !text.text.isEmpty && text.scale == 4
+      !text.text.isEmpty && text.scale == 2
     })
 }
 

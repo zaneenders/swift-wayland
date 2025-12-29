@@ -5,8 +5,7 @@ struct SwiftWayland {
     #if Toolbar
     await runToolbar()
     #else
-    // await runDemo()
-    await runLayout()
+    await runDemo()
     #endif
   }
 }
