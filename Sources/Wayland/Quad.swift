@@ -12,7 +12,7 @@ public struct Quad: BitwiseCopyable {
     UInt(abs(dst_p0.1 - dst_p1.1))
   }
 
-  public init(pos: (x: UInt, y: UInt), _ rect: Rect) {
+  init(pos: (x: UInt, y: UInt), _ rect: Rect) {
     let quad = Quad(
       dst_p0: (pos.x, pos.y),
       dst_p1: (pos.x + rect.width, pos.y + rect.height),
@@ -20,7 +20,7 @@ public struct Quad: BitwiseCopyable {
     self = quad
   }
 
-  public init(
+  init(
     dst_p0: (UInt, UInt), dst_p1: (UInt, UInt),
     tex_tl: (Float, Float) = (0, 0),
     tex_br: (Float, Float) = (1, 1),

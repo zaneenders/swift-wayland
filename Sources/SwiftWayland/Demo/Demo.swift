@@ -14,14 +14,7 @@ func runDemo() async {
     switch ev {
     case .frame(let winH, let winW):
       let screen = Screen(o: .vertical, ips: ips)
-      Wayland.preDraw()
-      var sizer = SizeWalker()
-      screen.walk(with: &sizer)
-      var positioner = PositionWalker(sizes: sizer.sizes)
-      screen.walk(with: &positioner)
-      var renderer = RenderWalker(positions: positioner.positions, Wayland.self)
-      screen.walk(with: &renderer)
-      Wayland.postDraw()
+      Wayland.draw(screen)
       frameLogger.trace("\(Wayland.elapsed)")
     case .key(let code, let keyState):
       if keyState == 1 {

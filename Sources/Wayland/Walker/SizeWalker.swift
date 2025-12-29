@@ -1,8 +1,8 @@
-public enum Size: Equatable, CustomStringConvertible {
+enum Size: Equatable, CustomStringConvertible {
   case unknown(Orientation)
   case known(height: UInt, width: UInt, Orientation)
 
-  public var description: String {
+  var description: String {
     switch self {
     case .unknown(let o):
       return "unknown: \(o)"
@@ -13,20 +13,20 @@ public enum Size: Equatable, CustomStringConvertible {
 }
 
 @MainActor
-public struct SizeWalker: Walker {
-  public var currentId: Hash = 0
-  public var parentId: Hash = 0
-  public var sizes: [Hash: Size] = [:]
-  public var parents: [Hash: Hash] = [:]
-  public var names: [Hash: String] = [:]
-  public var currentOrentation: Orientation = .vertical
-  public var tree: [Hash: [Hash]] = [:]
-  public var words: [Hash: Word] = [:]
-  public var quads: [Hash: Rect] = [:]
+struct SizeWalker: Walker {
+  var currentId: Hash = 0
+  var parentId: Hash = 0
+  var sizes: [Hash: Size] = [:]
+  var parents: [Hash: Hash] = [:]
+  var names: [Hash: String] = [:]
+  var currentOrentation: Orientation = .vertical
+  var tree: [Hash: [Hash]] = [:]
+  var words: [Hash: Word] = [:]
+  var quads: [Hash: Rect] = [:]
 
-  public init() {}
+  init() {}
 
-  mutating func connect(parent: Hash, current: Hash) {
+  private mutating func connect(parent: Hash, current: Hash) {
     if var sibilings = tree[parent] {
       sibilings.append(current)
       tree[parent] = sibilings
@@ -35,7 +35,7 @@ public struct SizeWalker: Walker {
     }
   }
 
-  public mutating func before(_ block: some Block) {
+  mutating func before(_ block: some Block) {
     names[currentId] = "\(type(of: block))"
     parents[currentId] = parentId
     connect(parent: parentId, current: currentId)
@@ -66,7 +66,7 @@ public struct SizeWalker: Walker {
     }
   }
 
-  public mutating func after(_ block: some Block) {
+  mutating func after(_ block: some Block) {
     guard let p = sizes[parentId], let me = sizes[currentId] else { return }
     switch (p, me) {
     case (.unknown(let o), .known(height: let mh, width: let mw, _)):
@@ -83,6 +83,6 @@ public struct SizeWalker: Walker {
     }
   }
 
-  public mutating func before(child block: some Block) {}
-  public mutating func after(child block: some Block) {}
+  mutating func before(child block: some Block) {}
+  mutating func after(child block: some Block) {}
 }

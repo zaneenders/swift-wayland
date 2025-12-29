@@ -5,7 +5,7 @@ public struct Text {
   public var forground: Color
   public var background: Color
 
-  public init(
+  init(
     _ text: String,
     at pos: (x: UInt, y: UInt),
     scale: UInt,

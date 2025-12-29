@@ -1,13 +1,27 @@
 import Logging
 
 @MainActor
-public protocol Walker {
+protocol Walker {
   var currentId: Hash { get set }
   var parentId: Hash { get set }
   mutating func before(_ block: some Block)
   mutating func after(_ block: some Block)
   mutating func before(child block: some Block)
   mutating func after(child block: some Block)
+}
+
+@MainActor
+extension Wayland {
+  public static func draw(_ block: some Block) {
+    Wayland.preDraw()
+    var sizer = SizeWalker()
+    block.walk(with: &sizer)
+    var positioner = PositionWalker(sizes: sizer.sizes)
+    block.walk(with: &positioner)
+    var renderer = RenderWalker(positions: positioner.positions, Wayland.self)
+    block.walk(with: &renderer)
+    Wayland.postDraw()
+  }
 }
 
 extension Block {
@@ -34,15 +48,15 @@ extension Block {
         walker.currentId = walker.parentId
         walker.parentId = parent
       }
-    } else if let rect = self as? Rect {
-    } else if let word = self as? Word {
+    } else if (self as? Rect != nil) || (self as? Word != nil) {
+      // Leaf Nodes
     } else {  // Composed
       self.layer.walk(with: &walker, orientation)
     }
     walker.after(self)
   }
 
-  public func walk(with walker: inout some Walker, _ orientation: Orientation = .vertical) {
+  func walk(with walker: inout some Walker, _ orientation: Orientation = .vertical) {
     let parent = walker.parentId
     walker.parentId = walker.currentId
     walker.currentId = self.id(current: walker.currentId)

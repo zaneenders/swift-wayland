@@ -23,14 +23,7 @@ func runToolbar() async {
     case .frame(let winH, let winW):
       let today = formatter.string(from: Date())
       let block = SystemClock(time: today)
-      Wayland.preDraw()
-      var sizer = SizeWalker()
-      block.walk(with: &sizer)
-      var positioner = PositionWalker(sizes: sizer.sizes)
-      block.walk(with: &positioner)
-      var renderer = RenderWalker(positions: positioner.positions, Wayland.self)
-      block.walk(with: &renderer)
-      Wayland.postDraw()
+      Wayland.draw(block)
     }
   }
 

@@ -1,16 +1,16 @@
 @MainActor
-public protocol Renderer {
+protocol Renderer {
   static func drawText(_ text: Text)
   static func drawQuad(_ quad: Quad)
 }
 
-public struct RenderWalker: Walker {
-  public var currentId: Hash = 0
-  public var parentId: Hash = 0
+struct RenderWalker: Walker {
+  var currentId: Hash = 0
+  var parentId: Hash = 0
   private var positions: [Hash: (x: UInt, y: UInt)] = [:]
   private let drawer: Renderer.Type
 
-  public init(
+  init(
     positions: [Hash: (x: UInt, y: UInt)],
     _ drawer: any Renderer.Type
   ) {
@@ -18,7 +18,7 @@ public struct RenderWalker: Walker {
     self.drawer = drawer
   }
 
-  public mutating func before(_ block: some Block) {
+  mutating func before(_ block: some Block) {
     if let pos = positions[currentId] {
       if let word = block as? Word {
         drawer.drawText(Text(word.label, at: pos, scale: word.scale))
@@ -30,7 +30,7 @@ public struct RenderWalker: Walker {
     }
   }
 
-  public mutating func after(_ block: some Block) {}
-  public mutating func before(child block: some Block) {}
-  public mutating func after(child block: some Block) {}
+  mutating func after(_ block: some Block) {}
+  mutating func before(child block: some Block) {}
+  mutating func after(child block: some Block) {}
 }
