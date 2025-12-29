@@ -1,11 +1,13 @@
+import Logging
 import Wayland
 
 #if !Toolbar
 @MainActor
 func runLayout() async {
 
+  let logger = Logger.create(logLevel: .trace)
+
   Wayland.setup()
-  var renderer = LayoutMachine(Wayland.self, .error)
   var block: some Block {
     LayoutTest()
   }
@@ -13,15 +15,15 @@ func runLayout() async {
   event_loop: for await ev in Wayland.events() {
     switch ev {
     case .frame(let winH, let winW):
+      Wayland.preDraw()
       var sizer = SizeWalker()
       block.walk(with: &sizer)
       var positioner = PositionWalker(sizes: sizer.sizes)
       block.walk(with: &positioner)
-      var r = RenderWalker(positions: positioner.positions, Wayland.self)
-      Wayland.preDraw()
-      block.walk(with: &r)
+      var renderer = RenderWalker(positions: positioner.positions, Wayland.self)
+      block.walk(with: &renderer)
       Wayland.postDraw()
-      renderer.reset()
+      logger.trace("\(Wayland.elapsed)")
     case .key(let code, let keyState):
       switch (code, keyState) {
       case (1, _):

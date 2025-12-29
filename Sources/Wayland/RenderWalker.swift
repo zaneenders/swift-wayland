@@ -23,8 +23,10 @@ public struct RenderWalker: Walker {
           tex_tl: (0, 0), tex_br: (1, 1), color: rect.color)
         drawer.drawQuad(quad)
       } else {
-        print(pos, type(of: block))
+        // print(pos, type(of: block))
       }
+    } else {
+      print("No position for \(currentId)")
     }
   }
 
