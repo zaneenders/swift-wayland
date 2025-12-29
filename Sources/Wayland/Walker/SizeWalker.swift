@@ -27,8 +27,6 @@ struct SizeWalker: Walker {
   var names: [Hash: String] = [:]
   var currentOrentation: Orientation = .vertical
   var tree: [Hash: [Hash]] = [:]
-  var words: [Hash: Word] = [:]
-  var quads: [Hash: Rect] = [:]
 
   init() {}
 
@@ -48,14 +46,11 @@ struct SizeWalker: Walker {
     if let rect = block as? Rect {
       let width = rect.width * rect.scale
       let height = rect.height * rect.scale
-      let container = Container(height: height, width: width, orientation: currentOrentation)
-      sizes[currentId] = .known(container)
-      quads[currentId] = rect
+      sizes[currentId] = .known(Container(height: height, width: width, orientation: currentOrentation))
     } else if let text = block as? Word {
       guard !text.label.contains("\n") else {
         fatalError("New lines not supported yet")
       }
-      words[currentId] = text
       sizes[currentId] = .known(Container(height: text.height, width: text.width, orientation: currentOrentation))
     } else if let group = block as? BlockGroup {
       if group.children.count < 1 {
@@ -85,15 +80,13 @@ struct SizeWalker: Walker {
           Container(
             height: max(myContainer.height, parentContainer.height),
             width: myContainer.width + parentContainer.width,
-            orientation:
-              parentContainer.orientation))
+            orientation: .horizontal))
       case .vertical:
         sizes[parentId] = .known(
           Container(
             height: myContainer.height + parentContainer.height,
             width: max(myContainer.width, parentContainer.width),
-            orientation:
-              parentContainer.orientation))
+            orientation: .vertical))
       }
     case (.unknown, .unknown), (.known, .unknown):
       fatalError("Invalid tree construction")
