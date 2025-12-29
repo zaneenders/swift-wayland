@@ -9,11 +9,13 @@ struct SizingTests {
   @Test("Basic Rectangle sizing")
   func rectBasicSizing() {
     var sizer = SizeWalker()
-    let test = RectTestBasic()
+    let scale: UInt = 2
+    let test = RectTestBasic(scale: scale)
     test.walk(with: &sizer)
     let testStruct = sizer.tree[0]![0]
     let tupleBlock = sizer.tree[testStruct]![0]
-    #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 50, width: 100, orientation: .vertical)))
+    #expect(
+      sizer.sizes[tupleBlock]! == .known(Container(height: scale * 50, width: scale * 100, orientation: .vertical)))
   }
 
   @Test("Multiple Rectangle horizontal layout")
@@ -126,8 +128,9 @@ struct SizingTests {
 }
 
 struct RectTestBasic: Block {
+  var scale: UInt = 1
   var layer: some Block {
-    Rectangle(width: 100, height: 50, color: .red, scale: 1)
+    Rectangle(width: 100, height: 50, color: .red, scale: scale)
   }
 }
 
@@ -214,4 +217,60 @@ struct SpacingTestLargeGap: Block {
       Rectangle(width: 5, height: 5, color: .blue, scale: 1)
     }
   }
+}
+
+// MARK: - Quad Scaling Tests
+
+struct QuadTestScaling: Block {
+  var layer: some Block {
+    Group(.horizontal) {
+      Rectangle(width: 10, height: 10, color: .red, scale: 1)
+      Rectangle(width: 10, height: 10, color: .blue, scale: 2)
+      Rectangle(width: 10, height: 10, color: .green, scale: 3)
+    }
+  }
+}
+
+struct QuadCaptureRenderer: Renderer {
+  static var capturedQuads: [Quad] = []
+
+  static func drawQuad(_ quad: Quad) {
+    capturedQuads.append(quad)
+  }
+
+  static func drawText(_ text: Text) {}
+
+  static func reset() {
+    capturedQuads.removeAll()
+  }
+}
+
+@MainActor
+@Test("Quad scaling verification")
+func quadScaling() {
+  var sizer = SizeWalker()
+  let test = QuadTestScaling()
+  test.walk(with: &sizer)
+
+  var positioner = PositionWalker(sizes: sizer.sizes.convert())
+  test.walk(with: &positioner)
+
+  // Reset renderer and capture quads
+  QuadCaptureRenderer.reset()
+  var renderWalker = RenderWalker(positions: positioner.positions, QuadCaptureRenderer.self)
+  test.walk(with: &renderWalker)
+
+  // Verify we captured 3 quads
+  #expect(QuadCaptureRenderer.capturedQuads.count == 3)
+
+  // Sort by width to get predictable order
+  let quads = QuadCaptureRenderer.capturedQuads.sorted { $0.width < $1.width }
+
+  // Verify scaled dimensions are correctly stored in quads
+  #expect(quads[0].width == 10)  // 10 * 1
+  #expect(quads[0].height == 10)  // 10 * 1
+  #expect(quads[1].width == 20)  // 10 * 2
+  #expect(quads[1].height == 20)  // 10 * 2
+  #expect(quads[2].width == 30)  // 10 * 3
+  #expect(quads[2].height == 30)  // 10 * 3
 }

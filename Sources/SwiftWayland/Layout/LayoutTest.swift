@@ -3,6 +3,7 @@ import Wayland
 struct LayoutTest: Block {
   let scale: UInt = 4
   var layer: some Block {
+    Rect(width: 25, height: 25, color: .magenta, scale: 5)
     Group(.horizontal) {
       Word("Left").scale(scale)
       Group(.vertical) {

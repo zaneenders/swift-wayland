@@ -26,10 +26,10 @@ struct PositionTests {
 
     // First rect should be at (0, 0)
     #expect(rectPositions[0] == (x: 0, y: 0))
-    // Second rect should be at (10, 0) - to the right
-    #expect(rectPositions[1] == (x: 10, y: 0))
-    // Third rect should be at (20, 0) - further right
-    #expect(rectPositions[2] == (x: 20, y: 0))
+    // Second rect should be at (50, 0) - to the right (10 * scale 5)
+    #expect(rectPositions[1] == (x: 50, y: 0))
+    // Third rect should be at (100, 0) - further right (10 * scale 5 * 2)
+    #expect(rectPositions[2] == (x: 100, y: 0))
   }
 
   @Test("Vertical positioning")
@@ -87,11 +87,12 @@ struct PositionTests {
 }
 
 struct PositionTestSimpleHorizontal: Block {
+  let scale: UInt = 5
   var layer: some Block {
     Group(.horizontal) {
-      Rectangle(width: 10, height: 10, color: .red, scale: 1)
-      Rectangle(width: 10, height: 10, color: .blue, scale: 1)
-      Rectangle(width: 10, height: 10, color: .green, scale: 1)
+      Rectangle(width: 10, height: 10, color: .red, scale: scale)
+      Rectangle(width: 10, height: 10, color: .blue, scale: scale)
+      Rectangle(width: 10, height: 10, color: .green, scale: scale)
     }
   }
 }

@@ -14,8 +14,9 @@ func layout() {
   var sizer = SizeWalker()
   let test = LayoutTest()
   test.walk(with: &sizer)
-  let root = sizer.tree[0]![0]
-  #expect(sizer.sizes[root]! == .known(Container(height: 84, width: 348, orientation: .vertical)))
+  let testStruct = sizer.tree[0]![0]
+  let tupleBlock = sizer.tree[testStruct]![0]
+  #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 209, width: 348, orientation: .vertical)))
   var positioner = PositionWalker(sizes: sizer.sizes.convert())
   test.walk(with: &positioner)
   var renderWalker = RenderWalker(positions: positioner.positions, TestRenderer.self)

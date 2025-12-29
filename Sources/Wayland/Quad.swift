@@ -13,9 +13,11 @@ struct Quad: BitwiseCopyable {
   }
 
   init(pos: (x: UInt, y: UInt), _ rect: Rect) {
+    let scaledWidth = rect.width * rect.scale
+    let scaledHeight = rect.height * rect.scale
     let quad = Quad(
       dst_p0: (pos.x, pos.y),
-      dst_p1: (pos.x + rect.width, pos.y + rect.height),
+      dst_p1: (pos.x + scaledWidth, pos.y + scaledHeight),
       tex_tl: (0, 0), tex_br: (1, 1), color: rect.color)
     self = quad
   }
