@@ -5,6 +5,12 @@ import CWaylandEGL
 import CWaylandProtocols
 import Foundation
 
+@MainActor
+protocol Renderer {
+  static func drawText(_ text: Text)
+  static func drawQuad(_ quad: Quad)
+}
+
 /// There is alot of global state here to setup and conform to Wayland's patterns.
 /// Their might be better ways to abstract this and clean it up a bit. But it's
 /// working for now.
@@ -415,7 +421,7 @@ public enum Wayland: Renderer {
     return (u0, v0, u1, v1)
   }
 
-  public static func drawQuad(_ quad: Quad) {
+  static func drawQuad(_ quad: Quad) {
     glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
     let rects: InlineArray<1, Quad> = [quad]
     unsafe rects.span.withUnsafeBytes { buf in
@@ -425,7 +431,7 @@ public enum Wayland: Renderer {
     glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, 1)
   }
 
-  public static func drawText(_ text: Text) {
+  static func drawText(_ text: Text) {
     var penX = text.pos.x
     let penY = text.pos.y
 

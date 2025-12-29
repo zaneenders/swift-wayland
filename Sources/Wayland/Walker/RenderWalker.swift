@@ -1,9 +1,3 @@
-@MainActor
-protocol Renderer {
-  static func drawText(_ text: Text)
-  static func drawQuad(_ quad: Quad)
-}
-
 struct RenderWalker: Walker {
   var currentId: Hash = 0
   var parentId: Hash = 0

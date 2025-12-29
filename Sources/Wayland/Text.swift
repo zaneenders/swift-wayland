@@ -1,4 +1,4 @@
-public struct Text {
+struct Text {
   public let text: String
   public let pos: (x: UInt, y: UInt)
   public let scale: UInt
