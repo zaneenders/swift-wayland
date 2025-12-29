@@ -3,6 +3,11 @@ import Testing
 @testable import SwiftWayland
 @testable import Wayland
 
+enum TestRenderer: Renderer {
+  static func drawQuad(_ quad: Quad) {}
+  static func drawText(_ text: Text) {}
+}
+
 @MainActor
 @Test
 func layout() {
@@ -13,101 +18,6 @@ func layout() {
   #expect(sizer.sizes[root]! == .known(height: 84, width: 348, .vertical))
   var positioner = PositionWalker(sizes: sizer.sizes)
   test.walk(with: &positioner)
-}
-
-// Computes the absolute positions to render elements.
-struct PositionWalker: Walker {
-  var currentId: Hash = 0
-  var parentId: Hash = 0
-  var sizes: [Hash: Size]
-  var positions: [Hash: (x: UInt, y: UInt)] = [:]
-  var currentX: UInt = 0
-  var currentY: UInt = 0
-  var layoutStack: [(containerX: UInt, containerY: UInt, orientation: Orientation)] = []
-
-  mutating func before(_ block: some Block) {
-    // Store the current position for this element
-    positions[currentId] = (currentX, currentY)
-
-    let size = sizes[currentId]!
-    if block is Word {
-      let word = block as! Word
-      print("Word '\(word.label)' at (\(currentX), \(currentY)) size: \(size)")
-    } else if block is Rect {
-      print("Rect at (\(currentX), \(currentY)) size: \(size)")
-    } else {
-      print("Other at (\(currentX), \(currentY)) size: \(size)")
-    }
-
-    // For orientation blocks, push a new layout context
-    if let orientationBlock = block as? OrientationBlock {
-      layoutStack.append((currentX, currentY, orientationBlock.orientation))
-    }
-  }
-
-  mutating func after(_ block: some Block) {
-    // For orientation blocks, pop the layout context and update parent position
-    if let orientationBlock = block as? OrientationBlock {
-      if let (containerX, containerY, orientation) = layoutStack.popLast() {
-        if let size = sizes[currentId] {
-          switch size {
-          case .known(let height, let width, _):
-            switch orientation {
-            case .horizontal:
-              currentX = containerX + width
-              currentY = containerY
-            case .vertical:
-              currentX = containerX
-              currentY = containerY + height
-            }
-          case .unknown:
-            break
-          }
-        }
-      }
-    } else {
-      // For regular blocks, update current position based on their own orientation
-      if let size = sizes[currentId] {
-        switch size {
-        case .known(let height, let width, let orientation):
-          switch orientation {
-          case .horizontal:
-            currentX += width
-          case .vertical:
-            currentY += height
-          }
-        case .unknown:
-          break
-        }
-      }
-    }
-  }
-
-  mutating func before(child block: some Block) {
-    // For child blocks, reset to the current container's position
-    if let (containerX, containerY, orientation) = layoutStack.last {
-      currentX = containerX
-      currentY = containerY
-    }
-  }
-
-  mutating func after(child block: some Block) {
-    // After processing a child, update the container's position for the next child
-    if let childSize = sizes[currentId], layoutStack.count > 0 {
-      let index = layoutStack.count - 1
-      let (containerX, containerY, orientation) = layoutStack[index]
-
-      switch childSize {
-      case .known(let height, let width, _):
-        switch orientation {
-        case .horizontal:
-          layoutStack[index] = (containerX + width, containerY, orientation)
-        case .vertical:
-          layoutStack[index] = (containerX, containerY + height, orientation)
-        }
-      case .unknown:
-        break
-      }
-    }
-  }
+  var renderWalker = RenderWalker(positions: positioner.positions, TestRenderer.self)
+  test.walk(with: &renderWalker)
 }

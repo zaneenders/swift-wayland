@@ -10,14 +10,16 @@ func runLayout() async {
     LayoutTest()
   }
 
-  var sizer = SizeWalker()
-  block.walk(with: &sizer)
-
   event_loop: for await ev in Wayland.events() {
     switch ev {
     case .frame(let winH, let winW):
+      var sizer = SizeWalker()
+      block.walk(with: &sizer)
+      var positioner = PositionWalker(sizes: sizer.sizes)
+      block.walk(with: &positioner)
+      var r = RenderWalker(positions: positioner.positions, Wayland.self)
       Wayland.preDraw()
-      block.draw(&renderer)
+      block.walk(with: &r)
       Wayland.postDraw()
       renderer.reset()
     case .key(let code, let keyState):
