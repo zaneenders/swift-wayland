@@ -16,11 +16,26 @@ extension Wayland {
     Wayland.preDraw()
     var sizer = SizeWalker()
     block.walk(with: &sizer)
-    var positioner = PositionWalker(sizes: sizer.sizes)
+    var positioner = PositionWalker(sizes: sizer.sizes.convert())
     block.walk(with: &positioner)
     var renderer = RenderWalker(positions: positioner.positions, Wayland.self)
     block.walk(with: &renderer)
     Wayland.postDraw()
+  }
+}
+
+extension [Hash: Size] {
+  func convert() -> [Hash: Container] {
+    var containers: [Hash: Container] = [:]
+    for (key, value) in self {
+      switch value {
+      case .known(let container):
+        containers[key] = container
+      case .unknown(_):
+        fatalError("\(#function) \(key) \(value)")
+      }
+    }
+    return containers
   }
 }
 

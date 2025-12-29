@@ -1,15 +1,21 @@
 enum Size: Equatable, CustomStringConvertible {
   case unknown(Orientation)
-  case known(height: UInt, width: UInt, Orientation)
+  case known(Container)
 
   var description: String {
     switch self {
     case .unknown(let o):
       return "unknown: \(o)"
-    case .known(height: let h, width: let w, let o):
-      return "height: \(h), width: \(w), orientation: \(o)"
+    case .known(let container):
+      return "height: \(container.height), width: \(container.width), orientation: \(container.orientation)"
     }
   }
+}
+
+struct Container: Equatable {
+  let height: UInt
+  let width: UInt
+  let orientation: Orientation
 }
 
 @MainActor
@@ -42,18 +48,19 @@ struct SizeWalker: Walker {
     if let rect = block as? Rect {
       let width = rect.width * rect.scale
       let height = rect.height * rect.scale
-      sizes[currentId] = .known(height: height, width: width, currentOrentation)
+      let container = Container(height: height, width: width, orientation: currentOrentation)
+      sizes[currentId] = .known(container)
       quads[currentId] = rect
     } else if let text = block as? Word {
       guard !text.label.contains("\n") else {
         fatalError("New lines not supported yet")
       }
       words[currentId] = text
-      sizes[currentId] = .known(height: text.height, width: text.width, currentOrentation)
+      sizes[currentId] = .known(Container(height: text.height, width: text.width, orientation: currentOrentation))
     } else if let group = block as? BlockGroup {
       if group.children.count < 1 {
         // Handle empty groups from optional blocks.
-        sizes[currentId] = .known(height: 0, width: 0, currentOrentation)
+        sizes[currentId] = .known(Container(height: 0, width: 0, orientation: currentOrentation))
       } else {
         sizes[currentId] = .unknown(currentOrentation)
       }
@@ -69,14 +76,24 @@ struct SizeWalker: Walker {
   mutating func after(_ block: some Block) {
     guard let p = sizes[parentId], let me = sizes[currentId] else { return }
     switch (p, me) {
-    case (.unknown(let o), .known(height: let mh, width: let mw, _)):
-      sizes[parentId] = .known(height: mh, width: mw, o)
-    case (.known(height: let h, width: let w, let o), .known(height: let mh, width: let mw, _)):
-      switch o {
+    case (.unknown(let o), .known(let container)):
+      sizes[parentId] = .known(Container(height: container.height, width: container.width, orientation: o))
+    case (.known(let parentContainer), .known(let myContainer)):
+      switch parentContainer.orientation {
       case .horizontal:
-        sizes[parentId] = .known(height: max(mh, h), width: mw + w, o)
+        sizes[parentId] = .known(
+          Container(
+            height: max(myContainer.height, parentContainer.height),
+            width: myContainer.width + parentContainer.width,
+            orientation:
+              parentContainer.orientation))
       case .vertical:
-        sizes[parentId] = .known(height: h + mh, width: max(mw, w), o)
+        sizes[parentId] = .known(
+          Container(
+            height: myContainer.height + parentContainer.height,
+            width: max(myContainer.width, parentContainer.width),
+            orientation:
+              parentContainer.orientation))
       }
     case (.unknown, .unknown), (.known, .unknown):
       fatalError("Invalid tree construction")
