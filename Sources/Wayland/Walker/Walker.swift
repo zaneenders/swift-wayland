@@ -12,13 +12,13 @@ protocol Walker {
 
 @MainActor
 extension Wayland {
-  public static func render(_ block: some Block) {
+  public static func render(_ block: some Block, logLevel: Logger.Level = .warning) {
     Wayland.preDraw()
     var sizer = SizeWalker()
     block.walk(with: &sizer)
     var positioner = PositionWalker(sizes: sizer.sizes.convert())
     block.walk(with: &positioner)
-    var renderer = RenderWalker(positions: positioner.positions, Wayland.self)
+    var renderer = RenderWalker(positions: positioner.positions, Wayland.self, logLevel: logLevel)
     block.walk(with: &renderer)
     Wayland.postDraw()
   }
