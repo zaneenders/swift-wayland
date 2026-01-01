@@ -39,7 +39,7 @@ func fullMockRenderPass() {
   #expect(positioner.positions.count == sizer.sizes.count)
 
   TestRenderer.reset()
-  var renderWalker = RenderWalker(positions: positioner.positions, TestRenderer.self)
+  var renderWalker = RenderWalker(positions: positioner.positions, TestRenderer.self, logLevel: .trace)
   test.walk(with: &renderWalker)
 
   #expect(!TestRenderer.drawnQuads.isEmpty)
@@ -57,6 +57,67 @@ func fullMockRenderPass() {
   #expect(
     TestRenderer.drawnTexts.allSatisfy { text in
       !text.text.isEmpty && text.scale == 2
+    })
+}
+
+@MainActor
+@Test func verifyBrightBackgroundColors() {
+  enum ColorTestRenderer: Renderer {
+    static var drawnTexts: [Text] = []
+
+    static func drawQuad(_ quad: Quad) {
+      // Ignore quads for this test
+    }
+
+    static func drawText(_ text: Text) {
+      drawnTexts.append(text)
+    }
+
+    static func reset() {
+      drawnTexts.removeAll()
+    }
+  }
+
+  // Create a simple layout with colored text
+  struct ColorTestLayout: Block {
+    var layer: some Block {
+      Group(.vertical) {
+        Word("Red Background").background(.red)
+        Word("Bright Yellow Background").background(.yellow)
+        Word("Cyan Background").background(.cyan)
+      }
+    }
+  }
+
+  var sizer = SizeWalker()
+  let test = ColorTestLayout()
+  test.walk(with: &sizer)
+
+  var positioner = PositionWalker(sizes: sizer.sizes.convert())
+  test.walk(with: &positioner)
+
+  ColorTestRenderer.reset()
+  var renderWalker = RenderWalker(positions: positioner.positions, ColorTestRenderer.self, logLevel: .trace)
+  test.walk(with: &renderWalker)
+
+  // Verify we captured 3 texts
+  #expect(ColorTestRenderer.drawnTexts.count == 3)
+
+  // Check that colored backgrounds are preserved
+  #expect(
+    ColorTestRenderer.drawnTexts.contains { text in
+      text.text == "Red Background" && text.background.r == 1.0 && text.background.g == 0.0 && text.background.b == 0.0
+    })
+
+  #expect(
+    ColorTestRenderer.drawnTexts.contains { text in
+      text.text == "Bright Yellow Background" && text.background.r == 1.0 && text.background.g == 1.0
+        && text.background.b == 0.0
+    })
+
+  #expect(
+    ColorTestRenderer.drawnTexts.contains { text in
+      text.text == "Cyan Background" && text.background.r == 0.0 && text.background.g == 1.0 && text.background.b == 1.0
     })
 }
 

@@ -257,7 +257,7 @@ func quadScaling() {
 
   // Reset renderer and capture quads
   QuadCaptureRenderer.reset()
-  var renderWalker = RenderWalker(positions: positioner.positions, QuadCaptureRenderer.self)
+  var renderWalker = RenderWalker(positions: positioner.positions, QuadCaptureRenderer.self, logLevel: .trace)
   test.walk(with: &renderWalker)
 
   // Verify we captured 3 quads
