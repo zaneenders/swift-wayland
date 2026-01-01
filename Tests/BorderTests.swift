@@ -72,7 +72,7 @@ struct BorderTests {
   @Test("Border rendering captures quads")
   func borderRenderingCapture() {
     var sizer = SizeWalker()
-    let test = BorderSizingTest()
+    let test = MultipleBorderColorsTest()
     test.walk(with: &sizer)
 
     var positioner = PositionWalker(sizes: sizer.sizes.convert())
@@ -82,15 +82,15 @@ struct BorderTests {
     var renderWalker = RenderWalker(positions: positioner.positions, BorderCaptureRenderer.self, logLevel: .error)
     test.walk(with: &renderWalker)
 
-    #expect(BorderCaptureRenderer.capturedQuads.count == 6)
+    #expect(BorderCaptureRenderer.capturedQuads.count == 3)
 
-    let redQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .red }
-    #expect(redQuads.count == 4)
+    let redBorderQuads = BorderCaptureRenderer.capturedQuads.filter { $0.borderColor == .red }
+    let blueBorderQuads = BorderCaptureRenderer.capturedQuads.filter { $0.borderColor == .blue }
+    let yellowNoBorderQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .yellow && $0.borderWidth == 0 }
 
-    let blueQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .blue }
-    let greenQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .green }
-    #expect(blueQuads.count == 1)
-    #expect(greenQuads.count == 1)
+    #expect(redBorderQuads.count == 1)  // Rectangle with red border
+    #expect(blueBorderQuads.count == 1)  // Rectangle with blue border
+    #expect(yellowNoBorderQuads.count == 1)  // No border
   }
 
   @Test("Border positioning verification")
@@ -106,28 +106,14 @@ struct BorderTests {
     var renderWalker = RenderWalker(positions: positioner.positions, BorderCaptureRenderer.self, logLevel: .error)
     test.walk(with: &renderWalker)
 
-    #expect(BorderCaptureRenderer.capturedQuads.count == 5)
+    #expect(BorderCaptureRenderer.capturedQuads.count == 1)
 
-    let greenQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .green }
-    let redQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .red }
-
-    #expect(greenQuads.count == 1)  // Main rectangle
-    #expect(redQuads.count == 4)  // Border quads
-
-    let mainRect = greenQuads.first!
+    let mainRect = BorderCaptureRenderer.capturedQuads.first!
     #expect(mainRect.width == 40)
     #expect(mainRect.height == 30)
-
-    let expectedBorderWidth: UInt = 3  // borderWidth (not scaled)
-    let expectedRectWidth: UInt = 40
-    let expectedRectHeight: UInt = 30
-
-    for borderQuad in redQuads {
-      let hasCorrectBorderWidth = borderQuad.width == expectedBorderWidth || borderQuad.height == expectedBorderWidth
-      let hasCorrectRectDimension = borderQuad.width == expectedRectWidth || borderQuad.height == expectedRectHeight
-
-      #expect(hasCorrectBorderWidth && hasCorrectRectDimension)
-    }
+    #expect(mainRect.color == .green)
+    #expect(mainRect.borderColor == .red)
+    #expect(mainRect.borderWidth == 3.0)
   }
 
   @Test("No border rectangles don't generate extra quads")
@@ -182,18 +168,16 @@ struct BorderTests {
     var renderWalker = RenderWalker(positions: positioner.positions, BorderCaptureRenderer.self, logLevel: .error)
     test.walk(with: &renderWalker)
 
-    #expect(BorderCaptureRenderer.capturedQuads.count == 11)
+    #expect(BorderCaptureRenderer.capturedQuads.count == 3)
 
-    let redBorderQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .red }
-    let blueBorderQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .blue }
-    let cyanQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .cyan }
-    let magentaQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .magenta }
-    let yellowQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .yellow }
+    let cyanQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .cyan && $0.borderColor == .red }
+    let magentaQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .magenta && $0.borderColor == .blue }
+    let yellowQuads = BorderCaptureRenderer.capturedQuads.filter { $0.color == .yellow && $0.borderWidth == 0 }
 
     #expect(cyanQuads.count == 1)
-    #expect(redBorderQuads.count == 4)
+    #expect(cyanQuads.first!.borderWidth == 2.0)
     #expect(magentaQuads.count == 1)
-    #expect(blueBorderQuads.count == 4)
+    #expect(magentaQuads.first!.borderWidth == 4.0)
     #expect(yellowQuads.count == 1)
   }
 }
@@ -249,47 +233,10 @@ enum BorderCaptureRenderer: Renderer {
   }
 
   static func drawBorder(around rect: Rect, at pos: (x: UInt, y: UInt), width: UInt, color: Color) {
-    // Simulate border rendering by creating border quads directly
-    let scaledWidth = rect.width * rect.scale
-    let scaledHeight = rect.height * rect.scale
-    let borderWidth = width
-
-    // Top border
-    capturedQuads.append(
-      Quad(
-        dst_p0: (pos.x, pos.y),
-        dst_p1: (pos.x + scaledWidth, pos.y + borderWidth),
-        tex_tl: (0, 0), tex_br: (1, 1),
-        color: color
-      ))
-
-    // Bottom border
-    capturedQuads.append(
-      Quad(
-        dst_p0: (pos.x, pos.y + scaledHeight - borderWidth),
-        dst_p1: (pos.x + scaledWidth, pos.y + scaledHeight),
-        tex_tl: (0, 0), tex_br: (1, 1),
-        color: color
-      ))
-
-    // Left border
-    capturedQuads.append(
-      Quad(
-        dst_p0: (pos.x, pos.y),
-        dst_p1: (pos.x + borderWidth, pos.y + scaledHeight),
-        tex_tl: (0, 0), tex_br: (1, 1),
-        color: color
-      ))
-
-    // Right border
-    capturedQuads.append(
-      Quad(
-        dst_p0: (pos.x + scaledWidth - borderWidth, pos.y),
-        dst_p1: (pos.x + scaledWidth, pos.y + scaledHeight),
-        tex_tl: (0, 0), tex_br: (1, 1),
-        color: color
-      ))
+    // No-op - borders are now handled in the shader via the main quad
   }
+
+
 
   static func reset() {
     capturedQuads.removeAll()

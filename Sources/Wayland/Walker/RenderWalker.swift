@@ -23,10 +23,6 @@ struct RenderWalker: Walker {
         drawer.drawText(word.draw(at: (pos.y, pos.x)))
       } else if let rect = block as? Rect {
         drawer.drawQuad(Quad(pos: pos, rect))
-
-        if rect.borderWidth > 0, let borderColor = rect.borderColor {
-          drawer.drawBorder(around: rect, at: pos, width: rect.borderWidth, color: borderColor)
-        }
       }
     } else {
       logger.warning("No position for \(currentId)")
