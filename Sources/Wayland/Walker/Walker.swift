@@ -12,7 +12,7 @@ protocol Walker {
 
 @MainActor
 extension Wayland {
-  public static func draw(_ block: some Block) {
+  public static func render(_ block: some Block) {
     Wayland.preDraw()
     var sizer = SizeWalker()
     block.walk(with: &sizer)

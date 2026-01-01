@@ -14,7 +14,7 @@ func runDemo() async {
     switch ev {
     case .frame(let winH, let winW):
       let screen = Screen(ips: ips)
-      Wayland.draw(screen)
+      Wayland.render(screen)
       frameLogger.trace("\(Wayland.elapsed)")
     case .key(let code, let keyState):
       if keyState == 1 {
