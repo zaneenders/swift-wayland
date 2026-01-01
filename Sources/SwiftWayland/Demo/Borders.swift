@@ -1,6 +1,6 @@
 import Wayland
 
-struct Boarders: Block {
+struct Borders: Block {
   var layer: some Block {
     Group(.horizontal) {
       Rect(width: 30, height: 20, color: .blue, scale: 2, borderWidth: 9, borderColor: .pink)

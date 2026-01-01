@@ -9,7 +9,6 @@ import Foundation
 protocol Renderer {
   static func drawText(_ text: Text)
   static func drawQuad(_ quad: Quad)
-  static func drawBorder(around rect: Rect, at pos: (x: UInt, y: UInt), width: UInt, color: Color)
 }
 
 /// There is alot of global state here to setup and conform to Wayland's patterns.
@@ -442,48 +441,6 @@ public enum Wayland: Renderer {
       unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, MemoryLayout<Quad>.stride, buf.baseAddress)
     }
     glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, 1)
-  }
-
-  static func drawBorder(around rect: Rect, at pos: (x: UInt, y: UInt), width: UInt, color: Color) {
-    let scaledWidth = rect.width * rect.scale
-    let scaledHeight = rect.height * rect.scale
-    let borderWidth = width
-
-    // Top border
-    drawQuad(
-      Quad(
-        dst_p0: (pos.x, pos.y),
-        dst_p1: (pos.x + scaledWidth, pos.y + borderWidth),
-        tex_tl: (0, 0), tex_br: (1, 1),
-        color: color
-      ))
-
-    // Bottom border
-    drawQuad(
-      Quad(
-        dst_p0: (pos.x, pos.y + scaledHeight - borderWidth),
-        dst_p1: (pos.x + scaledWidth, pos.y + scaledHeight),
-        tex_tl: (0, 0), tex_br: (1, 1),
-        color: color
-      ))
-
-    // Left border
-    drawQuad(
-      Quad(
-        dst_p0: (pos.x, pos.y),
-        dst_p1: (pos.x + borderWidth, pos.y + scaledHeight),
-        tex_tl: (0, 0), tex_br: (1, 1),
-        color: color
-      ))
-
-    // Right border
-    drawQuad(
-      Quad(
-        dst_p0: (pos.x + scaledWidth - borderWidth, pos.y),
-        dst_p1: (pos.x + scaledWidth, pos.y + scaledHeight),
-        tex_tl: (0, 0), tex_br: (1, 1),
-        color: color
-      ))
   }
 
   static func drawText(_ text: Text) {

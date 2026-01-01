@@ -17,13 +17,15 @@ struct Quad: BitwiseCopyable {
   init(pos: (x: UInt, y: UInt), _ rect: Rect) {
     let scaledWidth = rect.width * rect.scale
     let scaledHeight = rect.height * rect.scale
-    self.dst_p0 = (Float(pos.x), Float(pos.y))
-    self.dst_p1 = (Float(pos.x + scaledWidth), Float(pos.y + scaledHeight))
-    self.tex_tl = (0, 0)
-    self.tex_br = (1, 1)
-    self.color = rect.color
-    self.borderColor = rect.borderColor ?? Color(r: 0, g: 0, b: 0, a: 0)
-    self.borderWidth = Float(rect.borderWidth)
+    self.init(
+      dst_p0: (pos.x, pos.y),
+      dst_p1: (pos.x + scaledWidth, pos.y + scaledHeight),
+      tex_tl: (0, 0),
+      tex_br: (1, 1),
+      color: rect.color,
+      borderColor: rect.borderColor,
+      borderWidth: Float(rect.borderWidth)
+    )
   }
 
   init(

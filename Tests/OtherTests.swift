@@ -18,8 +18,6 @@ func fullMockRenderPass() {
       drawnTexts.append(text)
     }
 
-    static func drawBorder(around rect: Rect, at pos: (x: UInt, y: UInt), width: UInt, color: Color) {}
-
     static func reset() {
       drawnQuads.removeAll()
       drawnTexts.removeAll()
@@ -75,8 +73,6 @@ func fullMockRenderPass() {
       drawnTexts.append(text)
     }
 
-    static func drawBorder(around rect: Rect, at pos: (x: UInt, y: UInt), width: UInt, color: Color) {}
-
     static func reset() {
       drawnTexts.removeAll()
     }
@@ -101,7 +97,7 @@ func fullMockRenderPass() {
   test.walk(with: &positioner)
 
   ColorTestRenderer.reset()
-  var renderWalker = RenderWalker(positions: positioner.positions, ColorTestRenderer.self, logLevel: .trace)
+  var renderWalker = RenderWalker(positions: positioner.positions, ColorTestRenderer.self, logLevel: .error)
   test.walk(with: &renderWalker)
 
   // Verify we captured 3 texts

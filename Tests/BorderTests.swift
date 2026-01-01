@@ -10,7 +10,7 @@ struct BorderTests {
   func rectBorderProperties() {
     let rectWithoutBorder = Rectangle(width: 10, height: 15, color: .blue, scale: 2)
     #expect(rectWithoutBorder.borderWidth == 0)
-    #expect(rectWithoutBorder.borderColor == nil)
+    #expect(rectWithoutBorder.borderColor == Color(r: 0, g: 0, b: 0, a: 0))
     #expect(rectWithoutBorder.width == 10)
     #expect(rectWithoutBorder.height == 15)
     #expect(rectWithoutBorder.color == .blue)
@@ -49,7 +49,7 @@ struct BorderTests {
     // Test that default constructor creates no border
     let rectDefault = Rectangle(width: 5, height: 8, color: .cyan, scale: 2)
     #expect(rectDefault.borderWidth == 0)
-    #expect(rectDefault.borderColor == nil)
+    #expect(rectDefault.borderColor == Color(r: 0, g: 0, b: 0, a: 0))
   }
 
   @Test("Border sizing doesn't affect rectangle size")
@@ -231,12 +231,6 @@ enum BorderCaptureRenderer: Renderer {
 
   static func drawText(_ text: Text) {
   }
-
-  static func drawBorder(around rect: Rect, at pos: (x: UInt, y: UInt), width: UInt, color: Color) {
-    // No-op - borders are now handled in the shader via the main quad
-  }
-
-
 
   static func reset() {
     capturedQuads.removeAll()

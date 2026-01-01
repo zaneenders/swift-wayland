@@ -240,10 +240,6 @@ struct QuadCaptureRenderer: Renderer {
 
   static func drawText(_ text: Text) {}
 
-  static func drawBorder(around rect: Rect, at pos: (x: UInt, y: UInt), width: UInt, color: Color) {
-    // Border implementation for testing - not used in these tests
-  }
-
   static func reset() {
     capturedQuads.removeAll()
   }

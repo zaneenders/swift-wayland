@@ -10,7 +10,7 @@ struct Screen: Block {
           .forground(.white)
           .background(.random)
       }
-      Boarders()
+      Borders()
     }
   }
 }
