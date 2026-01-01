@@ -20,7 +20,7 @@ struct RenderWalker: Walker {
   mutating func before(_ block: some Block) {
     if let pos = positions[currentId] {
       if let word = block as? Word {
-        drawer.drawText(Text(word.label, at: pos, scale: word.scale))
+        drawer.drawText(word.draw(at: (pos.y, pos.x)))
       } else if let rect = block as? Rect {
         drawer.drawQuad(Quad(pos: pos, rect))
       }

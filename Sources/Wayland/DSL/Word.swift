@@ -38,7 +38,11 @@ public struct Word: Block {
   }
 
   func draw(at: (y: UInt, x: UInt)) -> Text {
-    return Text(label, at: (at.x, at.y), scale: self.scale, forground: self.forground, background: self.background)
+    return Text(
+      label, at: (x: at.x, y: at.y),
+      scale: self.scale,
+      forground: self.forground,
+      background: self.background)
   }
 }
 
