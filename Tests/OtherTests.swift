@@ -75,6 +75,8 @@ func fullMockRenderPass() {
       drawnTexts.append(text)
     }
 
+    static func drawBorder(around rect: Rect, at pos: (x: UInt, y: UInt), width: UInt, color: Color) {}
+
     static func reset() {
       drawnTexts.removeAll()
     }
