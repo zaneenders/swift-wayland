@@ -240,6 +240,10 @@ struct QuadCaptureRenderer: Renderer {
 
   static func drawText(_ text: Text) {}
 
+  static func drawBorder(around rect: Rect, at pos: (x: UInt, y: UInt), width: UInt, color: Color) {
+    // Border implementation for testing - not used in these tests
+  }
+
   static func reset() {
     capturedQuads.removeAll()
   }
@@ -257,7 +261,7 @@ func quadScaling() {
 
   // Reset renderer and capture quads
   QuadCaptureRenderer.reset()
-  var renderWalker = RenderWalker(positions: positioner.positions, QuadCaptureRenderer.self, logLevel: .trace)
+  var renderWalker = RenderWalker(positions: positioner.positions, QuadCaptureRenderer.self, logLevel: .error)
   test.walk(with: &renderWalker)
 
   // Verify we captured 3 quads

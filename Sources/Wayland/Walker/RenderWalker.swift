@@ -25,9 +25,7 @@ struct RenderWalker: Walker {
         drawer.drawQuad(Quad(pos: pos, rect))
 
         if rect.borderWidth > 0, let borderColor = rect.borderColor {
-          if let waylandDrawer = drawer as? Wayland.Type {
-            waylandDrawer.drawBorder(around: rect, at: pos, width: rect.borderWidth, color: borderColor)
-          }
+          drawer.drawBorder(around: rect, at: pos, width: rect.borderWidth, color: borderColor)
         }
       }
     } else {

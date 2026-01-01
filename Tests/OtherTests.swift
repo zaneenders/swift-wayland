@@ -18,6 +18,8 @@ func fullMockRenderPass() {
       drawnTexts.append(text)
     }
 
+    static func drawBorder(around rect: Rect, at pos: (x: UInt, y: UInt), width: UInt, color: Color) {}
+
     static func reset() {
       drawnQuads.removeAll()
       drawnTexts.removeAll()
@@ -39,7 +41,7 @@ func fullMockRenderPass() {
   #expect(positioner.positions.count == sizer.sizes.count)
 
   TestRenderer.reset()
-  var renderWalker = RenderWalker(positions: positioner.positions, TestRenderer.self, logLevel: .trace)
+  var renderWalker = RenderWalker(positions: positioner.positions, TestRenderer.self, logLevel: .error)
   test.walk(with: &renderWalker)
 
   #expect(!TestRenderer.drawnQuads.isEmpty)

@@ -6,10 +6,10 @@ struct Quad: BitwiseCopyable {
   var color: Color
 
   var height: UInt {
-    UInt(abs(dst_p0.0 - dst_p1.0))
+    UInt(abs(dst_p0.1 - dst_p1.1))
   }
   var width: UInt {
-    UInt(abs(dst_p0.1 - dst_p1.1))
+    UInt(abs(dst_p0.0 - dst_p1.0))
   }
 
   init(pos: (x: UInt, y: UInt), _ rect: Rect) {
