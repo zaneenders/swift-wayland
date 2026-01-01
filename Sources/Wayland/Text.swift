@@ -1,11 +1,11 @@
-public struct Text {
+struct Text {
   public let text: String
   public let pos: (x: UInt, y: UInt)
   public let scale: UInt
   public var forground: Color
   public var background: Color
 
-  public init(
+  init(
     _ text: String,
     at pos: (x: UInt, y: UInt),
     scale: UInt,

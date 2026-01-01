@@ -72,6 +72,17 @@ wayland-scanner client-header < protocols/wlr-layer-shell-unstable-v1.xml > Sour
 wayland-scanner private-code < protocols/wlr-layer-shell-unstable-v1.xml > Sources/CXDGShell/layer-shell-protocol.c
 ```
 
+## Testing
+
+### Code Coverage Report
+
+Generate detailed coverage report:
+
+```console
+swift test --enable-code-coverage
+llvm-cov report .build/debug/swift-waylandPackageTests.xctest --instr-profile=.build/debug/codecov/default.profdata --ignore-filename-regex='(.build|Tests)[/\\].*'
+```
+
 ## Feature Direction
 
 Currently I am using `wayland-client.h` to get this up and running but ideally 

@@ -21,12 +21,9 @@ func runToolbar() async {
   event_loop: for await ev in Wayland.events() {
     switch ev {
     case .frame(let winH, let winW):
-      var renderer = Renderer(Wayland.self)
-      Wayland.preDraw()
       let today = formatter.string(from: Date())
-      let view = SystemClock(time: today)
-        .draw(&renderer)
-      Wayland.postDraw()
+      let block = SystemClock(time: today)
+      Wayland.draw(block)
     }
   }
 
