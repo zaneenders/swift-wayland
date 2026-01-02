@@ -1,24 +1,17 @@
-public typealias Rect = Rectangle
+public typealias Rect = Recttangle
+/// A zero widht and height recttangle for which modifiers can be applied to make other shapes.
+public struct Recttangle: Block {
+  public var layer: some Block {}
+  public init() {}
+}
 
-public struct Rectangle: Block {
-  let color: Color
-  let height: UInt
-  let width: UInt
-  var scale: UInt = UInt(Wayland.scale)
-  let borderWidth: UInt
-  let borderColor: Color
-  let cornerRadius: UInt
-
-  public init(
-    width: UInt, height: UInt, color: Color, scale: UInt, borderWidth: UInt = 0,
-    borderColor: Color = Color(r: 0, g: 0, b: 0, a: 0), cornerRadius: UInt = 0
-  ) {
-    self.width = width
-    self.height = height
-    self.color = color
-    self.scale = scale
-    self.borderWidth = borderWidth
-    self.borderColor = borderColor
-    self.cornerRadius = cornerRadius
-  }
+extension Block {
+  public func width(_ width: UInt) -> some Block { self }
+  public func height(_ width: UInt) -> some Block { self }
+  public func forground(_ color: Color) -> some Block { self }
+  public func background(_ color: Color) -> some Block { self }
+  public func border(color: Color) -> some Block { self }
+  public func border(width: UInt) -> some Block { self }
+  public func border(radius: UInt) -> some Block { self }
+  public func scale(_ scale: UInt) -> some Block { self }
 }

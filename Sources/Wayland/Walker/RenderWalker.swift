@@ -21,7 +21,7 @@ struct RenderWalker: Walker {
     if let pos = positions[currentId] {
       if let word = block as? Text {
         drawer.drawText(word.draw(at: (pos.y, pos.x)))
-      } else if let rect = block as? Rect {
+      } else if let rect = block as? RenderableRect {
         drawer.drawQuad(Quad(pos: pos, rect))
       }
     } else {

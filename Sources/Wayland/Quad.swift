@@ -15,7 +15,7 @@ struct Quad: BitwiseCopyable {
     UInt(abs(dst_p0.0 - dst_p1.0))
   }
 
-  init(pos: (x: UInt, y: UInt), _ rect: Rect) {
+  init(pos: (x: UInt, y: UInt), _ rect: RenderableRect) {
     let scaledWidth = rect.width * rect.scale
     let scaledHeight = rect.height * rect.scale
     self.init(

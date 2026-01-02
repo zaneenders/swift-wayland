@@ -43,7 +43,7 @@ struct SizeWalker: Walker {
     names[currentId] = "\(type(of: block))"
     parents[currentId] = parentId
     connect(parent: parentId, current: currentId)
-    if let rect = block as? Rect {
+    if let rect = block as? RenderableRect {
       let width = rect.width * rect.scale
       let height = rect.height * rect.scale
       sizes[currentId] = .known(Container(height: height, width: width, orientation: currentOrentation))
