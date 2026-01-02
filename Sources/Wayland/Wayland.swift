@@ -7,7 +7,7 @@ import Foundation
 
 @MainActor
 protocol Renderer {
-  static func drawText(_ text: Text)
+  static func drawText(_ text: RenderableText)
   static func drawQuad(_ quad: Quad)
 }
 
@@ -449,7 +449,7 @@ public enum Wayland: Renderer {
     glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, 1)
   }
 
-  static func drawText(_ text: Text) {
+  static func drawText(_ text: RenderableText) {
     var penX = text.pos.x
     let penY = text.pos.y
 

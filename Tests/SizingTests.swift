@@ -136,7 +136,7 @@ struct RectTestBasic: Block {
 
 struct RectTestMultiple: Block {
   var layer: some Block {
-    Group(.horizontal) {
+    Direction(.horizontal) {
       Rectangle(width: 50, height: 30, color: .red, scale: 1)
       Rectangle(width: 40, height: 60, color: .blue, scale: 1)
       Rectangle(width: 30, height: 40, color: .green, scale: 1)
@@ -146,9 +146,9 @@ struct RectTestMultiple: Block {
 
 struct RectTestNested: Block {
   var layer: some Block {
-    Group(.vertical) {
+    Direction(.vertical) {
       Rectangle(width: 100, height: 20, color: .red, scale: 1)
-      Group(.horizontal) {
+      Direction(.horizontal) {
         Rectangle(width: 30, height: 30, color: .blue, scale: 1)
         Rectangle(width: 30, height: 30, color: .green, scale: 1)
       }
@@ -159,7 +159,7 @@ struct RectTestNested: Block {
 
 struct RectTestScaled: Block {
   var layer: some Block {
-    Group(.horizontal) {
+    Direction(.horizontal) {
       Rectangle(width: 10, height: 10, color: .red, scale: 1)
       Rectangle(width: 10, height: 10, color: .blue, scale: 2)
       Rectangle(width: 10, height: 10, color: .green, scale: 3)
@@ -169,49 +169,49 @@ struct RectTestScaled: Block {
 
 struct SpacingTestEmptyGroup: Block {
   var layer: some Block {
-    Group(.horizontal) {}
+    Direction(.horizontal) {}
   }
 }
 
 struct SpacingTestSingleElement: Block {
   var layer: some Block {
-    Group(.horizontal) {
-      Word("Single")
+    Direction(.horizontal) {
+      Text("Single")
     }
   }
 }
 
 struct SpacingTestWordRectMixed: Block {
   var layer: some Block {
-    Group(.horizontal) {
-      Word("Hello").scale(1)
+    Direction(.horizontal) {
+      Text("Hello").scale(1)
       Rectangle(width: 20, height: 20, color: .red, scale: 1)
-      Word("World").scale(1)
+      Text("World").scale(1)
     }
   }
 }
 
 struct SpacingTestComplexNesting: Block {
   var layer: some Block {
-    Group(.vertical) {
-      Word("Top")
-      Group(.horizontal) {
+    Direction(.vertical) {
+      Text("Top")
+      Direction(.horizontal) {
         Rectangle(width: 15, height: 15, color: .red, scale: 1)
-        Word("Middle")
+        Text("Middle")
         Rectangle(width: 15, height: 15, color: .blue, scale: 1)
       }
-      Group(.horizontal) {
+      Direction(.horizontal) {
         Rectangle(width: 10, height: 10, color: .green, scale: 1)
         Rectangle(width: 10, height: 10, color: .yellow, scale: 1)
       }
-      Word("Bottom")
+      Text("Bottom")
     }
   }
 }
 
 struct SpacingTestLargeGap: Block {
   var layer: some Block {
-    Group(.horizontal) {
+    Direction(.horizontal) {
       Rectangle(width: 5, height: 5, color: .red, scale: 1)
       Rectangle(width: 100, height: 100, color: .green, scale: 1)
       Rectangle(width: 5, height: 5, color: .blue, scale: 1)
@@ -223,7 +223,7 @@ struct SpacingTestLargeGap: Block {
 
 struct QuadTestScaling: Block {
   var layer: some Block {
-    Group(.horizontal) {
+    Direction(.horizontal) {
       Rectangle(width: 10, height: 10, color: .red, scale: 1)
       Rectangle(width: 10, height: 10, color: .blue, scale: 2)
       Rectangle(width: 10, height: 10, color: .green, scale: 3)
@@ -238,7 +238,7 @@ struct QuadCaptureRenderer: Renderer {
     capturedQuads.append(quad)
   }
 
-  static func drawText(_ text: Text) {}
+  static func drawText(_ text: RenderableText) {}
 
   static func reset() {
     capturedQuads.removeAll()

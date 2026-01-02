@@ -1,4 +1,4 @@
-public struct Group<B: Block>: Block, OrientationBlock {
+public struct Direction<B: Block>: Block, OrientationBlock {
   let orientation: Orientation
   let wrapped: B
 

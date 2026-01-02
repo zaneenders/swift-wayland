@@ -100,7 +100,7 @@ enum OptimizedBorderCaptureRenderer: Renderer {
     capturedQuads.append(quad)
   }
 
-  static func drawText(_ text: Text) {
+  static func drawText(_ text: RenderableText) {
   }
 
   static func reset() {
@@ -121,7 +121,7 @@ enum AntiAliasingCaptureRenderer: Renderer {
     }
   }
 
-  static func drawText(_ text: Text) {
+  static func drawText(_ text: RenderableText) {
   }
 
   static func reset() {
@@ -129,4 +129,3 @@ enum AntiAliasingCaptureRenderer: Renderer {
     smoothTransitionsDetected = false
   }
 }
-

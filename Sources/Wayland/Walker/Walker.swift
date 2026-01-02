@@ -63,7 +63,7 @@ extension Block {
         walker.currentId = walker.parentId
         walker.parentId = parent
       }
-    } else if (self as? Rect != nil) || (self as? Word != nil) {
+    } else if (self as? Rect != nil) || (self as? Text != nil) {
       // Leaf Nodes
     } else {  // Composed
       self.layer.walk(with: &walker, orientation)

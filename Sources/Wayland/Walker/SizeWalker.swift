@@ -47,7 +47,7 @@ struct SizeWalker: Walker {
       let width = rect.width * rect.scale
       let height = rect.height * rect.scale
       sizes[currentId] = .known(Container(height: height, width: width, orientation: currentOrentation))
-    } else if let text = block as? Word {
+    } else if let text = block as? Text {
       guard !text.label.contains("\n") else {
         fatalError("New lines not supported yet")
       }
