@@ -59,8 +59,8 @@ struct SizeWalker: Walker {
       } else {
         sizes[currentId] = .unknown(currentOrentation)
       }
-    } else if let o = block as? OrientationBlock {
-      currentOrentation = o.orientation
+    } else if let group = block as? DirectionGroup {
+      currentOrentation = group.orientation
       sizes[currentId] = .unknown(currentOrentation)
     } else {
       // User defined composed
