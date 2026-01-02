@@ -1,3 +1,4 @@
+/// Specifiies the direction in which to layout the child elements.
 public struct Direction<B: Block>: Block, OrientationBlock {
   let orientation: Orientation
   let wrapped: B
