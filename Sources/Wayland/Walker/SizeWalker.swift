@@ -47,7 +47,7 @@ struct SizeWalker: Walker {
       let width = rect.width * rect.scale
       let height = rect.height * rect.scale
       sizes[currentId] = .known(Container(height: height, width: width, orientation: currentOrentation))
-    } else if let text = block as? Word {
+    } else if let text = block as? Text {
       guard !text.label.contains("\n") else {
         fatalError("New lines not supported yet")
       }
@@ -59,8 +59,8 @@ struct SizeWalker: Walker {
       } else {
         sizes[currentId] = .unknown(currentOrentation)
       }
-    } else if let o = block as? OrientationBlock {
-      currentOrentation = o.orientation
+    } else if let group = block as? DirectionGroup {
+      currentOrentation = group.orientation
       sizes[currentId] = .unknown(currentOrentation)
     } else {
       // User defined composed

@@ -1,4 +1,4 @@
-struct Text {
+struct RenderableText {
   public let text: String
   public let pos: (x: UInt, y: UInt)
   public let scale: UInt

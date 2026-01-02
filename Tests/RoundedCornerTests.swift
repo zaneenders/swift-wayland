@@ -138,7 +138,7 @@ struct RoundedCornerTests {
 // Test helper structures
 struct MultipleCornerRadiusTest: Block {
   var layer: some Block {
-    Group(.horizontal) {
+    Direction(.horizontal) {
       Rect(width: 20, height: 15, color: .cyan, scale: 2, borderWidth: 2, borderColor: .red, cornerRadius: 0)
       Rect(width: 20, height: 15, color: .magenta, scale: 2, borderWidth: 2, borderColor: .red, cornerRadius: 5)
       Rect(width: 20, height: 15, color: .yellow, scale: 2, borderWidth: 2, borderColor: .red, cornerRadius: 10)
@@ -149,11 +149,10 @@ struct MultipleCornerRadiusTest: Block {
 
 struct RoundedCornerBorderTest: Block {
   var layer: some Block {
-    Group(.horizontal) {
+    Direction(.horizontal) {
       Rect(width: 25, height: 20, color: .white, scale: 2, borderWidth: 2, borderColor: .red, cornerRadius: 8)
       Rect(width: 25, height: 20, color: .cyan, scale: 2, borderWidth: 5, borderColor: .green, cornerRadius: 12)
       Rect(width: 25, height: 20, color: .gray, scale: 2, borderWidth: 8, borderColor: .blue, cornerRadius: 15)
     }
   }
 }
-

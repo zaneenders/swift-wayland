@@ -1,4 +1,4 @@
-public struct Word: Block {
+public struct Text: Block {
   let label: String
   var v: VLayout = .center
   var h: HLayout = .center
@@ -37,8 +37,8 @@ public struct Word: Block {
     Wayland.glyphH * self.scale
   }
 
-  func draw(at: (y: UInt, x: UInt)) -> Text {
-    return Text(
+  func draw(at: (y: UInt, x: UInt)) -> RenderableText {
+    return RenderableText(
       label, at: (x: at.x, y: at.y),
       scale: self.scale,
       forground: self.forground,

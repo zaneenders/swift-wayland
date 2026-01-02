@@ -184,7 +184,7 @@ struct BorderTests {
 
 struct BorderSizingTest: Block {
   var layer: some Block {
-    Group(.horizontal) {
+    Direction(.horizontal) {
       Rectangle(width: 20, height: 15, color: .blue, scale: 2)
       Rectangle(width: 20, height: 15, color: .green, scale: 2, borderWidth: 10, borderColor: .red)
     }
@@ -199,7 +199,7 @@ struct BorderPositionTest: Block {
 
 struct NoBorderTest: Block {
   var layer: some Block {
-    Group(.horizontal) {
+    Direction(.horizontal) {
       Rectangle(width: 10, height: 8, color: .blue, scale: 1)
       Rectangle(width: 12, height: 10, color: .yellow, scale: 2)
     }
@@ -214,7 +214,7 @@ struct ZeroBorderWidthTest: Block {
 
 struct MultipleBorderColorsTest: Block {
   var layer: some Block {
-    Group(.horizontal) {
+    Direction(.horizontal) {
       Rectangle(width: 15, height: 10, color: .cyan, scale: 2, borderWidth: 2, borderColor: .red)
       Rectangle(width: 15, height: 10, color: .magenta, scale: 2, borderWidth: 4, borderColor: .blue)
       Rectangle(width: 15, height: 10, color: .yellow, scale: 2)  // No border
@@ -229,7 +229,7 @@ enum BorderCaptureRenderer: Renderer {
     capturedQuads.append(quad)
   }
 
-  static func drawText(_ text: Text) {
+  static func drawText(_ text: RenderableText) {
   }
 
   static func reset() {

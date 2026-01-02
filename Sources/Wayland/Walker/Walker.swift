@@ -50,8 +50,8 @@ extension Block {
 
   func _walk(with walker: inout some Walker, _ orientation: Orientation) {
     walker.before(self)
-    if let o = self as? OrientationBlock {
-      self.layer.walk(with: &walker, o.orientation)
+    if let group = self as? DirectionGroup {
+      self.layer.walk(with: &walker, group.orientation)
     } else if let group = self as? BlockGroup {
       for (i, child) in group.children.enumerated() {
         let parent = walker.parentId
@@ -63,7 +63,7 @@ extension Block {
         walker.currentId = walker.parentId
         walker.parentId = parent
       }
-    } else if (self as? Rect != nil) || (self as? Word != nil) {
+    } else if (self as? Rect != nil) || (self as? Text != nil) {
       // Leaf Nodes
     } else {  // Composed
       self.layer.walk(with: &walker, orientation)

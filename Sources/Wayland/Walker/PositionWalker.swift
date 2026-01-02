@@ -17,14 +17,14 @@ struct PositionWalker: Walker {
     // Store the current position for this element
     positions[currentId] = (currentX, currentY)
     // For orientation blocks, push a new layout context
-    if let orientationBlock = block as? OrientationBlock {
-      layoutStack.append(LayoutContext(x: currentX, y: currentY, orientation: orientationBlock.orientation))
+    if let group = block as? DirectionGroup {
+      layoutStack.append(LayoutContext(x: currentX, y: currentY, orientation: group.orientation))
     }
   }
 
   mutating func after(_ block: some Block) {
     // For orientation blocks, pop the layout context and update parent position
-    if block is OrientationBlock {
+    if block is DirectionGroup {
       if let context = layoutStack.popLast() {
         let size = sizes[currentId]!
         switch context.orientation {

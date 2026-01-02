@@ -8,13 +8,13 @@ import Testing
 func fullMockRenderPass() {
   enum TestRenderer: Renderer {
     static var drawnQuads: [Quad] = []
-    static var drawnTexts: [Text] = []
+    static var drawnTexts: [RenderableText] = []
 
     static func drawQuad(_ quad: Quad) {
       drawnQuads.append(quad)
     }
 
-    static func drawText(_ text: Text) {
+    static func drawText(_ text: RenderableText) {
       drawnTexts.append(text)
     }
 
@@ -63,13 +63,13 @@ func fullMockRenderPass() {
 @MainActor
 @Test func verifyBrightBackgroundColors() {
   enum ColorTestRenderer: Renderer {
-    static var drawnTexts: [Text] = []
+    static var drawnTexts: [RenderableText] = []
 
     static func drawQuad(_ quad: Quad) {
       // Ignore quads for this test
     }
 
-    static func drawText(_ text: Text) {
+    static func drawText(_ text: RenderableText) {
       drawnTexts.append(text)
     }
 
@@ -81,10 +81,10 @@ func fullMockRenderPass() {
   // Create a simple layout with colored text
   struct ColorTestLayout: Block {
     var layer: some Block {
-      Group(.vertical) {
-        Word("Red Background").background(.red)
-        Word("Bright Yellow Background").background(.yellow)
-        Word("Cyan Background").background(.cyan)
+      Direction(.vertical) {
+        Text("Red Background").background(.red)
+        Text("Bright Yellow Background").background(.yellow)
+        Text("Cyan Background").background(.cyan)
       }
     }
   }

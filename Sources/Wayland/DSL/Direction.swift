@@ -1,4 +1,5 @@
-public struct Group<B: Block>: Block, OrientationBlock {
+/// Specifiies the direction in which to layout the child elements.
+public struct Direction<B: Block>: Block, DirectionGroup {
   let orientation: Orientation
   let wrapped: B
 
@@ -18,6 +19,6 @@ public enum Orientation {
 }
 
 @MainActor
-protocol OrientationBlock {
+protocol DirectionGroup {
   var orientation: Orientation { get }
 }

@@ -89,7 +89,7 @@ struct PositionTests {
 struct PositionTestSimpleHorizontal: Block {
   let scale: UInt = 5
   var layer: some Block {
-    Group(.horizontal) {
+    Direction(.horizontal) {
       Rectangle(width: 10, height: 10, color: .red, scale: scale)
       Rectangle(width: 10, height: 10, color: .blue, scale: scale)
       Rectangle(width: 10, height: 10, color: .green, scale: scale)
@@ -99,7 +99,7 @@ struct PositionTestSimpleHorizontal: Block {
 
 struct PositionTestSimpleVertical: Block {
   var layer: some Block {
-    Group(.vertical) {
+    Direction(.vertical) {
       Rectangle(width: 10, height: 10, color: .red, scale: 1)
       Rectangle(width: 10, height: 10, color: .blue, scale: 1)
       Rectangle(width: 10, height: 10, color: .green, scale: 1)
@@ -121,10 +121,10 @@ struct EdgeCaseVeryLarge: Block {
 
 struct EdgeCaseDeepNesting: Block {
   var layer: some Block {
-    Group(.horizontal) {
-      Group(.vertical) {
-        Group(.horizontal) {
-          Group(.vertical) {
+    Direction(.horizontal) {
+      Direction(.vertical) {
+        Direction(.horizontal) {
+          Direction(.vertical) {
             Rectangle(width: 10, height: 10, color: .red, scale: 1)
           }
         }
