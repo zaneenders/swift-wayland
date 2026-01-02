@@ -248,6 +248,24 @@ public enum Wayland: Renderer {
       5, 4, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_color))
     glVertexAttribDivisor(5, 1)
 
+    let off_border_color = off_color + MemoryLayout<Color>.stride
+    glEnableVertexAttribArray(6)
+    unsafe glVertexAttribPointer(
+      6, 4, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_border_color))
+    glVertexAttribDivisor(6, 1)
+
+    let off_border_width = off_border_color + MemoryLayout<Color>.stride
+    glEnableVertexAttribArray(7)
+    unsafe glVertexAttribPointer(
+      7, 1, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_border_width))
+    glVertexAttribDivisor(7, 1)
+
+    let off_corner_radius = off_border_width + MemoryLayout<Float>.stride
+    glEnableVertexAttribArray(8)
+    unsafe glVertexAttribPointer(
+      8, 1, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_corner_radius))
+    glVertexAttribDivisor(8, 1)
+
     unsafe glGenTextures(1, &whiteTex)
     glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
     let px: [UInt8] = [255, 255, 255, 255]

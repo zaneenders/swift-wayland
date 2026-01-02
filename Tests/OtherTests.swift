@@ -39,7 +39,7 @@ func fullMockRenderPass() {
   #expect(positioner.positions.count == sizer.sizes.count)
 
   TestRenderer.reset()
-  var renderWalker = RenderWalker(positions: positioner.positions, TestRenderer.self, logLevel: .trace)
+  var renderWalker = RenderWalker(positions: positioner.positions, TestRenderer.self, logLevel: .error)
   test.walk(with: &renderWalker)
 
   #expect(!TestRenderer.drawnQuads.isEmpty)
@@ -97,7 +97,7 @@ func fullMockRenderPass() {
   test.walk(with: &positioner)
 
   ColorTestRenderer.reset()
-  var renderWalker = RenderWalker(positions: positioner.positions, ColorTestRenderer.self, logLevel: .trace)
+  var renderWalker = RenderWalker(positions: positioner.positions, ColorTestRenderer.self, logLevel: .error)
   test.walk(with: &renderWalker)
 
   // Verify we captured 3 texts

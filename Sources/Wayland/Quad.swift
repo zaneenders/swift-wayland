@@ -4,29 +4,40 @@ struct Quad: BitwiseCopyable {
   var tex_tl: (Float, Float)
   var tex_br: (Float, Float)
   var color: Color
+  var borderColor: Color
+  var borderWidth: Float
+  var cornerRadius: Float
 
   var height: UInt {
-    UInt(abs(dst_p0.0 - dst_p1.0))
+    UInt(abs(dst_p0.1 - dst_p1.1))
   }
   var width: UInt {
-    UInt(abs(dst_p0.1 - dst_p1.1))
+    UInt(abs(dst_p0.0 - dst_p1.0))
   }
 
   init(pos: (x: UInt, y: UInt), _ rect: Rect) {
     let scaledWidth = rect.width * rect.scale
     let scaledHeight = rect.height * rect.scale
-    let quad = Quad(
+    self.init(
       dst_p0: (pos.x, pos.y),
       dst_p1: (pos.x + scaledWidth, pos.y + scaledHeight),
-      tex_tl: (0, 0), tex_br: (1, 1), color: rect.color)
-    self = quad
+      tex_tl: (0, 0),
+      tex_br: (1, 1),
+      color: rect.color,
+      borderColor: rect.borderColor,
+      borderWidth: Float(rect.borderWidth),
+      cornerRadius: Float(rect.cornerRadius)
+    )
   }
 
   init(
     dst_p0: (UInt, UInt), dst_p1: (UInt, UInt),
     tex_tl: (Float, Float) = (0, 0),
     tex_br: (Float, Float) = (1, 1),
-    color: Color
+    color: Color,
+    borderColor: Color = Color(r: 0, g: 0, b: 0, a: 0),
+    borderWidth: Float = 0.0,
+    cornerRadius: Float = 0.0
   ) {
     // NOTE: Converting to Float right here looks to be about a 2x slow down.
     // Long term I think it will be better to do this allocation farther up
@@ -37,5 +48,8 @@ struct Quad: BitwiseCopyable {
     self.tex_tl = tex_tl
     self.tex_br = tex_br
     self.color = color
+    self.borderColor = borderColor
+    self.borderWidth = borderWidth
+    self.cornerRadius = cornerRadius
   }
 }
