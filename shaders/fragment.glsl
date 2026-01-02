@@ -7,6 +7,7 @@ in vec2 v_uv;
 in vec4 v_color;
 in vec4 v_border_color;
 in float v_border_width;
+in float v_corner_radius;
 in vec2 v_dst_size;
 in vec2 v_position;        // Pre-calculated position from vertex shader
 
@@ -22,36 +23,59 @@ void main() {
   // 2. smoothstep for branchless border detection (eliminates if/else branching)
 
   if (v_border_width > 0.0 && v_border_color.a > 0.0) {
-    // Optimization 1: Use pre-calculated v_position from vertex shader
-    // Original: vec2 pixelPos = v_uv * v_dst_size;  // 2 multiplications per fragment
-    // Optimized: use v_position directly             // 0 multiplications per fragment
-
-    // === CONSERVATIVE OPTIMIZATION: Same logic as original, just faster ===
-    // Keep the exact same border detection logic that worked correctly
-    // The only optimization is eliminating the per-pixel position calculation
-
-    // Use the pre-calculated v_position instead of calculating v_uv * v_dst_size
-    // This maintains visual correctness while improving performance
-
+    // === ROUNDED CORNER BORDER DETECTION ===
+    
     // Check if fragment is within border width of any edge
-    bool isBorder = 
+    bool isEdgeBorder = 
       v_position.x < v_border_width ||           // Left border
       v_position.x > v_dst_size.x - v_border_width ||  // Right border
       v_position.y < v_border_width ||           // Top border
       v_position.y > v_dst_size.y - v_border_width;    // Bottom border
+
+    // Calculate distance to nearest corner for rounded corners
+    float cornerDist = 0.0;
+    if (v_corner_radius > 0.0) {
+      // Find which corner we're near
+      vec2 cornerCenter;
+      if (v_position.x < v_corner_radius && v_position.y < v_corner_radius) {
+        // Top-left corner
+        cornerCenter = vec2(v_corner_radius, v_corner_radius);
+      } else if (v_position.x > v_dst_size.x - v_corner_radius && v_position.y < v_corner_radius) {
+        // Top-right corner
+        cornerCenter = vec2(v_dst_size.x - v_corner_radius, v_corner_radius);
+      } else if (v_position.x < v_corner_radius && v_position.y > v_dst_size.y - v_corner_radius) {
+        // Bottom-left corner
+        cornerCenter = vec2(v_corner_radius, v_dst_size.y - v_corner_radius);
+      } else if (v_position.x > v_dst_size.x - v_corner_radius && v_position.y > v_dst_size.y - v_corner_radius) {
+        // Bottom-right corner
+        cornerCenter = vec2(v_dst_size.x - v_corner_radius, v_dst_size.y - v_corner_radius);
+      } else {
+        cornerCenter = v_position; // Not near a corner
+      }
+      
+      cornerDist = distance(v_position, cornerCenter);
+    }
+
+    // Determine if this is a border pixel
+    bool isBorder = isEdgeBorder;
+    if (v_corner_radius > 0.0) {
+      // Check if we're outside the rounded corner radius
+      bool outsideCorner = cornerDist > v_corner_radius;
+      bool insideCornerBorder = cornerDist > (v_corner_radius - v_border_width) && cornerDist <= v_corner_radius;
+      
+      isBorder = isBorder || outsideCorner || insideCornerBorder;
+      
+      // If outside corner completely, discard fragment
+      if (outsideCorner && !insideCornerBorder) {
+        discard;
+      }
+    }
 
     if (isBorder) {
       fragColor = v_border_color;
     } else {
       fragColor = baseColor;
     }
-
-    // === PERFORMANCE BENEFITS ===
-    // Original: ~15 operations + branching per fragment
-    // Optimized: ~10 operations + branchless per fragment  
-    // - 33% performance improvement (conservative estimate)
-    // - No branching (better GPU pipeline utilization)
-    // - Hardware-accelerated smoothstep operations
   } else {
     fragColor = baseColor;
   }

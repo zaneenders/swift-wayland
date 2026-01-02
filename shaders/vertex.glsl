@@ -11,6 +11,7 @@ layout(location=4) in vec2 i_src_p1;  // UV-space bottom-right - texture coordin
 layout(location=5) in vec4 i_color;  // Main rectangle color
 layout(location=6) in vec4 i_border_color;  // Border color (rgba) - optimized: could be removed later
 layout(location=7) in float i_border_width;  // Border width in pixels - optimized: could be removed later
+layout(location=8) in float i_corner_radius;  // Corner radius in pixels
 
 uniform vec2 uRes;  // Screen resolution (width, height) for coordinate conversion
 
@@ -20,6 +21,7 @@ out vec2 v_uv;              // Texture coordinates interpolated across the quad
 out vec4 v_color;           // Color interpolated across the quad (can be flat since we don't interpolate)
 out vec4 v_border_color;    // Border color (flat - same for all vertices)
 out float v_border_width;   // Border width (flat - same for all vertices)
+out float v_corner_radius;  // Corner radius (flat - same for all vertices)
 out vec2 v_dst_size;        // Rectangle dimensions in pixels (flat - same for all vertices)
 out vec2 v_position;        // NEW: Actual pixel position within this rectangle
 
@@ -60,6 +62,7 @@ void main() {
     v_color = i_color;
     v_border_color = i_border_color;
     v_border_width = i_border_width;
+    v_corner_radius = i_corner_radius;
 
     // Rectangle dimensions (flat - same for all vertices)
     v_dst_size = i_dst_p1 - i_dst_p0;
