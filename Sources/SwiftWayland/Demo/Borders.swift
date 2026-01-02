@@ -4,7 +4,7 @@ struct Borders: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Direction(.vertical) {
-        Text("Sharp").scale(2).forground(.white)
+        Text("Sharp")
         Rect()
           .width(40)
           .height(30)
@@ -15,7 +15,7 @@ struct Borders: Block {
           .border(radius: 0)
       }
       Direction(.vertical) {
-        Text("Rounded").scale(2).forground(.white)
+        Text("Rounded")
         Rect()
           .width(40)
           .height(30)
@@ -26,7 +26,7 @@ struct Borders: Block {
           .border(radius: 8)
       }
       Direction(.vertical) {
-        Text("Smooth").scale(2).forground(.white)
+        Text("Smooth")
         Rect()
           .width(40)
           .height(30)

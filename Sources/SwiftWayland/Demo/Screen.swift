@@ -4,10 +4,12 @@ struct Screen: Block {
   let ips: [String]
   var layer: some Block {
     Direction(.vertical) {  // TODO: This group should be implict
+      Text("Zane was here")
+        .foreground(.cyan)
       Layout()
       for ip in ips {
         Text(ip).scale(4)
-          .forground(.white)
+          .foreground(.black)
           .background(.random)
       }
       Borders()

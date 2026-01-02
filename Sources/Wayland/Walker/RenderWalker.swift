@@ -23,6 +23,16 @@ struct RenderWalker: Walker {
         drawer.drawText(word.draw(at: (pos.y, pos.x)))
       } else if let rect = block as? RenderableRect {
         drawer.drawQuad(Quad(pos: pos, rect))
+      } else if block is Recttangle {
+        // Create a default RenderableRect for Rect instances
+        // This should be updated when rectangle modifiers are properly implemented
+        let defaultRect = RenderableRect(
+          width: 100,
+          height: 50,
+          color: Color(r: 255, g: 255, b: 255, a: 255),
+          scale: 1
+        )
+        drawer.drawQuad(Quad(pos: pos, defaultRect))
       }
     } else {
       logger.warning("No position for \(currentId)")

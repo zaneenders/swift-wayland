@@ -1,22 +1,4 @@
-enum Size: Equatable, CustomStringConvertible {
-  case unknown(Orientation)
-  case known(Container)
-
-  var description: String {
-    switch self {
-    case .unknown(let o):
-      return "unknown: \(o)"
-    case .known(let container):
-      return "height: \(container.height), width: \(container.width), orientation: \(container.orientation)"
-    }
-  }
-}
-
-struct Container: Equatable {
-  let height: UInt
-  let width: UInt
-  let orientation: Orientation
-}
+import Logging
 
 @MainActor
 struct SizeWalker: Walker {
@@ -27,8 +9,11 @@ struct SizeWalker: Walker {
   var names: [Hash: String] = [:]
   var currentOrentation: Orientation = .vertical
   var tree: [Hash: [Hash]] = [:]
+  let logger: Logger
 
-  init() {}
+  init(logLevel: Logger.Level = .trace) {
+    self.logger = Logger.create(logLevel: logLevel, label: "SizeWalker")
+  }
 
   private mutating func connect(parent: Hash, current: Hash) {
     if var sibilings = tree[parent] {
@@ -43,15 +28,23 @@ struct SizeWalker: Walker {
     names[currentId] = "\(type(of: block))"
     parents[currentId] = parentId
     connect(parent: parentId, current: currentId)
-    if let rect = block as? RenderableRect {
+
+    // Handle AttributedBlock by processing the wrapped block with attributes
+    if let attributedBlock = block as? any HasAttributes {
+      processAttributedBlock(attributedBlock)
+    } else if let rect = block as? RenderableRect {
       let width = rect.width * rect.scale
       let height = rect.height * rect.scale
       sizes[currentId] = .known(Container(height: height, width: width, orientation: currentOrentation))
+    } else if let rect = block as? Recttangle {
+      // For now, use default dimensions for Rect instances
+      // This should be updated when the rectangle modifiers are properly implemented
+      sizes[currentId] = .known(Container(height: 50, width: 100, orientation: currentOrentation))
     } else if let text = block as? Text {
       guard !text.label.contains("\n") else {
         fatalError("New lines not supported yet")
       }
-      sizes[currentId] = .known(Container(height: text.height, width: text.width, orientation: currentOrentation))
+      sizes[currentId] = .known(Container(height: text.height(), width: text.width(), orientation: currentOrentation))
     } else if let group = block as? BlockGroup {
       if group.children.count < 1 {
         // Handle empty groups from optional blocks.
@@ -66,6 +59,34 @@ struct SizeWalker: Walker {
       // User defined composed
       sizes[currentId] = .unknown(currentOrentation)
     }
+  }
+
+  private mutating func processAttributedBlock(_ attributedBlock: any HasAttributes) {
+    let attributes = attributedBlock.attributes
+
+    // Check if the wrapped block is a known type
+    let wrappedBlock = attributedBlock.layer
+    logger.notice("\(#function) \(type(of: wrappedBlock))")
+
+    var width: UInt = 100  // default width
+    var height: UInt = 50  // default height
+
+    // Apply attributes if set
+    if let attrWidth = attributes.width {
+      width = attrWidth
+    }
+    if let attrHeight = attributes.height {
+      height = attrHeight
+    }
+
+    // Handle scale
+    if let scale = attributes.scale {
+      width *= scale
+      height *= scale
+    }
+
+    // For now, create a container with the attributes
+    sizes[currentId] = .known(Container(height: height, width: width, orientation: currentOrentation))
   }
 
   mutating func after(_ block: some Block) {
@@ -95,4 +116,24 @@ struct SizeWalker: Walker {
 
   mutating func before(child block: some Block) {}
   mutating func after(child block: some Block) {}
+}
+
+enum Size: Equatable, CustomStringConvertible {
+  case unknown(Orientation)
+  case known(Container)
+
+  var description: String {
+    switch self {
+    case .unknown(let o):
+      return "unknown: \(o)"
+    case .known(let container):
+      return "height: \(container.height), width: \(container.width), orientation: \(container.orientation)"
+    }
+  }
+}
+
+struct Container: Equatable {
+  let height: UInt
+  let width: UInt
+  let orientation: Orientation
 }
