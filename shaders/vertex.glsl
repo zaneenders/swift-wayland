@@ -41,29 +41,29 @@ void main() {
     // Multiplying by 0.5 gives (0,0), (1,0), (0,1), (1,1)
     // This 't' is the interpolation factor for barycentric coordinates
     vec2 t = 0.5 * (a_quad + 1.0);
-    
+
     // === PIXEL POSITION CALCULATION ===
     // Mix between top-left and bottom-right corners using barycentric coordinates
     // This gives us the actual screen pixel position for this vertex
     vec2 ppx = mix(i_dst_p0, i_dst_p1, t);
-    
+
     // Convert to NDC and set final vertex position
     gl_Position = vec4(px_to_ndc(ppx), 0.0, 1.0);
-    
+
     // === INTERPOLATING VALUES SETUP ===
     // These values will be automatically interpolated across the quad by GPU
-    
+
     // UV coordinates for texture sampling (interpolated)
     v_uv = mix(i_src_p0, i_src_p1, t);
-    
+
     // Colors (flat qualifiers tell GPU not to interpolate, saving cycles)
     v_color = i_color;
     v_border_color = i_border_color;
     v_border_width = i_border_width;
-    
+
     // Rectangle dimensions (flat - same for all vertices)
     v_dst_size = i_dst_p1 - i_dst_p0;
-    
+
     // === KEY OPTIMIZATION: Pass pixel position to fragment shader ===
     // Instead of calculating position in fragment shader for every pixel, 
     // we pass it as an interpolated varying. The GPU interpolates this for free!
