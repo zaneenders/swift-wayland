@@ -21,7 +21,7 @@ struct SizeWalker: Walker {
     parents[currentId] = parentId
 
     if let attributedBlock = block as? any HasAttributes {
-      processAttributedBlock(attributedBlock)
+      apply(attributes: attributedBlock.attributes, block)
     } else if let text = block as? Text {
       guard !text.label.contains("\n") else {
         fatalError("New lines not supported yet")
@@ -47,15 +47,11 @@ struct SizeWalker: Walker {
     }
   }
 
-  private mutating func processAttributedBlock(_ attributedBlock: any HasAttributes) {
-    let attributes = attributedBlock.attributes
-
-    let wrappedBlock = attributedBlock.layer
-
+  private mutating func apply(attributes: Attributes, _ block: some Block) {
     var width: UInt = 0
     var height: UInt = 0
 
-    if let text = wrappedBlock as? Text {
+    if let text = block.layer as? Text {
       width = text.width(attributes.scale ?? defaultScale)
       height = text.height(attributes.scale ?? defaultScale)
     } else {
