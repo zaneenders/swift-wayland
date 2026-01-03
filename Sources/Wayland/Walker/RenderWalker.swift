@@ -23,50 +23,57 @@ struct RenderWalker: Walker {
   }
 
   mutating func before(_ block: some Block) {
-    if let pos = positions[currentId] {
-      if let attributedBlock = block as? any HasAttributes,
-        let word = attributedBlock.layer as? Text
-      {
-        let scale = attributedBlock.attributes.scale ?? defaultScale
-        let foreground = attributedBlock.attributes.foreground ?? .white
-        let background = attributedBlock.attributes.background ?? .black
-        drawer.drawText(word.draw(at: (pos.y, pos.x), scale: scale, forground: foreground, background: background))
-      } else if let word = block as? Text {
-        drawer.drawText(word.draw(at: (pos.y, pos.x)))
-      } else if let attributedBlock = block as? any HasAttributes,
-        attributedBlock.layer as? Rectangle != nil,
-        let size = sizes[currentId]
-      {
-        let quad = Quad(
-          dst_p0: (pos.x, pos.y),
-          dst_p1: (pos.x + size.width, pos.y + size.height),
-          tex_tl: (0, 0),
-          tex_br: (1, 1),
-          color: attributedBlock.attributes.background ?? .white,
-          borderColor: attributedBlock.attributes.borderColor ?? .black,
-          borderWidth: Float(attributedBlock.attributes.borderWidth ?? 0),
-          cornerRadius: Float(attributedBlock.attributes.borderRadius ?? 0)
-        )
-        drawer.drawQuad(quad)
-      } else if let size = sizes[currentId],
-        block is Rectangle
-      {
-        let quad = Quad(
-          dst_p0: (pos.x, pos.y),
-          dst_p1: (pos.x + size.width, pos.y + size.height),
-          tex_tl: (0, 0),
-          tex_br: (1, 1),
-          color: .white,
-          borderColor: .black,
-          borderWidth: 0.0,
-          cornerRadius: 0.0
-        )
-        drawer.drawQuad(quad)
-      } else {
-        logger.warning("Unable to render :\(currentId) \(type(of: block))")
-      }
-    } else {
+    guard let pos = positions[currentId] else {
       logger.warning("No position for \(currentId)")
+      return
+    }
+
+    if let attributedBlock = block as? any HasAttributes,
+      let word = attributedBlock.layer as? Text
+    {
+      let scale = attributedBlock.attributes.scale ?? defaultScale
+      let foreground = attributedBlock.attributes.foreground ?? .white
+      let background = attributedBlock.attributes.background ?? .black
+      drawer.drawText(word.draw(at: (pos.y, pos.x), scale: scale, forground: foreground, background: background))
+      return
+    }
+
+    if let word = block as? Text {
+      drawer.drawText(word.draw(at: (pos.y, pos.x)))
+      return
+    }
+
+    if let attributedBlock = block as? any HasAttributes,
+      attributedBlock.layer as? Rectangle != nil,
+      let size = sizes[currentId]
+    {
+      let quad = Quad(
+        dst_p0: (pos.x, pos.y),
+        dst_p1: (pos.x + size.width, pos.y + size.height),
+        tex_tl: (0, 0),
+        tex_br: (1, 1),
+        color: attributedBlock.attributes.background ?? .white,
+        borderColor: attributedBlock.attributes.borderColor ?? .black,
+        borderWidth: Float(attributedBlock.attributes.borderWidth ?? 0),
+        cornerRadius: Float(attributedBlock.attributes.borderRadius ?? 0)
+      )
+      drawer.drawQuad(quad)
+      return
+    }
+
+    if let size = sizes[currentId], block is Rectangle {
+      let quad = Quad(
+        dst_p0: (pos.x, pos.y),
+        dst_p1: (pos.x + size.width, pos.y + size.height),
+        tex_tl: (0, 0),
+        tex_br: (1, 1),
+        color: .white,
+        borderColor: .black,
+        borderWidth: 0.0,
+        cornerRadius: 0.0
+      )
+      drawer.drawQuad(quad)
+      return
     }
   }
 
