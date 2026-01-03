@@ -90,9 +90,21 @@ struct PositionTestSimpleHorizontal: Block {
   let scale: UInt = 5
   var layer: some Block {
     Direction(.horizontal) {
-      Rectangle(width: 10, height: 10, color: .red, scale: scale)
-      Rectangle(width: 10, height: 10, color: .blue, scale: scale)
-      Rectangle(width: 10, height: 10, color: .green, scale: scale)
+      Rect()
+        .width(10)
+        .height(10)
+        .background(.red)
+        .scale(scale)
+      Rect()
+        .width(10)
+        .height(10)
+        .background(.blue)
+        .scale(scale)
+      Rect()
+        .width(10)
+        .height(10)
+        .background(.green)
+        .scale(scale)
     }
   }
 }
@@ -100,22 +112,42 @@ struct PositionTestSimpleHorizontal: Block {
 struct PositionTestSimpleVertical: Block {
   var layer: some Block {
     Direction(.vertical) {
-      Rectangle(width: 10, height: 10, color: .red, scale: 1)
-      Rectangle(width: 10, height: 10, color: .blue, scale: 1)
-      Rectangle(width: 10, height: 10, color: .green, scale: 1)
+      Rect()
+        .width(10)
+        .height(10)
+        .background(.red)
+        .scale(1)
+      Rect()
+        .width(10)
+        .height(10)
+        .background(.blue)
+        .scale(1)
+      Rect()
+        .width(10)
+        .height(10)
+        .background(.green)
+        .scale(1)
     }
   }
 }
 
 struct EdgeCaseZeroSize: Block {
   var layer: some Block {
-    Rectangle(width: 0, height: 0, color: .red, scale: 1)
+    Rect()
+      .width(0)
+      .height(0)
+      .background(.red)
+      .scale(1)
   }
 }
 
 struct EdgeCaseVeryLarge: Block {
   var layer: some Block {
-    Rectangle(width: UInt.max / 2, height: UInt.max / 2, color: .red, scale: 1)
+    Rect()
+      .width(UInt.max / 2)
+      .height(UInt.max / 2)
+      .background(.red)
+      .scale(1)
   }
 }
 
@@ -125,7 +157,11 @@ struct EdgeCaseDeepNesting: Block {
       Direction(.vertical) {
         Direction(.horizontal) {
           Direction(.vertical) {
-            Rectangle(width: 10, height: 10, color: .red, scale: 1)
+            Rect()
+              .width(10)
+              .height(10)
+              .background(.red)
+              .scale(1)
           }
         }
       }

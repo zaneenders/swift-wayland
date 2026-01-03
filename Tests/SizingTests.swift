@@ -5,7 +5,6 @@ import Testing
 @MainActor
 @Suite
 struct SizingTests {
-
   @Test("Basic Rectangle sizing")
   func rectBasicSizing() {
     var sizer = SizeWalker()
@@ -89,13 +88,11 @@ struct SizingTests {
   @Test("Mixed Word and Rectangle spacing")
   func spacingWordRectMixed() {
     var sizer = SizeWalker()
-    let test = SpacingTestWordRectMixed()
+    let test = SpacingTestWordRectMixed(scale: 1)
     test.walk(with: &sizer)
     let testStruct = sizer.tree[0]![0]
     let group = sizer.tree[testStruct]![0]
     let tupleBlock = sizer.tree[group]![0]
-
-    // Width: "Hello"(31) + 20 + "World"(27) = 78, Height: max(16, 20, 16) = 20
     #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 20, width: 78, orientation: .horizontal)))
   }
 
@@ -125,21 +122,152 @@ struct SizingTests {
     // Width: 5 + 100 + 5 = 110, Height: max(5, 100, 5) = 100
     #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 100, width: 110, orientation: .horizontal)))
   }
+
+  @Test("Basic Rectangle scaling")
+  func basicRectangleScaling() {
+    var sizer = SizeWalker()
+    let scale: UInt = 2
+    let test = RectTestBasic(scale: scale)
+    test.walk(with: &sizer)
+    let testStruct = sizer.tree[0]![0]
+    let tupleBlock = sizer.tree[testStruct]![0]
+
+    if case .known(let container) = sizer.sizes[tupleBlock]! {
+      #expect(container.height == scale * 50)
+      #expect(container.width == scale * 100)
+    }
+  }
+
+  @Test("Multiple Rectangle scaling")
+  func multipleRectangleScaling() {
+    var sizer = SizeWalker()
+    let test = RectTestScaled()
+    test.walk(with: &sizer)
+    let testStruct = sizer.tree[0]![0]
+    let group = sizer.tree[testStruct]![0]
+    let tupleBlock = sizer.tree[group]![0]
+
+    // Width: 10*1 + 10*2 + 10*3 = 60, Height: max(10*1, 10*2, 10*3) = 30
+    if case .known(let container) = sizer.sizes[tupleBlock]! {
+      #expect(container.height == 30)
+      #expect(container.width == 60)
+    }
+  }
+
+  @Test("Quad scaling verification")
+  func quadScaling() {
+    var sizer = SizeWalker()
+    let test = QuadTestScaling()
+    test.walk(with: &sizer)
+
+    var positioner = PositionWalker(sizes: sizer.sizes.convert())
+    test.walk(with: &positioner)
+
+    // Reset renderer and capture quads
+    QuadCaptureRenderer.reset()
+    var renderWalker = RenderWalker(
+      positions: positioner.positions, sizes: sizer.sizes.convert(), QuadCaptureRenderer.self, logLevel: .error)
+    test.walk(with: &renderWalker)
+
+    // Filter out 0x0 quads (from empty containers)
+    let nonZeroQuads = QuadCaptureRenderer.capturedQuads.filter {
+      $0.width > 0 && $0.height > 0
+    }
+
+    // Verify we captured 3 non-zero quads
+    #expect(nonZeroQuads.count == 3)
+
+    // Sort by width to get predictable order
+    let quads = nonZeroQuads.sorted { $0.width < $1.width }
+
+    // Verify scaled dimensions are correctly stored in quads
+    #expect(quads[0].width == 10)  // 10 * 1
+    #expect(quads[0].height == 10)  // 10 * 1
+    #expect(quads[1].width == 20)  // 10 * 2
+    #expect(quads[1].height == 20)  // 10 * 2
+    #expect(quads[2].width == 30)  // 10 * 3
+    #expect(quads[2].height == 30)  // 10 * 3
+  }
+
+  @Test func scaledText() {
+    let scale: UInt = 16
+    let block = ScaledText(scale: scale)
+
+    var sizer = SizeWalker()
+    block.walk(with: &sizer)
+
+    let testStruct = sizer.tree[0]![0]
+    let attributedBlock = sizer.tree[testStruct]![0]
+
+    if case .known(let container) = sizer.sizes[attributedBlock]! {
+      #expect(container.width == 29 * scale)
+      #expect(container.height == 7 * scale)
+      #expect(container.orientation == .vertical)
+    }
+  }
+
+  @Test func textRenderingWithScale() {
+    let block = TextTestScaling()
+
+    var sizer = SizeWalker()
+    block.walk(with: &sizer)
+
+    var positioner = PositionWalker(sizes: sizer.sizes.convert())
+    block.walk(with: &positioner)
+
+    // Reset renderer and capture text
+    TextCaptureRenderer.reset()
+    var renderWalker = RenderWalker(
+      positions: positioner.positions, sizes: sizer.sizes.convert(), TextCaptureRenderer.self, logLevel: .error)
+    block.walk(with: &renderWalker)
+
+    // Verify we captured 3 text items
+    #expect(TextCaptureRenderer.capturedTexts.count == 3)
+
+    // Sort by scale to get predictable order
+    let texts = TextCaptureRenderer.capturedTexts.sorted { $0.scale < $1.scale }
+
+    // Verify scale is correctly applied
+    #expect(texts[0].scale == 1)
+    #expect(texts[0].text == "Small")
+    #expect(texts[1].scale == 2)
+    #expect(texts[1].text == "Medium")
+    #expect(texts[2].scale == 3)
+    #expect(texts[2].text == "Large")
+
+    // Verify colors are applied
+    #expect(texts[0].forground == .red)
+    #expect(texts[1].forground == .green)
+    #expect(texts[2].forground == .blue)
+  }
 }
 
-struct RectTestBasic: Block {
-  var scale: UInt = 1
+struct ScaledText: Block {
+  let scale: UInt
   var layer: some Block {
-    Rectangle(width: 100, height: 50, color: .red, scale: scale)
+    Text("Hello")
+      .scale(scale)
   }
 }
 
 struct RectTestMultiple: Block {
   var layer: some Block {
     Direction(.horizontal) {
-      Rectangle(width: 50, height: 30, color: .red, scale: 1)
-      Rectangle(width: 40, height: 60, color: .blue, scale: 1)
-      Rectangle(width: 30, height: 40, color: .green, scale: 1)
+      Rect()
+        .width(50)
+        .height(30)
+        .background(.red)
+        .scale(1)
+      Rect()
+        .width(40)
+        .height(60)
+        .background(.blue)
+        .scale(1)
+      Rect()
+        .width(30)
+        .height(40)
+        .background(.green)
+        .scale(1)
     }
   }
 }
@@ -147,22 +275,28 @@ struct RectTestMultiple: Block {
 struct RectTestNested: Block {
   var layer: some Block {
     Direction(.vertical) {
-      Rectangle(width: 100, height: 20, color: .red, scale: 1)
+      Rect()
+        .width(100)
+        .height(20)
+        .background(.red)
+        .scale(1)
       Direction(.horizontal) {
-        Rectangle(width: 30, height: 30, color: .blue, scale: 1)
-        Rectangle(width: 30, height: 30, color: .green, scale: 1)
+        Rect()
+          .width(30)
+          .height(30)
+          .background(.blue)
+          .scale(1)
+        Rect()
+          .width(30)
+          .height(30)
+          .background(.green)
+          .scale(1)
       }
-      Rectangle(width: 100, height: 20, color: .yellow, scale: 1)
-    }
-  }
-}
-
-struct RectTestScaled: Block {
-  var layer: some Block {
-    Direction(.horizontal) {
-      Rectangle(width: 10, height: 10, color: .red, scale: 1)
-      Rectangle(width: 10, height: 10, color: .blue, scale: 2)
-      Rectangle(width: 10, height: 10, color: .green, scale: 3)
+      Rect()
+        .width(100)
+        .height(20)
+        .background(.yellow)
+        .scale(1)
     }
   }
 }
@@ -182,12 +316,17 @@ struct SpacingTestSingleElement: Block {
 }
 
 struct SpacingTestWordRectMixed: Block {
+  let scale: UInt
   var layer: some Block {
     Direction(.horizontal) {
-      Text("Hello").scale(1)
-      Rectangle(width: 20, height: 20, color: .red, scale: 1)
-      Text("World").scale(1)
+      Text("Hello")
+      Rect()
+        .width(20)
+        .height(20)
+        .background(.red)
+      Text("World")
     }
+    .scale(scale)
   }
 }
 
@@ -196,13 +335,29 @@ struct SpacingTestComplexNesting: Block {
     Direction(.vertical) {
       Text("Top")
       Direction(.horizontal) {
-        Rectangle(width: 15, height: 15, color: .red, scale: 1)
+        Rect()
+          .width(15)
+          .height(15)
+          .background(.red)
+          .scale(1)
         Text("Middle")
-        Rectangle(width: 15, height: 15, color: .blue, scale: 1)
+        Rect()
+          .width(15)
+          .height(15)
+          .background(.blue)
+          .scale(1)
       }
       Direction(.horizontal) {
-        Rectangle(width: 10, height: 10, color: .green, scale: 1)
-        Rectangle(width: 10, height: 10, color: .yellow, scale: 1)
+        Rect()
+          .width(10)
+          .height(10)
+          .background(.green)
+          .scale(1)
+        Rect()
+          .width(10)
+          .height(10)
+          .background(.yellow)
+          .scale(1)
       }
       Text("Bottom")
     }
@@ -212,29 +367,115 @@ struct SpacingTestComplexNesting: Block {
 struct SpacingTestLargeGap: Block {
   var layer: some Block {
     Direction(.horizontal) {
-      Rectangle(width: 5, height: 5, color: .red, scale: 1)
-      Rectangle(width: 100, height: 100, color: .green, scale: 1)
-      Rectangle(width: 5, height: 5, color: .blue, scale: 1)
+      Rect()
+        .width(5)
+        .height(5)
+        .background(.red)
+        .scale(1)
+      Rect()
+        .width(100)
+        .height(100)
+        .background(.green)
+        .scale(1)
+      Rect()
+        .width(5)
+        .height(5)
+        .background(.blue)
+        .scale(1)
     }
   }
 }
-
-// MARK: - Quad Scaling Tests
 
 struct QuadTestScaling: Block {
   var layer: some Block {
     Direction(.horizontal) {
-      Rectangle(width: 10, height: 10, color: .red, scale: 1)
-      Rectangle(width: 10, height: 10, color: .blue, scale: 2)
-      Rectangle(width: 10, height: 10, color: .green, scale: 3)
+      Rect()
+        .width(10)
+        .height(10)
+        .background(.red)
+        .scale(1)
+      Rect()
+        .width(10)
+        .height(10)
+        .background(.blue)
+        .scale(2)
+      Rect()
+        .width(10)
+        .height(10)
+        .background(.green)
+        .scale(3)
     }
   }
 }
 
-struct QuadCaptureRenderer: Renderer {
+struct RectTestBasic: Block {
+  var scale: UInt = 1
+  var layer: some Block {
+    Rect()
+      .width(100)
+      .height(50)
+      .background(.red)
+      .scale(scale)
+  }
+}
+
+struct RectTestScaled: Block {
+  var layer: some Block {
+    Direction(.horizontal) {
+      Rect()
+        .width(10)
+        .height(10)
+        .background(.red)
+        .scale(1)
+      Rect()
+        .width(10)
+        .height(10)
+        .background(.blue)
+        .scale(2)
+      Rect()
+        .width(10)
+        .height(10)
+        .background(.green)
+        .scale(3)
+    }
+  }
+}
+
+struct TextTestScaling: Block {
+  var layer: some Block {
+    Direction(.horizontal) {
+      Text("Small")
+        .scale(1)
+        .foreground(.red)
+      Text("Medium")
+        .scale(2)
+        .foreground(.green)
+      Text("Large")
+        .scale(3)
+        .foreground(.blue)
+    }
+  }
+}
+
+enum TextCaptureRenderer: Renderer {
+  static var capturedTexts: [RenderableText] = []
+
+  static func drawQuad(_ quad: Quad) {}
+
+  static func drawText(_ text: RenderableText) {
+    capturedTexts.append(text)
+  }
+
+  static func reset() {
+    capturedTexts.removeAll()
+  }
+}
+
+enum QuadCaptureRenderer: Renderer {
   static var capturedQuads: [Quad] = []
 
   static func drawQuad(_ quad: Quad) {
+
     capturedQuads.append(quad)
   }
 
@@ -243,34 +484,4 @@ struct QuadCaptureRenderer: Renderer {
   static func reset() {
     capturedQuads.removeAll()
   }
-}
-
-@MainActor
-@Test("Quad scaling verification")
-func quadScaling() {
-  var sizer = SizeWalker()
-  let test = QuadTestScaling()
-  test.walk(with: &sizer)
-
-  var positioner = PositionWalker(sizes: sizer.sizes.convert())
-  test.walk(with: &positioner)
-
-  // Reset renderer and capture quads
-  QuadCaptureRenderer.reset()
-  var renderWalker = RenderWalker(positions: positioner.positions, QuadCaptureRenderer.self, logLevel: .error)
-  test.walk(with: &renderWalker)
-
-  // Verify we captured 3 quads
-  #expect(QuadCaptureRenderer.capturedQuads.count == 3)
-
-  // Sort by width to get predictable order
-  let quads = QuadCaptureRenderer.capturedQuads.sorted { $0.width < $1.width }
-
-  // Verify scaled dimensions are correctly stored in quads
-  #expect(quads[0].width == 10)  // 10 * 1
-  #expect(quads[0].height == 10)  // 10 * 1
-  #expect(quads[1].width == 20)  // 10 * 2
-  #expect(quads[1].height == 20)  // 10 * 2
-  #expect(quads[2].width == 30)  // 10 * 3
-  #expect(quads[2].height == 30)  // 10 * 3
 }
