@@ -1,6 +1,6 @@
-public typealias Rect = Recttangle
+public typealias Rect = Rectangle
 /// A zero widht and height recttangle for which modifiers can be applied to make other shapes.
-public struct Recttangle: Block {
+public struct Rectangle: Block {
   public var layer: some Block {}
   public init() {}
 }
@@ -44,6 +44,47 @@ public struct AttributedBlock<B: Block>: Block, HasAttributes {
   public var attributes = Attributes()
 
   public typealias Component = B
+
+  // Computed properties for direct access to common attributes
+  public var width: UInt {
+    get { attributes.width ?? 0 }
+    set { attributes.width = newValue }
+  }
+
+  public var height: UInt {
+    get { attributes.height ?? 0 }
+    set { attributes.height = newValue }
+  }
+
+  public var scale: UInt {
+    get { attributes.scale ?? 1 }
+    set { attributes.scale = newValue }
+  }
+
+  public var color: Color {
+    get { attributes.background ?? Color(r: 0, g: 0, b: 0, a: 0) }
+    set { attributes.background = newValue }
+  }
+
+  public var borderWidth: UInt {
+    get { attributes.borderWidth ?? 0 }
+    set { attributes.borderWidth = newValue }
+  }
+
+  public var borderColor: Color {
+    get { attributes.borderColor ?? Color(r: 0, g: 0, b: 0, a: 0) }
+    set { attributes.borderColor = newValue }
+  }
+
+  public var borderRadius: UInt {
+    get { attributes.borderRadius ?? 0 }
+    set { attributes.borderRadius = newValue }
+  }
+
+  public var cornerRadius: UInt {
+    get { attributes.borderRadius ?? 0 }
+    set { attributes.borderRadius = newValue }
+  }
 }
 
 extension Block {
@@ -146,4 +187,3 @@ extension AttributedBlock {
     return copy
   }
 }
-

@@ -8,6 +8,14 @@ protocol Walker {
   mutating func after(_ block: some Block)
   mutating func before(child block: some Block)
   mutating func after(child block: some Block)
+  mutating func inheritAttributes(from parentId: Hash, to childId: Hash)
+}
+
+@MainActor
+extension Walker {
+  mutating func inheritAttributes(from parentId: Hash, to childId: Hash) {
+    // Default implementation does nothing
+  }
 }
 
 @MainActor
@@ -18,7 +26,7 @@ extension Wayland {
     block.walk(with: &sizer)
     var positioner = PositionWalker(sizes: sizer.sizes.convert())
     block.walk(with: &positioner)
-    var renderer = RenderWalker(positions: positioner.positions, Wayland.self, logLevel: logLevel)
+    var renderer = RenderWalker(positions: positioner.positions, sizes: sizer.sizes.convert(), Wayland.self, logLevel: logLevel)
     block.walk(with: &renderer)
     Wayland.postDraw()
   }
@@ -57,6 +65,7 @@ extension Block {
         let parent = walker.parentId
         walker.parentId = walker.currentId
         walker.currentId = child.id(current: walker.currentId, i)
+        walker.inheritAttributes(from: parent, to: walker.currentId)
         walker.before(child: child)
         child._walk(with: &walker, orientation)
         walker.after(child: child)
@@ -65,6 +74,14 @@ extension Block {
       }
     } else if (self as? Rect != nil) || (self as? Text != nil) {
       // Leaf Nodes
+    } else if let attributedBlock = self as? any HasAttributes {
+      // AttributedBlock - check if its layer is a container that should be walked
+      let layer = attributedBlock.layer
+      if layer is DirectionGroup || layer is BlockGroup {
+        // The layer is a container with children, so walk it
+        layer._walk(with: &walker, orientation)
+      }
+      // Otherwise, it's a leaf element like Text/Rectangle, so don't walk further
     } else {  // Composed
       self.layer.walk(with: &walker, orientation)
     }
@@ -75,6 +92,7 @@ extension Block {
     let parent = walker.parentId
     walker.parentId = walker.currentId
     walker.currentId = self.id(current: walker.currentId)
+    walker.inheritAttributes(from: parent, to: walker.currentId)
     _walk(with: &walker, orientation)
     walker.currentId = walker.parentId
     walker.parentId = parent

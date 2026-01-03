@@ -29,17 +29,16 @@ struct SizeWalker: Walker {
     parents[currentId] = parentId
     connect(parent: parentId, current: currentId)
 
-    // Handle AttributedBlock by processing the wrapped block with attributes
     if let attributedBlock = block as? any HasAttributes {
       processAttributedBlock(attributedBlock)
-    } else if let rect = block as? Recttangle {
+    } else if block is Rectangle {
       // Recttangle at base have a size of 0x0. Attributes are applied to modify this.
       sizes[currentId] = .known(Container(height: 0, width: 0, orientation: currentOrentation))
     } else if let text = block as? Text {
       guard !text.label.contains("\n") else {
         fatalError("New lines not supported yet")
       }
-      sizes[currentId] = .known(Container(height: text.height(), width: text.width(), orientation: currentOrentation))
+      sizes[currentId] = .known(Container(height: text.height(1), width: text.width(1), orientation: currentOrentation))
     } else if let group = block as? BlockGroup {
       if group.children.count < 1 {
         // Handle empty groups from optional blocks.
@@ -60,22 +59,30 @@ struct SizeWalker: Walker {
     let attributes = attributedBlock.attributes
 
     let wrappedBlock = attributedBlock.layer
-    logger.notice("\(#function) \(type(of: wrappedBlock))")
 
     var width: UInt = 0
     var height: UInt = 0
 
-    if let attrWidth = attributes.width {
-      width = attrWidth
-    }
-    if let attrHeight = attributes.height {
-      height = attrHeight
+    // Get intrinsic size of wrapped block first
+    if let text = wrappedBlock as? Text {
+      width = text.width(attributes.scale ?? 1)
+      height = text.height(attributes.scale ?? 1)
+    } else {
+      width = 0
+      height = 0
+      if let attrWidth = attributes.width {
+        width = attrWidth
+      }
+      if let attrHeight = attributes.height {
+        height = attrHeight
+      }
+
+      if let scale = attributes.scale {
+        width *= scale
+        height *= scale
+      }
     }
 
-    if let scale = attributes.scale {
-      width *= scale
-      height *= scale
-    }
     sizes[currentId] = .known(Container(height: height, width: width, orientation: currentOrentation))
   }
 
@@ -87,10 +94,13 @@ struct SizeWalker: Walker {
     case (.known(let parentContainer), .known(let myContainer)):
       switch parentContainer.orientation {
       case .horizontal:
+        let newWidth = myContainer.width + parentContainer.width
+        let newHeight = max(myContainer.height, parentContainer.height)
+
         sizes[parentId] = .known(
           Container(
-            height: max(myContainer.height, parentContainer.height),
-            width: myContainer.width + parentContainer.width,
+            height: newHeight,
+            width: newWidth,
             orientation: .horizontal))
       case .vertical:
         sizes[parentId] = .known(
