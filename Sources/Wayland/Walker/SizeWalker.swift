@@ -8,9 +8,11 @@ struct SizeWalker: Walker {
   var parents: [Hash: Hash] = [:]
   var names: [Hash: String] = [:]
   var currentOrentation: Orientation = .vertical
+  var attributes: [Hash: Attributes]
   let logger: Logger
 
-  init(logLevel: Logger.Level = .trace) {
+  init(attributes: [Hash: Attributes], logLevel: Logger.Level = .trace) {
+    self.attributes = attributes
     self.logger = Logger.create(logLevel: logLevel, label: "SizeWalker")
   }
 

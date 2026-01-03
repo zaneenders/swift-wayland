@@ -16,7 +16,7 @@ extension Wayland {
     Wayland.preDraw()
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
     var positioner = PositionWalker(sizes: sizer.sizes.convert())
     block.walk(with: &positioner)
@@ -51,7 +51,7 @@ extension Block {
     return hash(current | hash("\(type(of: self))"))
   }
 
-  func _walk(with walker: inout some Walker, _ orientation: Orientation) {
+  private func _walk(with walker: inout some Walker, _ orientation: Orientation) {
     walker.before(self)
     if let group = self as? DirectionGroup {
       self.layer.walk(with: &walker, group.orientation)

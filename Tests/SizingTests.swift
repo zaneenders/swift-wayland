@@ -11,12 +11,12 @@ struct SizingTests {
     let test = RectTestBasic(scale: scale)
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let tupleBlock = attributesWalker.tree[testStruct]![0]
     #expect(
-      sizer.sizes[tupleBlock]! == .known(Container(height: scale * 50, width: scale * 100, orientation: .vertical)))
+      sizer.sizes[tupleBlock]! == Size.known(Container(height: scale * 50, width: scale * 100, orientation: .vertical)))
   }
 
   @Test("Multiple Rectangle horizontal layout")
@@ -24,7 +24,7 @@ struct SizingTests {
     let test = RectTestMultiple()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
     // Navigate to the actual group containing the rectangles
@@ -45,13 +45,13 @@ struct SizingTests {
     let test = RectTestNested()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
     let tupleBlock = attributesWalker.tree[group]![0]
     // Vertical: 20 + max(30, 30) + 20 = 70, Width: max(100, 60, 100) = 100
-    #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 70, width: 100, orientation: .vertical)))
+    #expect(sizer.sizes[tupleBlock]! == Size.known(Container(height: 70, width: 100, orientation: .vertical)))
   }
 
   @Test("Rectangle scaling")
@@ -59,13 +59,13 @@ struct SizingTests {
     let test = RectTestScaled()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
     let tupleBlock = attributesWalker.tree[group]![0]
     // Width: 10*1 + 10*2 + 10*3 = 60, Height: max(10*1, 10*2, 10*3) = 30
-    #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 30, width: 60, orientation: .horizontal)))
+    #expect(sizer.sizes[tupleBlock]! == Size.known(Container(height: 30, width: 60, orientation: .horizontal)))
   }
 
   @Test("Empty group sizing")
@@ -73,12 +73,12 @@ struct SizingTests {
     let test = SpacingTestEmptyGroup()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
     let tupleBlock = attributesWalker.tree[group]![0]
-    #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 0, width: 0, orientation: .horizontal)))
+    #expect(sizer.sizes[tupleBlock]! == Size.known(Container(height: 0, width: 0, orientation: .horizontal)))
   }
 
   @Test("Single element group")
@@ -86,7 +86,7 @@ struct SizingTests {
     let test = SpacingTestSingleElement()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
@@ -102,12 +102,12 @@ struct SizingTests {
     let test = SpacingTestWordRectMixed(scale: 1)
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
     let tupleBlock = attributesWalker.tree[group]![0]
-    #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 20, width: 78, orientation: .horizontal)))
+    #expect(sizer.sizes[tupleBlock]! == Size.known(Container(height: 20, width: 78, orientation: .horizontal)))
   }
 
   @Test("Complex nesting spacing")
@@ -115,7 +115,7 @@ struct SizingTests {
     let test = SpacingTestComplexNesting()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
@@ -132,13 +132,13 @@ struct SizingTests {
     let test = SpacingTestLargeGap()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
     let tupleBlock = attributesWalker.tree[group]![0]
     // Width: 5 + 100 + 5 = 110, Height: max(5, 100, 5) = 100
-    #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 100, width: 110, orientation: .horizontal)))
+    #expect(sizer.sizes[tupleBlock]! == Size.known(Container(height: 100, width: 110, orientation: .horizontal)))
   }
 
   @Test("Basic Rectangle scaling")
@@ -147,7 +147,7 @@ struct SizingTests {
     let test = RectTestBasic(scale: scale)
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let tupleBlock = attributesWalker.tree[testStruct]![0]
@@ -163,7 +163,7 @@ struct SizingTests {
     let test = RectTestScaled()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
@@ -178,8 +178,10 @@ struct SizingTests {
 
   @Test("Quad scaling verification")
   func quadScaling() {
-    var sizer = SizeWalker()
     let test = QuadTestScaling()
+    var attributesWalker = AttributesWalker()
+    test.walk(with: &attributesWalker)
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
     var positioner = PositionWalker(sizes: sizer.sizes.convert())
@@ -217,7 +219,7 @@ struct SizingTests {
 
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
 
     let testStruct = attributesWalker.tree[0]![0]
@@ -233,7 +235,9 @@ struct SizingTests {
   @Test func textRenderingWithScale() {
     let block = TextTestScaling()
 
-    var sizer = SizeWalker()
+    var attributesWalker = AttributesWalker()
+    block.walk(with: &attributesWalker)
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
 
     var positioner = PositionWalker(sizes: sizer.sizes.convert())

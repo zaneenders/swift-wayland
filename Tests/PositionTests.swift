@@ -11,7 +11,7 @@ struct PositionTests {
     let test = PositionTestSimpleHorizontal()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
     var positioner = PositionWalker(sizes: sizer.sizes.convert())
@@ -39,7 +39,7 @@ struct PositionTests {
     let test = PositionTestSimpleVertical()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
     var positioner = PositionWalker(sizes: sizer.sizes.convert())
@@ -67,7 +67,7 @@ struct PositionTests {
     let test = EdgeCaseZeroSize()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let tupleBlock = attributesWalker.tree[testStruct]![0]
@@ -79,7 +79,7 @@ struct PositionTests {
     let test = EdgeCaseDeepNesting()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker()
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group1 = attributesWalker.tree[testStruct]![0]
