@@ -67,9 +67,8 @@ extension Block {
     } else if self as? Text != nil {
       // Leaf Nodes
     } else if let attributedBlock = self as? any HasAttributes {
-      let layer = attributedBlock.layer
-      if layer is DirectionGroup || layer is BlockGroup {
-        layer._walk(with: &walker, orientation)
+      if !(attributedBlock.layer is Text) {  // Prevents double rendering for now.
+        self.layer.walk(with: &walker)
       }
     } else {  // Composed
       self.layer.walk(with: &walker, orientation)
