@@ -64,16 +64,13 @@ extension Block {
         walker.currentId = walker.parentId
         walker.parentId = parent
       }
-    } else if (self as? Rect != nil) || (self as? Text != nil) {
+    } else if self as? Text != nil {
       // Leaf Nodes
     } else if let attributedBlock = self as? any HasAttributes {
-      // AttributedBlock - check if its layer is a container that should be walked
       let layer = attributedBlock.layer
       if layer is DirectionGroup || layer is BlockGroup {
-        // The layer is a container with children, so walk it
         layer._walk(with: &walker, orientation)
       }
-      // Otherwise, it's a leaf element like Text/Rectangle, so don't walk further
     } else {  // Composed
       self.layer.walk(with: &walker, orientation)
     }
