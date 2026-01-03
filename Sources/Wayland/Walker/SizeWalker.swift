@@ -20,8 +20,8 @@ struct SizeWalker: Walker {
     names[currentId] = "\(type(of: block))"
     parents[currentId] = parentId
 
-    if let attributedBlock = block as? any HasAttributes {
-      apply(attributes: attributedBlock.attributes, block)
+    if let attributes = attributes[currentId] {
+      apply(attributes: attributes, block)
     } else if let text = block as? Text {
       guard !text.label.contains("\n") else {
         fatalError("New lines not supported yet")

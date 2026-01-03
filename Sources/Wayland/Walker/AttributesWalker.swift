@@ -21,8 +21,6 @@ struct AttributesWalker: Walker {
 
     if let attributedBlock = block as? any HasAttributes {
       attributes[currentId] = attributedBlock.attributes
-    } else {
-      attributes[currentId] = Attributes()
     }
   }
 
