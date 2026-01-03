@@ -32,14 +32,9 @@ struct SizeWalker: Walker {
     // Handle AttributedBlock by processing the wrapped block with attributes
     if let attributedBlock = block as? any HasAttributes {
       processAttributedBlock(attributedBlock)
-    } else if let rect = block as? RenderableRect {
-      let width = rect.width * rect.scale
-      let height = rect.height * rect.scale
-      sizes[currentId] = .known(Container(height: height, width: width, orientation: currentOrentation))
     } else if let rect = block as? Recttangle {
-      // For now, use default dimensions for Rect instances
-      // This should be updated when the rectangle modifiers are properly implemented
-      sizes[currentId] = .known(Container(height: 50, width: 100, orientation: currentOrentation))
+      // Recttangle at base have a size of 0x0. Attributes are applied to modify this.
+      sizes[currentId] = .known(Container(height: 0, width: 0, orientation: currentOrentation))
     } else if let text = block as? Text {
       guard !text.label.contains("\n") else {
         fatalError("New lines not supported yet")
@@ -64,14 +59,12 @@ struct SizeWalker: Walker {
   private mutating func processAttributedBlock(_ attributedBlock: any HasAttributes) {
     let attributes = attributedBlock.attributes
 
-    // Check if the wrapped block is a known type
     let wrappedBlock = attributedBlock.layer
     logger.notice("\(#function) \(type(of: wrappedBlock))")
 
-    var width: UInt = 100  // default width
-    var height: UInt = 50  // default height
+    var width: UInt = 0
+    var height: UInt = 0
 
-    // Apply attributes if set
     if let attrWidth = attributes.width {
       width = attrWidth
     }
@@ -79,13 +72,10 @@ struct SizeWalker: Walker {
       height = attrHeight
     }
 
-    // Handle scale
     if let scale = attributes.scale {
       width *= scale
       height *= scale
     }
-
-    // For now, create a container with the attributes
     sizes[currentId] = .known(Container(height: height, width: width, orientation: currentOrentation))
   }
 
