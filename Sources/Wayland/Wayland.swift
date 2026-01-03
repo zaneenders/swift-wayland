@@ -43,7 +43,6 @@ public enum Wayland: Renderer {
   public static let glyphW: UInt = 5
   public static let glyphH: UInt = 7
   public static let glyphSpacing: UInt = 1
-  public static let scale: UInt = 12
 
   static let firstChar: UInt8 = 32
   static let lastChar: UInt8 = 126

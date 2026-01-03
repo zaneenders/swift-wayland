@@ -24,22 +24,25 @@ func fullMockRenderPass() {
     }
   }
 
-  var sizer = SizeWalker()
   let test = Layout()
+  var attributesWalker = AttributesWalker()
+  test.walk(with: &attributesWalker)
+  var sizer = SizeWalker(attributes: attributesWalker.attributes)
   test.walk(with: &sizer)
 
   #expect(!sizer.sizes.isEmpty)
 
-  let testStruct = sizer.tree[0]![0]
-  let tupleBlock = sizer.tree[testStruct]![0]
-  #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 167, width: 479, orientation: .horizontal)))
+  let testStruct = attributesWalker.tree[0]![0]
+  let tupleBlock = attributesWalker.tree[testStruct]![0]
+  #expect(sizer.sizes[tupleBlock]! == Size.known(Container(height: 167, width: 479, orientation: .horizontal)))
 
   var positioner = PositionWalker(sizes: sizer.sizes.convert())
   test.walk(with: &positioner)
   #expect(positioner.positions.count == sizer.sizes.count)
 
   TestRenderer.reset()
-  var renderWalker = RenderWalker(positions: positioner.positions, TestRenderer.self, logLevel: .error)
+  var renderWalker = RenderWalker(
+    positions: positioner.positions, sizes: sizer.sizes.convert(), TestRenderer.self, logLevel: .error)
   test.walk(with: &renderWalker)
 
   #expect(!TestRenderer.drawnQuads.isEmpty)
@@ -89,15 +92,18 @@ func fullMockRenderPass() {
     }
   }
 
-  var sizer = SizeWalker()
   let test = ColorTestLayout()
+  var attributesWalker = AttributesWalker()
+  test.walk(with: &attributesWalker)
+  var sizer = SizeWalker(attributes: attributesWalker.attributes)
   test.walk(with: &sizer)
 
   var positioner = PositionWalker(sizes: sizer.sizes.convert())
   test.walk(with: &positioner)
 
   ColorTestRenderer.reset()
-  var renderWalker = RenderWalker(positions: positioner.positions, ColorTestRenderer.self, logLevel: .error)
+  var renderWalker = RenderWalker(
+    positions: positioner.positions, sizes: sizer.sizes.convert(), ColorTestRenderer.self, logLevel: .error)
   test.walk(with: &renderWalker)
 
   // Verify we captured 3 texts

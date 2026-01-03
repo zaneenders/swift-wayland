@@ -15,21 +15,6 @@ struct Quad: BitwiseCopyable {
     UInt(abs(dst_p0.0 - dst_p1.0))
   }
 
-  init(pos: (x: UInt, y: UInt), _ rect: Rect) {
-    let scaledWidth = rect.width * rect.scale
-    let scaledHeight = rect.height * rect.scale
-    self.init(
-      dst_p0: (pos.x, pos.y),
-      dst_p1: (pos.x + scaledWidth, pos.y + scaledHeight),
-      tex_tl: (0, 0),
-      tex_br: (1, 1),
-      color: rect.color,
-      borderColor: rect.borderColor,
-      borderWidth: Float(rect.borderWidth),
-      cornerRadius: Float(rect.cornerRadius)
-    )
-  }
-
   init(
     dst_p0: (UInt, UInt), dst_p1: (UInt, UInt),
     tex_tl: (Float, Float) = (0, 0),
