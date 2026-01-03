@@ -31,14 +31,15 @@ struct SizeWalker: Walker {
 
     if let attributedBlock = block as? any HasAttributes {
       processAttributedBlock(attributedBlock)
-    } else if block is Rectangle {
-      // Recttangle at base have a size of 0x0. Attributes are applied to modify this.
-      sizes[currentId] = .known(Container(height: 0, width: 0, orientation: currentOrentation))
     } else if let text = block as? Text {
       guard !text.label.contains("\n") else {
         fatalError("New lines not supported yet")
       }
-      sizes[currentId] = .known(Container(height: text.height(1), width: text.width(1), orientation: currentOrentation))
+      sizes[currentId] = .known(
+        Container(
+          height: text.height(defaultScale),
+          width: text.width(defaultScale),
+          orientation: currentOrentation))
     } else if let group = block as? BlockGroup {
       if group.children.count < 1 {
         // Handle empty groups from optional blocks.
@@ -63,20 +64,16 @@ struct SizeWalker: Walker {
     var width: UInt = 0
     var height: UInt = 0
 
-    // Get intrinsic size of wrapped block first
     if let text = wrappedBlock as? Text {
-      width = text.width(attributes.scale ?? 1)
-      height = text.height(attributes.scale ?? 1)
+      width = text.width(attributes.scale ?? defaultScale)
+      height = text.height(attributes.scale ?? defaultScale)
     } else {
-      width = 0
-      height = 0
       if let attrWidth = attributes.width {
         width = attrWidth
       }
       if let attrHeight = attributes.height {
         height = attrHeight
       }
-
       if let scale = attributes.scale {
         width *= scale
         height *= scale

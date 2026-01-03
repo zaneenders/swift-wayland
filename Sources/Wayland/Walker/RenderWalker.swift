@@ -44,7 +44,6 @@ struct RenderWalker: Walker {
     }
 
     if let attributedBlock = block as? any HasAttributes,
-      attributedBlock.layer as? Rectangle != nil,
       let size = sizes[currentId]
     {
       let quad = Quad(
@@ -56,21 +55,6 @@ struct RenderWalker: Walker {
         borderColor: attributedBlock.attributes.borderColor ?? .black,
         borderWidth: Float(attributedBlock.attributes.borderWidth ?? 0),
         cornerRadius: Float(attributedBlock.attributes.borderRadius ?? 0)
-      )
-      drawer.drawQuad(quad)
-      return
-    }
-
-    if let size = sizes[currentId], block is Rectangle {
-      let quad = Quad(
-        dst_p0: (pos.x, pos.y),
-        dst_p1: (pos.x + size.width, pos.y + size.height),
-        tex_tl: (0, 0),
-        tex_br: (1, 1),
-        color: .white,
-        borderColor: .black,
-        borderWidth: 0.0,
-        cornerRadius: 0.0
       )
       drawer.drawQuad(quad)
       return
