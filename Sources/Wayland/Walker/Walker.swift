@@ -8,14 +8,6 @@ protocol Walker {
   mutating func after(_ block: some Block)
   mutating func before(child block: some Block)
   mutating func after(child block: some Block)
-  mutating func inheritAttributes(from parentId: Hash, to childId: Hash)
-}
-
-@MainActor
-extension Walker {
-  mutating func inheritAttributes(from parentId: Hash, to childId: Hash) {
-    // Default implementation does nothing
-  }
 }
 
 @MainActor
@@ -26,7 +18,8 @@ extension Wayland {
     block.walk(with: &sizer)
     var positioner = PositionWalker(sizes: sizer.sizes.convert())
     block.walk(with: &positioner)
-    var renderer = RenderWalker(positions: positioner.positions, sizes: sizer.sizes.convert(), Wayland.self, logLevel: logLevel)
+    var renderer = RenderWalker(
+      positions: positioner.positions, sizes: sizer.sizes.convert(), Wayland.self, logLevel: logLevel)
     block.walk(with: &renderer)
     Wayland.postDraw()
   }
@@ -65,7 +58,6 @@ extension Block {
         let parent = walker.parentId
         walker.parentId = walker.currentId
         walker.currentId = child.id(current: walker.currentId, i)
-        walker.inheritAttributes(from: parent, to: walker.currentId)
         walker.before(child: child)
         child._walk(with: &walker, orientation)
         walker.after(child: child)
@@ -92,7 +84,6 @@ extension Block {
     let parent = walker.parentId
     walker.parentId = walker.currentId
     walker.currentId = self.id(current: walker.currentId)
-    walker.inheritAttributes(from: parent, to: walker.currentId)
     _walk(with: &walker, orientation)
     walker.currentId = walker.parentId
     walker.parentId = parent
