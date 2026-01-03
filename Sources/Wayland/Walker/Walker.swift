@@ -14,6 +14,8 @@ protocol Walker {
 extension Wayland {
   public static func render(_ block: some Block, logLevel: Logger.Level = .warning) {
     Wayland.preDraw()
+    var attributesWalker = AttributesWalker()
+    block.walk(with: &attributesWalker)
     var sizer = SizeWalker()
     block.walk(with: &sizer)
     var positioner = PositionWalker(sizes: sizer.sizes.convert())

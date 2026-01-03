@@ -23,6 +23,19 @@ struct Attributes {
     self.borderRadius = borderRadius
     self.scale = scale
   }
+
+  func apply(_ other: Attributes) -> Attributes {
+    var copy = self
+    copy.width = other.width
+    copy.height = other.height
+    copy.foreground = other.foreground
+    copy.background = other.background
+    copy.borderColor = other.borderColor
+    copy.borderWidth = other.borderWidth
+    copy.borderRadius = other.borderRadius
+    copy.scale = other.scale
+    return copy
+  }
 }
 
 protocol HasAttributes: Block {

@@ -8,26 +8,15 @@ struct SizeWalker: Walker {
   var parents: [Hash: Hash] = [:]
   var names: [Hash: String] = [:]
   var currentOrentation: Orientation = .vertical
-  var tree: [Hash: [Hash]] = [:]
   let logger: Logger
 
   init(logLevel: Logger.Level = .trace) {
     self.logger = Logger.create(logLevel: logLevel, label: "SizeWalker")
   }
 
-  private mutating func connect(parent: Hash, current: Hash) {
-    if var sibilings = tree[parent] {
-      sibilings.append(current)
-      tree[parent] = sibilings
-    } else {
-      tree[parent] = [current]
-    }
-  }
-
   mutating func before(_ block: some Block) {
     names[currentId] = "\(type(of: block))"
     parents[currentId] = parentId
-    connect(parent: parentId, current: currentId)
 
     if let attributedBlock = block as? any HasAttributes {
       processAttributedBlock(attributedBlock)

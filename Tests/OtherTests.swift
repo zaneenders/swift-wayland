@@ -24,14 +24,16 @@ func fullMockRenderPass() {
     }
   }
 
-  var sizer = SizeWalker()
   let test = Layout()
+  var attributesWalker = AttributesWalker()
+  test.walk(with: &attributesWalker)
+  var sizer = SizeWalker()
   test.walk(with: &sizer)
 
   #expect(!sizer.sizes.isEmpty)
 
-  let testStruct = sizer.tree[0]![0]
-  let tupleBlock = sizer.tree[testStruct]![0]
+  let testStruct = attributesWalker.tree[0]![0]
+  let tupleBlock = attributesWalker.tree[testStruct]![0]
   #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 167, width: 479, orientation: .horizontal)))
 
   var positioner = PositionWalker(sizes: sizer.sizes.convert())
@@ -90,8 +92,10 @@ func fullMockRenderPass() {
     }
   }
 
-  var sizer = SizeWalker()
   let test = ColorTestLayout()
+  var attributesWalker = AttributesWalker()
+  test.walk(with: &attributesWalker)
+  var sizer = SizeWalker()
   test.walk(with: &sizer)
 
   var positioner = PositionWalker(sizes: sizer.sizes.convert())
