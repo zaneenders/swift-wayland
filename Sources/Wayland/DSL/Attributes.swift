@@ -45,7 +45,7 @@ protocol HasAttributes: Block {
 public struct AttributedBlock<B: Block>: Block, HasAttributes {
   var attributes = Attributes()
 
-  public var wrapped: B
+  var wrapped: B
   public var layer: B {
     wrapped
   }
@@ -61,12 +61,6 @@ extension Block {
   public func height(_ height: UInt) -> AttributedBlock<Self> {
     var newBlock = AttributedBlock(wrapped: self)
     newBlock.attributes.height = height
-    return newBlock
-  }
-
-  public func foreground(_ color: Color) -> AttributedBlock<Self> {
-    var newBlock = AttributedBlock(wrapped: self)
-    newBlock.attributes.foreground = color
     return newBlock
   }
 
@@ -93,7 +87,14 @@ extension Block {
     newBlock.attributes.borderRadius = radius
     return newBlock
   }
+}
 
+extension Text {
+  public func foreground(_ color: Color) -> AttributedBlock<Self> {
+    var newBlock = AttributedBlock(wrapped: self)
+    newBlock.attributes.foreground = color
+    return newBlock
+  }
   public func scale(_ scale: UInt) -> AttributedBlock<Self> {
     var newBlock = AttributedBlock(wrapped: self)
     newBlock.attributes.scale = scale
@@ -112,12 +113,6 @@ extension AttributedBlock {
   public func height(_ height: UInt) -> Self {
     var copy = self
     copy.attributes.height = height
-    return copy
-  }
-
-  public func foreground(_ color: Color) -> Self {
-    var copy = self
-    copy.attributes.foreground = color
     return copy
   }
 
@@ -142,6 +137,15 @@ extension AttributedBlock {
   public func border(radius: UInt) -> Self {
     var copy = self
     copy.attributes.borderRadius = radius
+    return copy
+  }
+}
+
+extension AttributedBlock where Component == Text {
+
+  public func foreground(_ color: Color) -> Self {
+    var copy = self
+    copy.attributes.foreground = color
     return copy
   }
 

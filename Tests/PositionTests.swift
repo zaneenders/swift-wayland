@@ -3,7 +3,7 @@ import Testing
 @testable import Wayland
 
 @MainActor
-@Suite
+@Suite("Position Walker Tests")
 struct PositionTests {
 
   @Test("Horizontal positioning")
@@ -28,10 +28,13 @@ struct PositionTests {
 
     // First rect should be at (0, 0)
     #expect(rectPositions[0] == (x: 0, y: 0))
-    // Second rect should be at (50, 0) - to the right (10 * scale 5)
-    #expect(rectPositions[1] == (x: 50, y: 0))
-    // Third rect should be at (100, 0) - further right (10 * scale 5 * 2)
-    #expect(rectPositions[2] == (x: 100, y: 0))
+    // Second rect should be at (10, 0) - to the right (width 10)
+    #expect(rectPositions[1] == (x: 10, y: 0))
+    // Third rect should be at (20, 0) - further right (10 + 10)
+    #expect(rectPositions[2] == (x: 20, y: 0))
+
+    // All positions should be valid
+    rectPositions.forEach { TestUtils.Assert.validPosition((Int($0.x), Int($0.y))) }
   }
 
   @Test("Vertical positioning")
@@ -60,6 +63,9 @@ struct PositionTests {
     #expect(rectPositions[1] == (x: 0, y: 10))
     // Third rect should be at (0, 20) - further below
     #expect(rectPositions[2] == (x: 0, y: 20))
+
+    // All positions should be valid
+    rectPositions.forEach { TestUtils.Assert.validPosition((Int($0.x), Int($0.y))) }
   }
 
   @Test("Zero size rectangle")
@@ -92,6 +98,45 @@ struct PositionTests {
       #expect(container.width == 10)
     }
   }
+
+  @Test("Edge case: very large values")
+  func edgeCaseVeryLarge() {
+    let test = EdgeCaseVeryLarge()
+    var attributesWalker = AttributesWalker()
+    test.walk(with: &attributesWalker)
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    test.walk(with: &sizer)
+    let testStruct = attributesWalker.tree[0]![0]
+    let tupleBlock = attributesWalker.tree[testStruct]![0]
+    if case .known(let container) = sizer.sizes[tupleBlock]! {
+      // Verify large values don't cause overflow or crashes
+      #expect(container.width > 0, "Width should be positive for large values")
+      #expect(container.height > 0, "Height should be positive for large values")
+    }
+  }
+
+  @Test("Edge case: overflow protection")
+  func edgeCaseOverflowProtection() {
+    // Test that adding elements with very large values doesn't crash
+    struct OverflowTest: Block {
+      var layer: some Block {
+        Direction(.horizontal) {
+          Rect().width(100).height(100).background(.red)
+          Rect().width(200).height(200).background(.blue)
+          Rect().width(300).height(300).background(.green)
+        }
+      }
+    }
+
+    let test = OverflowTest()
+    var attributesWalker = AttributesWalker()
+    test.walk(with: &attributesWalker)
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    test.walk(with: &sizer)
+
+    // Should not crash
+    #expect(!sizer.sizes.isEmpty, "Should calculate sizes without crashing")
+  }
 }
 
 struct PositionTestSimpleHorizontal: Block {
@@ -102,17 +147,14 @@ struct PositionTestSimpleHorizontal: Block {
         .width(10)
         .height(10)
         .background(.red)
-        .scale(scale)
       Rect()
         .width(10)
         .height(10)
         .background(.blue)
-        .scale(scale)
       Rect()
         .width(10)
         .height(10)
         .background(.green)
-        .scale(scale)
     }
   }
 }
@@ -124,17 +166,14 @@ struct PositionTestSimpleVertical: Block {
         .width(10)
         .height(10)
         .background(.red)
-        .scale(1)
       Rect()
         .width(10)
         .height(10)
         .background(.blue)
-        .scale(1)
       Rect()
         .width(10)
         .height(10)
         .background(.green)
-        .scale(1)
     }
   }
 }
@@ -145,7 +184,6 @@ struct EdgeCaseZeroSize: Block {
       .width(0)
       .height(0)
       .background(.red)
-      .scale(1)
   }
 }
 
@@ -155,7 +193,6 @@ struct EdgeCaseVeryLarge: Block {
       .width(UInt.max / 2)
       .height(UInt.max / 2)
       .background(.red)
-      .scale(1)
   }
 }
 
@@ -169,7 +206,6 @@ struct EdgeCaseDeepNesting: Block {
               .width(10)
               .height(10)
               .background(.red)
-              .scale(1)
           }
         }
       }

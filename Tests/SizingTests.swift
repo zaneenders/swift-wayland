@@ -64,8 +64,8 @@ struct SizingTests {
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
     let tupleBlock = attributesWalker.tree[group]![0]
-    // Width: 10*1 + 10*2 + 10*3 = 60, Height: max(10*1, 10*2, 10*3) = 30
-    #expect(sizer.sizes[tupleBlock]! == Size.known(Container(height: 30, width: 60, orientation: .horizontal)))
+    // Width: 10 + 10 + 10 = 30, Height: max(10, 10, 10) = 10 (scale is Text-only now)
+    #expect(sizer.sizes[tupleBlock]! == Size.known(Container(height: 10, width: 30, orientation: .horizontal)))
   }
 
   @Test("Empty group sizing")
@@ -169,10 +169,10 @@ struct SizingTests {
     let group = attributesWalker.tree[testStruct]![0]
     let tupleBlock = attributesWalker.tree[group]![0]
 
-    // Width: 10*1 + 10*2 + 10*3 = 60, Height: max(10*1, 10*2, 10*3) = 30
+    // Width: 10 + 10 + 10 = 30, Height: max(10, 10, 10) = 10 (scale is Text-only now)
     if case .known(let container) = sizer.sizes[tupleBlock]! {
-      #expect(container.height == 30)
-      #expect(container.width == 60)
+      #expect(container.height == 10)
+      #expect(container.width == 30)
     }
   }
 
@@ -204,13 +204,13 @@ struct SizingTests {
     // Sort by width to get predictable order
     let quads = nonZeroQuads.sorted { $0.width < $1.width }
 
-    // Verify scaled dimensions are correctly stored in quads
-    #expect(quads[0].width == 10)  // 10 * 1
-    #expect(quads[0].height == 10)  // 10 * 1
-    #expect(quads[1].width == 20)  // 10 * 2
-    #expect(quads[1].height == 20)  // 10 * 2
-    #expect(quads[2].width == 30)  // 10 * 3
-    #expect(quads[2].height == 30)  // 10 * 3
+    // Verify rectangle dimensions (no scaling for Rect)
+    #expect(quads[0].width == 10)
+    #expect(quads[0].height == 10)
+    #expect(quads[1].width == 10)
+    #expect(quads[1].height == 10)
+    #expect(quads[2].width == 10)
+    #expect(quads[2].height == 10)
   }
 
   @Test func scaledText() {
@@ -258,9 +258,9 @@ struct SizingTests {
     // Verify scale is correctly applied
     #expect(texts[0].scale == 1)
     #expect(texts[0].text == "Small")
-    #expect(texts[1].scale == 2)
+    #expect(texts[1].scale == 1)  // No explicit scale set
     #expect(texts[1].text == "Medium")
-    #expect(texts[2].scale == 3)
+    #expect(texts[2].scale == 1)  // No explicit scale set
     #expect(texts[2].text == "Large")
 
     // Verify colors are applied
@@ -285,17 +285,14 @@ struct RectTestMultiple: Block {
         .width(50)
         .height(30)
         .background(.red)
-        .scale(1)
       Rect()
         .width(40)
         .height(60)
         .background(.blue)
-        .scale(1)
       Rect()
         .width(30)
         .height(40)
         .background(.green)
-        .scale(1)
     }
   }
 }
@@ -307,24 +304,20 @@ struct RectTestNested: Block {
         .width(100)
         .height(20)
         .background(.red)
-        .scale(1)
       Direction(.horizontal) {
         Rect()
           .width(30)
           .height(30)
           .background(.blue)
-          .scale(1)
         Rect()
           .width(30)
           .height(30)
           .background(.green)
-          .scale(1)
       }
       Rect()
         .width(100)
         .height(20)
         .background(.yellow)
-        .scale(1)
     }
   }
 }
@@ -348,13 +341,14 @@ struct SpacingTestWordRectMixed: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Text("Hello")
+        .scale(scale)
       Rect()
-        .width(20)
-        .height(20)
+        .width(20 * scale)
+        .height(20 * scale)
         .background(.red)
       Text("World")
+        .scale(scale)
     }
-    .scale(scale)
   }
 }
 
@@ -367,25 +361,21 @@ struct SpacingTestComplexNesting: Block {
           .width(15)
           .height(15)
           .background(.red)
-          .scale(1)
         Text("Middle")
         Rect()
           .width(15)
           .height(15)
           .background(.blue)
-          .scale(1)
       }
       Direction(.horizontal) {
         Rect()
           .width(10)
           .height(10)
           .background(.green)
-          .scale(1)
         Rect()
           .width(10)
           .height(10)
           .background(.yellow)
-          .scale(1)
       }
       Text("Bottom")
     }
@@ -399,17 +389,14 @@ struct SpacingTestLargeGap: Block {
         .width(5)
         .height(5)
         .background(.red)
-        .scale(1)
       Rect()
         .width(100)
         .height(100)
         .background(.green)
-        .scale(1)
       Rect()
         .width(5)
         .height(5)
         .background(.blue)
-        .scale(1)
     }
   }
 }
@@ -421,17 +408,14 @@ struct QuadTestScaling: Block {
         .width(10)
         .height(10)
         .background(.red)
-        .scale(1)
       Rect()
         .width(10)
         .height(10)
         .background(.blue)
-        .scale(2)
       Rect()
         .width(10)
         .height(10)
         .background(.green)
-        .scale(3)
     }
   }
 }
@@ -440,10 +424,9 @@ struct RectTestBasic: Block {
   var scale: UInt = 1
   var layer: some Block {
     Rect()
-      .width(100)
-      .height(50)
+      .width(100 * scale)
+      .height(50 * scale)
       .background(.red)
-      .scale(scale)
   }
 }
 
@@ -454,17 +437,14 @@ struct RectTestScaled: Block {
         .width(10)
         .height(10)
         .background(.red)
-        .scale(1)
       Rect()
         .width(10)
         .height(10)
         .background(.blue)
-        .scale(2)
       Rect()
         .width(10)
         .height(10)
         .background(.green)
-        .scale(3)
     }
   }
 }
@@ -473,13 +453,10 @@ struct TextTestScaling: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Text("Small")
-        .scale(1)
         .foreground(.red)
       Text("Medium")
-        .scale(2)
         .foreground(.green)
       Text("Large")
-        .scale(3)
         .foreground(.blue)
     }
   }

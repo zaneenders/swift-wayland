@@ -8,7 +8,6 @@ struct Layout: Block {
         .width(25)
         .height(25)
         .background(.yellow)
-        .scale(5)
       Direction(.horizontal) {
         Text("Left").scale(scale)
         Direction(.vertical) {
@@ -24,7 +23,6 @@ struct Layout: Block {
             .width(25)
             .height(25)
             .background(.magenta)
-            .scale(5)
           Text("Bottom").scale(scale)
         }
         Text("Right").scale(scale)
@@ -33,7 +31,6 @@ struct Layout: Block {
         .width(25)
         .height(25)
         .background(.cyan)
-        .scale(5)
     }
   }
 }
