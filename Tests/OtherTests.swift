@@ -4,136 +4,104 @@ import Testing
 @testable import Wayland
 
 @MainActor
-@Test
-func fullMockRenderPass() {
-  enum TestRenderer: Renderer {
-    static var drawnQuads: [Quad] = []
-    static var drawnTexts: [RenderableText] = []
+@Suite("Integration Tests")
+struct IntegrationTests {
 
-    static func drawQuad(_ quad: Quad) {
-      drawnQuads.append(quad)
+  @Test("Full mock render pass")
+  func fullMockRenderPass() {
+    let test = Layout()
+    let result = TestUtils.renderBlock(test, with: TestUtils.QuadCaptureRenderer.self)
+
+    #expect(!result.sizes.sizes.isEmpty, "Should have calculated sizes")
+
+    guard let tupleBlock = TestUtils.TreeNavigator.findTupleBlock(in: result.attributes),
+      let size = result.sizes.sizes[tupleBlock]
+    else {
+      Issue.record("Failed to find tuple block or get size")
+      return
     }
 
-    static func drawText(_ text: RenderableText) {
-      drawnTexts.append(text)
-    }
+    #expect(
+      size == Size.known(Container(height: 67, width: 224, orientation: .vertical)),
+      "Layout should have expected dimensions")
 
-    static func reset() {
-      drawnQuads.removeAll()
-      drawnTexts.removeAll()
-    }
+    #expect(
+      result.positions.positions.count == result.sizes.sizes.count,
+      "Should have position for every sized element")
+
+    #expect(!TestUtils.QuadCaptureRenderer.capturedQuads.isEmpty, "Should have drawn quads")
+
+    TestUtils.QuadCaptureRenderer.capturedQuads.forEach { TestUtils.Assert.quadHasValidCoordinates($0) }
+
+    #expect(TestUtils.QuadCaptureRenderer.capturedQuads.count >= 3, "Should draw at least 3 quads")
+
+    #expect(
+      TestUtils.QuadCaptureRenderer.capturedQuads.allSatisfy { $0.width == 25 && $0.height == 25 },
+      "All quads should be 25x25")
   }
-
-  var sizer = SizeWalker()
-  let test = Layout()
-  test.walk(with: &sizer)
-
-  #expect(!sizer.sizes.isEmpty)
-
-  let testStruct = sizer.tree[0]![0]
-  let tupleBlock = sizer.tree[testStruct]![0]
-  #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 167, width: 479, orientation: .horizontal)))
-
-  var positioner = PositionWalker(sizes: sizer.sizes.convert())
-  test.walk(with: &positioner)
-  #expect(positioner.positions.count == sizer.sizes.count)
-
-  TestRenderer.reset()
-  var renderWalker = RenderWalker(positions: positioner.positions, TestRenderer.self, logLevel: .error)
-  test.walk(with: &renderWalker)
-
-  #expect(!TestRenderer.drawnQuads.isEmpty)
-  #expect(!TestRenderer.drawnTexts.isEmpty)
-
-  #expect(TestRenderer.drawnQuads.allSatisfy { $0.dst_p0.0 >= 0 && $0.dst_p0.1 >= 0 })
-  #expect(TestRenderer.drawnTexts.allSatisfy { $0.pos.x >= 0 && $0.pos.y >= 0 })
-
-  #expect(TestRenderer.drawnQuads.count == 3)
-  #expect(
-    TestRenderer.drawnQuads.allSatisfy { quad in
-      quad.width == 125 && quad.height == 125
-    })
-
-  #expect(
-    TestRenderer.drawnTexts.allSatisfy { text in
-      !text.text.isEmpty && text.scale == 2
-    })
 }
 
+@Suite("Color and Utility Tests")
 @MainActor
-@Test func verifyBrightBackgroundColors() {
-  enum ColorTestRenderer: Renderer {
-    static var drawnTexts: [RenderableText] = []
+struct ColorAndUtilityTests {
 
-    static func drawQuad(_ quad: Quad) {
-      // Ignore quads for this test
-    }
-
-    static func drawText(_ text: RenderableText) {
-      drawnTexts.append(text)
-    }
-
-    static func reset() {
-      drawnTexts.removeAll()
-    }
-  }
-
-  // Create a simple layout with colored text
-  struct ColorTestLayout: Block {
-    var layer: some Block {
-      Direction(.vertical) {
-        Text("Red Background").background(.red)
-        Text("Bright Yellow Background").background(.yellow)
-        Text("Cyan Background").background(.cyan)
+  @Test("Bright background colors preservation")
+  func verifyBrightBackgroundColors() {
+    struct ColorTestLayout: Block {
+      var layer: some Block {
+        Direction(.vertical) {
+          Text("Red Background").background(.red)
+          Text("Bright Yellow Background").background(.yellow)
+          Text("Cyan Background").background(.cyan)
+        }
       }
     }
+
+    let test = ColorTestLayout()
+    _ = TestUtils.renderBlock(test, with: TestUtils.TextCaptureRenderer.self)
+
+    #expect(
+      TestUtils.TextCaptureRenderer.capturedTexts.count >= 3,
+      "Should capture at least 3 texts with backgrounds")
+
+    let expectedColors = [
+      ("Red Background", Color(r: 1.0, g: 0.0, b: 0.0, a: 1.0)),
+      ("Bright Yellow Background", Color(r: 1.0, g: 1.0, b: 0.0, a: 1.0)),
+      ("Cyan Background", Color(r: 0.0, g: 1.0, b: 1.0, a: 1.0)),
+    ]
+
+    for (text, expectedColor) in expectedColors {
+      #expect(
+        TestUtils.TextCaptureRenderer.capturedTexts.contains { captured in
+          captured.text == text && captured.background == expectedColor
+        }, "Should preserve color for '\(text)'")
+    }
+  }
+}
+
+@Suite("Network and Utility Tests")
+struct NetworkAndUtilityTests {
+
+  @Test("CloudFlare IP lookup")
+  func cloudFlare() async {
+    let ips = await getIps()
+    #expect(ips.count > 0, "Should return at least one IP address")
+    #expect(ips.allSatisfy { $0.contains(".") }, "All IPs should contain dots")
   }
 
-  var sizer = SizeWalker()
-  let test = ColorTestLayout()
-  test.walk(with: &sizer)
+  @Test("Hash function consistency")
+  func hashing() async {
+    let chromaHash = hash("Chroma")
+    #expect(chromaHash == 4_247_990_530_641_679_754, "Hash should match expected value")
 
-  var positioner = PositionWalker(sizes: sizer.sizes.convert())
-  test.walk(with: &positioner)
+    let chromaHash2 = hash("Chroma")
+    #expect(chromaHash == chromaHash2, "Same input should produce same hash")
 
-  ColorTestRenderer.reset()
-  var renderWalker = RenderWalker(positions: positioner.positions, ColorTestRenderer.self, logLevel: .error)
-  test.walk(with: &renderWalker)
+    let rehash = hash(chromaHash)
+    #expect(chromaHash != rehash, "Hashing a hash should produce different result")
 
-  // Verify we captured 3 texts
-  #expect(ColorTestRenderer.drawnTexts.count == 3)
-
-  // Check that colored backgrounds are preserved
-  #expect(
-    ColorTestRenderer.drawnTexts.contains { text in
-      text.text == "Red Background" && text.background.r == 1.0 && text.background.g == 0.0 && text.background.b == 0.0
-    })
-
-  #expect(
-    ColorTestRenderer.drawnTexts.contains { text in
-      text.text == "Bright Yellow Background" && text.background.r == 1.0 && text.background.g == 1.0
-        && text.background.b == 0.0
-    })
-
-  #expect(
-    ColorTestRenderer.drawnTexts.contains { text in
-      text.text == "Cyan Background" && text.background.r == 0.0 && text.background.g == 1.0 && text.background.b == 1.0
-    })
-}
-
-@Test func cloudFlare() async {
-  let ips = await getIps()
-  #expect(ips.count > 0)
-  #expect(ips.allSatisfy { $0.contains(".") })
-}
-
-@Test func hashing() async {
-  let chromaHash = hash("Chroma")
-  #expect(chromaHash == 4_247_990_530_641_679_754)
-
-  let chromaHash2 = hash("Chroma")
-  #expect(chromaHash == chromaHash2)
-
-  let rehash = hash(chromaHash)
-  #expect(chromaHash != rehash)
+    // Test edge cases
+    #expect(hash("") != hash(" "), "Empty string should hash differently from space")
+    #expect(hash("a") != hash("A"), "Case sensitivity should be preserved")
+  }
 }

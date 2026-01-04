@@ -4,7 +4,10 @@ struct Layout: Block {
   let scale: UInt = 2
   var layer: some Block {
     Direction(.horizontal) {
-      Rect(width: 25, height: 25, color: .yellow, scale: 5)
+      Rect()
+        .width(25)
+        .height(25)
+        .background(.yellow)
       Direction(.horizontal) {
         Text("Left").scale(scale)
         Direction(.vertical) {
@@ -16,12 +19,18 @@ struct Layout: Block {
               }
             }
           }
-          Rect(width: 25, height: 25, color: .magenta, scale: 5)
+          Rect()
+            .width(25)
+            .height(25)
+            .background(.magenta)
           Text("Bottom").scale(scale)
         }
         Text("Right").scale(scale)
       }
-      Rect(width: 25, height: 25, color: .cyan, scale: 5)
+      Rect()
+        .width(25)
+        .height(25)
+        .background(.cyan)
     }
   }
 }

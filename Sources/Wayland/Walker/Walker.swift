@@ -14,11 +14,14 @@ protocol Walker {
 extension Wayland {
   public static func render(_ block: some Block, logLevel: Logger.Level = .warning) {
     Wayland.preDraw()
-    var sizer = SizeWalker()
+    var attributesWalker = AttributesWalker()
+    block.walk(with: &attributesWalker)
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
     var positioner = PositionWalker(sizes: sizer.sizes.convert())
     block.walk(with: &positioner)
-    var renderer = RenderWalker(positions: positioner.positions, Wayland.self, logLevel: logLevel)
+    var renderer = RenderWalker(
+      positions: positioner.positions, sizes: sizer.sizes.convert(), Wayland.self, logLevel: logLevel)
     block.walk(with: &renderer)
     Wayland.postDraw()
   }
@@ -48,7 +51,7 @@ extension Block {
     return hash(current | hash("\(type(of: self))"))
   }
 
-  func _walk(with walker: inout some Walker, _ orientation: Orientation) {
+  private func _walk(with walker: inout some Walker, _ orientation: Orientation) {
     walker.before(self)
     if let group = self as? DirectionGroup {
       self.layer.walk(with: &walker, group.orientation)
@@ -63,8 +66,12 @@ extension Block {
         walker.currentId = walker.parentId
         walker.parentId = parent
       }
-    } else if (self as? Rect != nil) || (self as? Text != nil) {
+    } else if self as? Text != nil {
       // Leaf Nodes
+    } else if let attributedBlock = self as? any HasAttributes {
+      if !(attributedBlock.layer is Text) {  // Prevents double rendering for now.
+        self.layer.walk(with: &walker)
+      }
     } else {  // Composed
       self.layer.walk(with: &walker, orientation)
     }

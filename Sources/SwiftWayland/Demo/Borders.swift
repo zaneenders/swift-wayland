@@ -4,16 +4,34 @@ struct Borders: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Direction(.vertical) {
-        Text("Sharp").scale(2).forground(.white)
-        Rect(width: 40, height: 30, color: .blue, scale: 2, borderWidth: 8, borderColor: .pink, cornerRadius: 0)
+        Text("Sharp")
+        Rect()
+          .width(40)
+          .height(30)
+          .background(.blue)
+          .border(width: 8)
+          .border(color: .pink)
+          .border(radius: 0)
       }
       Direction(.vertical) {
-        Text("Rounded").scale(2).forground(.white)
-        Rect(width: 40, height: 30, color: .green, scale: 2, borderWidth: 6, borderColor: .red, cornerRadius: 8)
+        Text("Rounded")
+        Rect()
+          .width(40)
+          .height(30)
+          .background(.green)
+          .border(width: 6)
+          .border(color: .red)
+          .border(radius: 8)
       }
       Direction(.vertical) {
-        Text("Smooth").scale(2).forground(.white)
-        Rect(width: 40, height: 30, color: .purple, scale: 2, borderWidth: 4, borderColor: .yellow, cornerRadius: 15)
+        Text("Smooth")
+        Rect()
+          .width(40)
+          .height(30)
+          .background(.purple)
+          .border(width: 4)
+          .border(color: .yellow)
+          .border(radius: 15)
       }
     }
   }
