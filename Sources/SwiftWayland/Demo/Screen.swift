@@ -3,9 +3,21 @@ import Wayland
 struct Screen: Block {
   let scale: UInt
   let ips: [String]
+  let fps: String
+
+  init(scale: UInt, ips: [String], fps: String = "") {
+    self.scale = scale
+    self.ips = ips
+    self.fps = fps
+  }
+
   var layer: some Block {
     Direction(.vertical) {  // TODO: This group should be implict
       EmptyBlock()
+      if !fps.isEmpty {
+        Text(fps)
+          .foreground(.green)
+      }
       Text("Zane was here")
         .scale(scale)
         .foreground(.cyan)
