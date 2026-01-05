@@ -9,6 +9,7 @@ struct Screen: Block {
       Text("Zane was here")
         .scale(scale)
         .foreground(.cyan)
+        .padding(15)
       Layout(scale: scale)
       for ip in ips {
         Text(ip).scale(4)

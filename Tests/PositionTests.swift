@@ -14,7 +14,7 @@ struct PositionTests {
     var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
-    var positioner = PositionWalker(sizes: sizer.sizes.convert())
+    var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
     test.walk(with: &positioner)
 
     // Get the tuple block containing the rectangles
@@ -45,7 +45,7 @@ struct PositionTests {
     var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
-    var positioner = PositionWalker(sizes: sizer.sizes.convert())
+    var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
     test.walk(with: &positioner)
 
     // Get the tuple block containing rectangles

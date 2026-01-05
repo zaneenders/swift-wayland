@@ -59,7 +59,7 @@ enum TestUtils {
       }
     }
 
-    var positionWalker = PositionWalker(sizes: containers)
+    var positionWalker = PositionWalker(sizes: containers, attributes: attributesWalker.attributes)
     block.walk(with: &positionWalker)
 
     return (attributes: attributesWalker, sizes: sizeWalker, positions: positionWalker)

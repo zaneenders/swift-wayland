@@ -18,7 +18,7 @@ extension Wayland {
     block.walk(with: &attributesWalker)
     var sizer = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
-    var positioner = PositionWalker(sizes: sizer.sizes.convert())
+    var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
     block.walk(with: &positioner)
     var renderer = RenderWalker(
       positions: positioner.positions, sizes: sizer.sizes.convert(), Wayland.self, logLevel: logLevel)
