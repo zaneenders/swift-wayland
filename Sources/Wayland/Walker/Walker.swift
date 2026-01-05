@@ -13,7 +13,7 @@ protocol Walker {
 @MainActor
 extension Wayland {
   public static func render(_ block: some Block, logLevel: Logger.Level = .warning) {
-    Wayland.preDraw()
+    // TODO: TO many allocations here
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
     var sizer = SizeWalker(attributes: attributesWalker.attributes)
@@ -23,7 +23,6 @@ extension Wayland {
     var renderer = RenderWalker(
       positions: positioner.positions, sizes: sizer.sizes.convert(), Wayland.self, logLevel: logLevel)
     block.walk(with: &renderer)
-    Wayland.postDraw()
   }
 }
 

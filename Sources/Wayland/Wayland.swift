@@ -11,38 +11,31 @@ protocol Renderer {
   static func drawQuad(_ quad: Quad)
 }
 
+public enum State {
+  case running
+  case error(reason: String)
+  case exit
+
+  var isRunning: Bool {
+    switch self {
+    case .running: true
+    case .error, .exit: false
+    }
+  }
+}
+
+@MainActor
+struct Glyph {
+  var rows: [String] = Array(repeating: "", count: Int(Wayland.glyphH))
+}
+
 /// There is alot of global state here to setup and conform to Wayland's patterns.
 /// Their might be better ways to abstract this and clean it up a bit. But it's
 /// working for now.
 @MainActor
 public enum Wayland: Renderer {
 
-  @MainActor struct Glyph {
-    var rows: [String] = Array(repeating: "", count: Int(glyphH))
-  }
-
-  public enum State {
-    case running
-    case error(reason: String)
-    case exit
-
-    var isRunning: Bool {
-      switch self {
-      case .running: true
-      case .error, .exit: false
-      }
-    }
-  }
-
   public internal(set) static var state: State = .running
-
-  public static func exit() {
-    state = .exit
-  }
-
-  public static var currentFPS: Double {
-    fps
-  }
 
   public static let glyphW: UInt = 5
   public static let glyphH: UInt = 7
@@ -95,6 +88,24 @@ public enum Wayland: Renderer {
   #else
   static var xdgSurface: OpaquePointer!
   #endif
+
+  static var start = ContinuousClock.now
+  static var end = ContinuousClock.now
+  public internal(set) static var elapsed: Duration = end - start
+
+  public internal(set) static var refresh_rate: Duration = .milliseconds(16)
+  static var lastFrameTime: ContinuousClock.Instant = ContinuousClock.now
+  static var frameCount: UInt = 0
+  static var fps: Double = 0.0
+  static var fpsUpdateTime: ContinuousClock.Instant = ContinuousClock.now
+
+  public static func exit() {
+    state = .exit
+  }
+
+  public static var currentFPS: Double {
+    fps
+  }
 
   static func initEGL() throws(WaylandError) {
     unsafe eglDisplay = eglGetDisplay(EGLNativeDisplayType(display))
@@ -537,10 +548,6 @@ public enum Wayland: Renderer {
     elapsed = end - start
   }
 
-  static var start = ContinuousClock.now
-  static var end = ContinuousClock.now
-  public internal(set) static var elapsed: Duration = end - start
-
   static var frameListener = unsafe wl_callback_listener(
     done: { _, callback, _time in
       unsafe wl_callback_destroy(callback)
@@ -581,13 +588,7 @@ public enum Wayland: Renderer {
   #endif
   static var registryListener = unsafe wl_registry_listener(global: onGlobal, global_remove: { _, _, _ in })
 
-  static var refresh_rate: Duration = .milliseconds(16)
-  static var lastFrameTime: ContinuousClock.Instant = ContinuousClock.now
-  static var frameCount: UInt = 0
-  static var fps: Double = 0.0
-  static var fpsUpdateTime: ContinuousClock.Instant = ContinuousClock.now
-
-  public static func setup(_ refresh_rate: Duration = .milliseconds(16)) {
+  public static func setup(_ refresh_rate: Duration = refresh_rate) {
     self.refresh_rate = refresh_rate
     Task {
       unsafe display = wl_display_connect(nil)
