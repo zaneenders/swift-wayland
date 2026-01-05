@@ -40,6 +40,10 @@ public enum Wayland: Renderer {
     state = .exit
   }
 
+  public static var currentFPS: Double {
+    fps
+  }
+
   public static let glyphW: UInt = 5
   public static let glyphH: UInt = 7
   public static let glyphSpacing: UInt = 1
@@ -578,6 +582,10 @@ public enum Wayland: Renderer {
   static var registryListener = unsafe wl_registry_listener(global: onGlobal, global_remove: { _, _, _ in })
 
   static var refresh_rate: Duration = .milliseconds(33)
+  static var lastFrameTime: ContinuousClock.Instant = ContinuousClock.now
+  static var frameCount: UInt128 = 0
+  static var fps: Double = 0.0
+  static var fpsUpdateTime: ContinuousClock.Instant = ContinuousClock.now
 
   public static func setup(_ refresh_rate: Duration = .milliseconds(33)) {
     self.refresh_rate = refresh_rate
@@ -777,6 +785,20 @@ public enum Wayland: Renderer {
       // Render loop
       while Wayland.state.isRunning {
         try? await Task.sleep(for: refresh_rate)
+
+        // Calculate FPS
+        let now = ContinuousClock.now
+        _ = now - lastFrameTime
+        lastFrameTime = now
+
+        frameCount += 1
+        let fpsDelta = now - fpsUpdateTime
+        if fpsDelta >= .seconds(1) {
+          fps = Double(frameCount) / Double(fpsDelta.components.seconds)
+          frameCount = 0
+          fpsUpdateTime = now
+        }
+
         send(.frame(height: UInt(winH), width: UInt(winW)))
       }
       continuation?.finish()
