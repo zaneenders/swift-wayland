@@ -583,7 +583,7 @@ public enum Wayland: Renderer {
 
   static var refresh_rate: Duration = .milliseconds(16)
   static var lastFrameTime: ContinuousClock.Instant = ContinuousClock.now
-  static var frameCount: UInt128 = 0
+  static var frameCount: UInt = 0
   static var fps: Double = 0.0
   static var fpsUpdateTime: ContinuousClock.Instant = ContinuousClock.now
 
