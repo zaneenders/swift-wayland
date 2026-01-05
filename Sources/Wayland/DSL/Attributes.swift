@@ -1,3 +1,33 @@
+struct Padding {
+  var top: UInt?
+  var right: UInt?
+  var bottom: UInt?
+  var left: UInt?
+
+  init() {}
+
+  init(all: UInt) {
+    self.top = all
+    self.right = all
+    self.bottom = all
+    self.left = all
+  }
+
+  init(top: UInt? = nil, right: UInt? = nil, bottom: UInt? = nil, left: UInt? = nil) {
+    self.top = top
+    self.right = right
+    self.bottom = bottom
+    self.left = left
+  }
+
+  init(horizontal: UInt, vertical: UInt) {
+    self.top = vertical
+    self.bottom = vertical
+    self.left = horizontal
+    self.right = horizontal
+  }
+}
+
 struct Attributes {
   var width: UInt?
   var height: UInt?
@@ -7,12 +37,14 @@ struct Attributes {
   var borderWidth: UInt?
   var borderRadius: UInt?
   var scale: UInt?
+  var padding: Padding?
 
   init() {}
 
   init(
     width: UInt? = nil, height: UInt? = nil, foreground: Color? = nil, background: Color? = nil,
-    borderColor: Color? = nil, borderWidth: UInt? = nil, borderRadius: UInt? = nil, scale: UInt? = nil
+    borderColor: Color? = nil, borderWidth: UInt? = nil, borderRadius: UInt? = nil, scale: UInt? = nil,
+    padding: Padding? = nil
   ) {
     self.width = width
     self.height = height
@@ -22,6 +54,7 @@ struct Attributes {
     self.borderWidth = borderWidth
     self.borderRadius = borderRadius
     self.scale = scale
+    self.padding = padding
   }
 
   func apply(_ other: Attributes) -> Attributes {
@@ -34,6 +67,7 @@ struct Attributes {
     copy.borderWidth = other.borderWidth
     copy.borderRadius = other.borderRadius
     copy.scale = other.scale
+    copy.padding = other.padding
     return copy
   }
 }
@@ -87,6 +121,32 @@ extension Block {
     newBlock.attributes.borderRadius = radius
     return newBlock
   }
+
+  public func padding(_ padding: UInt) -> AttributedBlock<Self> {
+    var newBlock = AttributedBlock(wrapped: self)
+    newBlock.attributes.padding = Padding(all: padding)
+    return newBlock
+  }
+
+  public func padding(top: UInt, right: UInt, bottom: UInt, left: UInt) -> AttributedBlock<Self> {
+    var newBlock = AttributedBlock(wrapped: self)
+    newBlock.attributes.padding = Padding(top: top, right: right, bottom: bottom, left: left)
+    return newBlock
+  }
+
+  public func padding(horizontal: UInt, vertical: UInt) -> AttributedBlock<Self> {
+    var newBlock = AttributedBlock(wrapped: self)
+    newBlock.attributes.padding = Padding(horizontal: horizontal, vertical: vertical)
+    return newBlock
+  }
+
+  public func padding(top: UInt? = nil, right: UInt? = nil, bottom: UInt? = nil, left: UInt? = nil) -> AttributedBlock<
+    Self
+  > {
+    var newBlock = AttributedBlock(wrapped: self)
+    newBlock.attributes.padding = Padding(top: top, right: right, bottom: bottom, left: left)
+    return newBlock
+  }
 }
 
 extension Text {
@@ -98,6 +158,32 @@ extension Text {
   public func scale(_ scale: UInt) -> AttributedBlock<Self> {
     var newBlock = AttributedBlock(wrapped: self)
     newBlock.attributes.scale = scale
+    return newBlock
+  }
+
+  public func padding(_ padding: UInt) -> AttributedBlock<Self> {
+    var newBlock = AttributedBlock(wrapped: self)
+    newBlock.attributes.padding = Padding(all: padding)
+    return newBlock
+  }
+
+  public func padding(top: UInt, right: UInt, bottom: UInt, left: UInt) -> AttributedBlock<Self> {
+    var newBlock = AttributedBlock(wrapped: self)
+    newBlock.attributes.padding = Padding(top: top, right: right, bottom: bottom, left: left)
+    return newBlock
+  }
+
+  public func padding(horizontal: UInt, vertical: UInt) -> AttributedBlock<Self> {
+    var newBlock = AttributedBlock(wrapped: self)
+    newBlock.attributes.padding = Padding(horizontal: horizontal, vertical: vertical)
+    return newBlock
+  }
+
+  public func padding(top: UInt? = nil, right: UInt? = nil, bottom: UInt? = nil, left: UInt? = nil) -> AttributedBlock<
+    Self
+  > {
+    var newBlock = AttributedBlock(wrapped: self)
+    newBlock.attributes.padding = Padding(top: top, right: right, bottom: bottom, left: left)
     return newBlock
   }
 }
@@ -137,6 +223,30 @@ extension AttributedBlock {
   public func border(radius: UInt) -> Self {
     var copy = self
     copy.attributes.borderRadius = radius
+    return copy
+  }
+
+  public func padding(_ padding: UInt) -> Self {
+    var copy = self
+    copy.attributes.padding = Padding(all: padding)
+    return copy
+  }
+
+  public func padding(top: UInt, right: UInt, bottom: UInt, left: UInt) -> Self {
+    var copy = self
+    copy.attributes.padding = Padding(top: top, right: right, bottom: bottom, left: left)
+    return copy
+  }
+
+  public func padding(horizontal: UInt, vertical: UInt) -> Self {
+    var copy = self
+    copy.attributes.padding = Padding(horizontal: horizontal, vertical: vertical)
+    return copy
+  }
+
+  public func padding(top: UInt? = nil, right: UInt? = nil, bottom: UInt? = nil, left: UInt? = nil) -> Self {
+    var copy = self
+    copy.attributes.padding = Padding(top: top, right: right, bottom: bottom, left: left)
     return copy
   }
 }

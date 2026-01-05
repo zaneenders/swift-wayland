@@ -13,7 +13,7 @@ func runDemo() async {
   event_loop: for await ev in Wayland.events() {
     switch ev {
     case .frame(let winH, let winW):
-      let screen = Screen(ips: ips)
+      let screen = Screen(scale: 2, ips: ips)
       Wayland.render(screen)
       frameLogger.trace("\(Wayland.elapsed)")
     case .key(let code, let keyState):

@@ -65,6 +65,10 @@ struct SizeWalker: Walker {
         height = attrHeight
       }
     }
+    if let padding = attributes.padding {
+      width += (padding.left ?? 0) + (padding.right ?? 0)
+      height += (padding.top ?? 0) + (padding.bottom ?? 0)
+    }
 
     sizes[currentId] = .known(Container(height: height, width: width, orientation: currentOrentation))
   }
