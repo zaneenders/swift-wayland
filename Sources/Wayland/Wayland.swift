@@ -581,13 +581,13 @@ public enum Wayland: Renderer {
   #endif
   static var registryListener = unsafe wl_registry_listener(global: onGlobal, global_remove: { _, _, _ in })
 
-  static var refresh_rate: Duration = .milliseconds(33)
+  static var refresh_rate: Duration = .milliseconds(16)
   static var lastFrameTime: ContinuousClock.Instant = ContinuousClock.now
   static var frameCount: UInt128 = 0
   static var fps: Double = 0.0
   static var fpsUpdateTime: ContinuousClock.Instant = ContinuousClock.now
 
-  public static func setup(_ refresh_rate: Duration = .milliseconds(33)) {
+  public static func setup(_ refresh_rate: Duration = .milliseconds(16)) {
     self.refresh_rate = refresh_rate
     Task {
       unsafe display = wl_display_connect(nil)
