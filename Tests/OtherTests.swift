@@ -9,7 +9,7 @@ struct IntegrationTests {
 
   @Test("Full mock render pass")
   func fullMockRenderPass() {
-    let test = Layout()
+    let test = Layout(scale: 1)
     let result = TestUtils.renderBlock(test, with: TestUtils.QuadCaptureRenderer.self)
 
     #expect(!result.sizes.sizes.isEmpty, "Should have calculated sizes")
@@ -22,7 +22,7 @@ struct IntegrationTests {
     }
 
     #expect(
-      size == Size.known(Container(height: 67, width: 224, orientation: .vertical)),
+      size == Size.known(Container(height: 46, width: 137, orientation: .vertical)),
       "Layout should have expected dimensions")
 
     #expect(

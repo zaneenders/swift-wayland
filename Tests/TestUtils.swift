@@ -9,9 +9,9 @@ enum TestUtils {
 
   /// Common renderer for capturing quads during tests
   enum QuadCaptureRenderer: Renderer {
-    static var capturedQuads: [Quad] = []
+    static var capturedQuads: [RenderableQuad] = []
 
-    static func drawQuad(_ quad: Quad) {
+    static func drawQuad(_ quad: RenderableQuad) {
       capturedQuads.append(quad)
     }
 
@@ -28,7 +28,7 @@ enum TestUtils {
   enum TextCaptureRenderer: Renderer {
     static var capturedTexts: [RenderableText] = []
 
-    static func drawQuad(_ quad: Quad) {}
+    static func drawQuad(_ quad: RenderableQuad) {}
 
     static func drawText(_ text: RenderableText) {
       capturedTexts.append(text)
@@ -59,7 +59,7 @@ enum TestUtils {
       }
     }
 
-    var positionWalker = PositionWalker(sizes: containers)
+    var positionWalker = PositionWalker(sizes: containers, attributes: attributesWalker.attributes)
     block.walk(with: &positionWalker)
 
     return (attributes: attributesWalker, sizes: sizeWalker, positions: positionWalker)
@@ -151,7 +151,7 @@ enum TestUtils {
       }
     }
 
-    static func quadHasValidCoordinates(_ quad: Quad) {
+    static func quadHasValidCoordinates(_ quad: RenderableQuad) {
       #expect(quad.dst_p0.0 >= 0 && quad.dst_p0.1 >= 0, "Quad position should be non-negative")
       #expect(quad.width > 0 && quad.height > 0, "Quad dimensions should be positive")
     }

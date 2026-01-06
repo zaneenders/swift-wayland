@@ -1,10 +1,12 @@
 import Wayland
 
 struct Screen: Block {
+  let scale: UInt
   let ips: [String]
   let fps: String
 
-  init(ips: [String], fps: String = "") {
+  init(scale: UInt, ips: [String], fps: String = "") {
+    self.scale = scale
     self.ips = ips
     self.fps = fps
   }
@@ -15,16 +17,20 @@ struct Screen: Block {
       if !fps.isEmpty {
         Text(fps)
           .foreground(.green)
+          .padding(5)
       }
       Text("Zane was here")
+        .scale(scale)
         .foreground(.cyan)
-      Layout()
+        .padding(15)
+      Layout(scale: scale)
       for ip in ips {
         Text(ip).scale(4)
-          .foreground(.black)
-          .background(.random)
+          .foreground(.random)
+          .background(.white)
+          .padding(5)
       }
-      Borders()
+      Borders(scale: scale)
       Rect()
     }
   }

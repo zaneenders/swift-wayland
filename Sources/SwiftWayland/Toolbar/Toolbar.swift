@@ -6,9 +6,9 @@ struct SystemClock: Block {
   var time: String
   var layer: some Block {
     // TODO display to the right side of the screen
-    Word(time).scale(2)
+    Text(time).scale(2)
+      .foreground(.teal)
       .background(.black)
-      .forground(.teal)
   }
 }
 
@@ -21,9 +21,11 @@ func runToolbar() async {
   event_loop: for await ev in Wayland.events() {
     switch ev {
     case .frame(let winH, let winW):
+      Wayland.preDraw()
       let today = formatter.string(from: Date())
       let block = SystemClock(time: today)
-      Wayland.draw(block)
+      Wayland.render(block)
+      Wayland.postDraw()
     }
   }
 

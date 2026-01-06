@@ -49,6 +49,6 @@ func getIps() async -> [String] {
   }
   let ips = data.result.ipv4Cidrs
   let end = ContinuousClock.now
-  print(start.duration(to: end))
+  print("Request time:", start.duration(to: end))
   return ips
 }

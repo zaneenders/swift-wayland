@@ -184,7 +184,7 @@ struct SizingTests {
     var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
-    var positioner = PositionWalker(sizes: sizer.sizes.convert())
+    var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
     test.walk(with: &positioner)
 
     // Reset renderer and capture quads
@@ -240,7 +240,7 @@ struct SizingTests {
     var sizer = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
 
-    var positioner = PositionWalker(sizes: sizer.sizes.convert())
+    var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
     block.walk(with: &positioner)
 
     // Reset renderer and capture text
@@ -465,7 +465,7 @@ struct TextTestScaling: Block {
 enum TextCaptureRenderer: Renderer {
   static var capturedTexts: [RenderableText] = []
 
-  static func drawQuad(_ quad: Quad) {}
+  static func drawQuad(_ quad: RenderableQuad) {}
 
   static func drawText(_ text: RenderableText) {
     capturedTexts.append(text)
@@ -477,9 +477,9 @@ enum TextCaptureRenderer: Renderer {
 }
 
 enum QuadCaptureRenderer: Renderer {
-  static var capturedQuads: [Quad] = []
+  static var capturedQuads: [RenderableQuad] = []
 
-  static func drawQuad(_ quad: Quad) {
+  static func drawQuad(_ quad: RenderableQuad) {
 
     capturedQuads.append(quad)
   }

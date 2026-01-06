@@ -34,7 +34,11 @@ struct RenderWalker: Walker {
       let scale = attributedBlock.attributes.scale ?? defaultScale
       let foreground = attributedBlock.attributes.foreground ?? .white
       let background = attributedBlock.attributes.background ?? .black
-      drawer.drawText(word.draw(at: (pos.y, pos.x), scale: scale, forground: foreground, background: background))
+      let padding = attributedBlock.attributes.padding ?? Padding()
+      let px = padding.left ?? 0
+      let py = padding.top ?? 0
+      drawer.drawText(
+        word.draw(at: (pos.y + py, pos.x + px), scale: scale, forground: foreground, background: background))
       return
     }
 
@@ -46,9 +50,12 @@ struct RenderWalker: Walker {
     if let attributedBlock = block as? any HasAttributes,
       let size = sizes[currentId]
     {
-      let quad = Quad(
-        dst_p0: (pos.x, pos.y),
-        dst_p1: (pos.x + size.width, pos.y + size.height),
+      let padding = attributedBlock.attributes.padding ?? Padding()
+      let px = padding.left ?? 0
+      let py = padding.top ?? 0
+      let quad = RenderableQuad(
+        dst_p0: (pos.x + px, pos.y + py),
+        dst_p1: (pos.x + px + size.width, pos.y + py + size.height),
         tex_tl: (0, 0),
         tex_br: (1, 1),
         color: attributedBlock.attributes.background ?? .white,

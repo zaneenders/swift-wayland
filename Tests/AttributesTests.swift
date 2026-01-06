@@ -5,6 +5,30 @@ import Testing
 @Suite
 @MainActor
 struct AttributesTests {
+  struct PaddingTest: Block {
+    let padding: UInt
+    var layer: some Block {
+      Text("Padding")
+        .padding(padding)
+    }
+  }
+
+  @Test
+  func testBasicPadding() {
+    let padding: UInt = 15
+    let test = PaddingTest(padding: padding)
+    let (attributes, sizes, positions) = TestUtils.walkBlock(test)
+    let root = attributes.tree[0]![0]
+    let node = sizes.sizes[root]!
+    switch node {
+    case .known(let container):
+      #expect(container.height == 7 + (padding * 2))
+      #expect(container.width == 41 + (padding * 2))
+    case .unknown(_):
+      Issue.record("unknown size")
+    }
+  }
+
   struct IDK: Block {
     var layer: some Block {
       Text("IDk")

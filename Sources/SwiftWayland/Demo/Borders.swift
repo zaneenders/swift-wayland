@@ -1,13 +1,15 @@
 import Wayland
 
 struct Borders: Block {
+  let scale: UInt
   var layer: some Block {
     Direction(.horizontal) {
       Direction(.vertical) {
         Text("Sharp")
+          .scale(scale)
         Rect()
-          .width(40)
-          .height(30)
+          .width(40 * scale)
+          .height(30 * scale)
           .background(.blue)
           .border(width: 8)
           .border(color: .pink)
@@ -15,9 +17,10 @@ struct Borders: Block {
       }
       Direction(.vertical) {
         Text("Rounded")
+          .scale(scale)
         Rect()
-          .width(40)
-          .height(30)
+          .width(40 * scale)
+          .height(30 * scale)
           .background(.green)
           .border(width: 6)
           .border(color: .red)
@@ -25,9 +28,10 @@ struct Borders: Block {
       }
       Direction(.vertical) {
         Text("Smooth")
+          .scale(scale)
         Rect()
-          .width(40)
-          .height(30)
+          .width(40 * scale)
+          .height(30 * scale)
           .background(.purple)
           .border(width: 4)
           .border(color: .yellow)

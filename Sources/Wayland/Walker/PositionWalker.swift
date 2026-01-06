@@ -3,14 +3,16 @@ struct PositionWalker: Walker {
 
   var currentId: Hash = 0
   var parentId: Hash = 0
+  var attributes: [Hash: Attributes]
   private(set) var positions: [Hash: (x: UInt, y: UInt)] = [:]
   private var sizes: [Hash: Container]
   private var currentX: UInt = 0
   private var currentY: UInt = 0
   private var layoutStack: [LayoutContext] = []
 
-  init(sizes: [Hash: Container]) {
+  init(sizes: [Hash: Container], attributes: [Hash: Attributes]) {
     self.sizes = sizes
+    self.attributes = attributes
   }
 
   mutating func before(_ block: some Block) {

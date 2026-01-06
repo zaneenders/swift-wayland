@@ -22,8 +22,7 @@ struct SizeWalker: Walker {
 
     if let attributes = attributes[currentId] {
       apply(attributes: attributes, block)
-    }
-    if block is any HasAttributes {
+    } else if block is any HasAttributes {
       // Skip over attributes blocks
     } else if let text = block as? Text {
       guard !text.label.contains("\n") else {
@@ -64,6 +63,10 @@ struct SizeWalker: Walker {
       if let attrHeight = attributes.height {
         height = attrHeight
       }
+    }
+    if let padding = attributes.padding {
+      width += (padding.left ?? 0) + (padding.right ?? 0)
+      height += (padding.top ?? 0) + (padding.bottom ?? 0)
     }
 
     sizes[currentId] = .known(Container(height: height, width: width, orientation: currentOrentation))
