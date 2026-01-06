@@ -465,7 +465,7 @@ struct TextTestScaling: Block {
 enum TextCaptureRenderer: Renderer {
   static var capturedTexts: [RenderableText] = []
 
-  static func drawQuad(_ quad: Quad) {}
+  static func drawQuad(_ quad: RenderableQuad) {}
 
   static func drawText(_ text: RenderableText) {
     capturedTexts.append(text)
@@ -477,9 +477,9 @@ enum TextCaptureRenderer: Renderer {
 }
 
 enum QuadCaptureRenderer: Renderer {
-  static var capturedQuads: [Quad] = []
+  static var capturedQuads: [RenderableQuad] = []
 
-  static func drawQuad(_ quad: Quad) {
+  static func drawQuad(_ quad: RenderableQuad) {
 
     capturedQuads.append(quad)
   }
