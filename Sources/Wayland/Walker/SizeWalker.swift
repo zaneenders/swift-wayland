@@ -57,11 +57,11 @@ struct SizeWalker: Walker {
       width = text.width(attributes.scale ?? defaultScale)
       height = text.height(attributes.scale ?? defaultScale)
     } else {
-      if let attrWidth = attributes.width {
-        width = attrWidth
+      if case .fixed(let w) = attributes.width {
+        width = w
       }
-      if let attrHeight = attributes.height {
-        height = attrHeight
+      if case .fixed(let h) = attributes.height {
+        height = h
       }
     }
     if let padding = attributes.padding {

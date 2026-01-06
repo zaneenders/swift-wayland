@@ -282,16 +282,16 @@ struct RectTestMultiple: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Rect()
-        .width(50)
-        .height(30)
+        .width(.fixed(50))
+        .height(.fixed(30))
         .background(.red)
       Rect()
-        .width(40)
-        .height(60)
+        .width(.fixed(40))
+        .height(.fixed(60))
         .background(.blue)
       Rect()
-        .width(30)
-        .height(40)
+        .width(.fixed(30))
+        .height(.fixed(40))
         .background(.green)
     }
   }
@@ -301,22 +301,22 @@ struct RectTestNested: Block {
   var layer: some Block {
     Direction(.vertical) {
       Rect()
-        .width(100)
-        .height(20)
+        .width(.fixed(100))
+        .height(.fixed(20))
         .background(.red)
       Direction(.horizontal) {
         Rect()
-          .width(30)
-          .height(30)
+          .width(.fixed(30))
+          .height(.fixed(30))
           .background(.blue)
         Rect()
-          .width(30)
-          .height(30)
+          .width(.fixed(30))
+          .height(.fixed(30))
           .background(.green)
       }
       Rect()
-        .width(100)
-        .height(20)
+        .width(.fixed(100))
+        .height(.fixed(20))
         .background(.yellow)
     }
   }
@@ -343,8 +343,8 @@ struct SpacingTestWordRectMixed: Block {
       Text("Hello")
         .scale(scale)
       Rect()
-        .width(20 * scale)
-        .height(20 * scale)
+        .width(.fixed(20 * scale))
+        .height(.fixed(20 * scale))
         .background(.red)
       Text("World")
         .scale(scale)
@@ -358,23 +358,23 @@ struct SpacingTestComplexNesting: Block {
       Text("Top")
       Direction(.horizontal) {
         Rect()
-          .width(15)
-          .height(15)
+          .width(.fixed(15))
+          .height(.fixed(15))
           .background(.red)
         Text("Middle")
         Rect()
-          .width(15)
-          .height(15)
+          .width(.fixed(15))
+          .height(.fixed(15))
           .background(.blue)
       }
       Direction(.horizontal) {
         Rect()
-          .width(10)
-          .height(10)
+          .width(.fixed(10))
+          .height(.fixed(10))
           .background(.green)
         Rect()
-          .width(10)
-          .height(10)
+          .width(.fixed(10))
+          .height(.fixed(10))
           .background(.yellow)
       }
       Text("Bottom")
@@ -386,16 +386,16 @@ struct SpacingTestLargeGap: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Rect()
-        .width(5)
-        .height(5)
+        .width(.fixed(5))
+        .height(.fixed(5))
         .background(.red)
       Rect()
-        .width(100)
-        .height(100)
+        .width(.fixed(100))
+        .height(.fixed(100))
         .background(.green)
       Rect()
-        .width(5)
-        .height(5)
+        .width(.fixed(5))
+        .height(.fixed(5))
         .background(.blue)
     }
   }
@@ -405,16 +405,16 @@ struct QuadTestScaling: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.red)
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.blue)
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.green)
     }
   }
@@ -424,8 +424,8 @@ struct RectTestBasic: Block {
   var scale: UInt = 1
   var layer: some Block {
     Rect()
-      .width(100 * scale)
-      .height(50 * scale)
+      .width(.fixed(100 * scale))
+      .height(.fixed(50 * scale))
       .background(.red)
   }
 }
@@ -434,16 +434,16 @@ struct RectTestScaled: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.red)
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.blue)
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.green)
     }
   }

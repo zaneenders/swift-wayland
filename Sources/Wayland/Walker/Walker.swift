@@ -19,7 +19,7 @@ extension Wayland {
     var sizer = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
     let containers = sizer.sizes.convert()
-    var grower = GrowWalker(sizes: containers)
+    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
     block.walk(with: &grower)
     var positioner = PositionWalker(sizes: containers, attributes: attributesWalker.attributes)
     block.walk(with: &positioner)

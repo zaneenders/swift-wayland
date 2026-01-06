@@ -52,7 +52,7 @@ enum TestUtils {
     block.walk(with: &sizeWalker)
 
     let containers = sizeWalker.sizes.convert()
-    var grower = GrowWalker(sizes: containers)
+    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
     block.walk(with: &grower)
 
     var positionWalker = PositionWalker(sizes: containers, attributes: attributesWalker.attributes)
