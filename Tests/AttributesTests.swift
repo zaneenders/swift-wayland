@@ -17,7 +17,7 @@ struct AttributesTests {
   func testBasicPadding() {
     let padding: UInt = 15
     let test = PaddingTest(padding: padding)
-    let (attributes, sizes, positions) = TestUtils.walkBlock(test)
+    let (attributes, sizes, positions, grower) = TestUtils.walkBlock(test)
     let root = attributes.tree[0]![0]
     let node = sizes.sizes[root]!
     switch node {
