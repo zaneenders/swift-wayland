@@ -17,6 +17,7 @@ struct Screen: Block {
       if !fps.isEmpty {
         Text(fps)
           .foreground(.green)
+          .padding(5)
       }
       Text("Zane was here")
         .scale(scale)
@@ -25,8 +26,9 @@ struct Screen: Block {
       Layout(scale: scale)
       for ip in ips {
         Text(ip).scale(4)
-          .foreground(.black)
-          .background(.random)
+          .foreground(.random)
+          .background(.white)
+          .padding(5)
       }
       Borders(scale: scale)
       Rect()

@@ -8,7 +8,7 @@ import Foundation
 @MainActor
 protocol Renderer {
   static func drawText(_ text: RenderableText)
-  static func drawQuad(_ quad: Quad)
+  static func drawQuad(_ quad: RenderableQuad)
 }
 
 public enum State {
@@ -230,9 +230,9 @@ public enum Wayland: Renderer {
     unsafe glGenBuffers(1, &instanceVBO)
     glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
     glBufferData(
-      GLenum(GL_ARRAY_BUFFER), 4000 * MemoryLayout<Quad>.stride, nil, GLenum(GL_DYNAMIC_DRAW))
+      GLenum(GL_ARRAY_BUFFER), 4000 * MemoryLayout<RenderableQuad>.stride, nil, GLenum(GL_DYNAMIC_DRAW))
 
-    let stride = GLsizei(MemoryLayout<Quad>.stride)
+    let stride = GLsizei(MemoryLayout<RenderableQuad>.stride)
     glEnableVertexAttribArray(1)
     unsafe glVertexAttribPointer(
       1, 2, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: 0 + 0))
@@ -453,12 +453,12 @@ public enum Wayland: Renderer {
     return (u0, v0, u1, v1)
   }
 
-  static func drawQuad(_ quad: Quad) {
+  static func drawQuad(_ quad: RenderableQuad) {
     glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
-    let rects: InlineArray<1, Quad> = [quad]
+    let rects: InlineArray<1, RenderableQuad> = [quad]
     unsafe rects.span.withUnsafeBytes { buf in
       glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-      unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, MemoryLayout<Quad>.stride, buf.baseAddress)
+      unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, MemoryLayout<RenderableQuad>.stride, buf.baseAddress)
     }
     glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, 1)
   }
@@ -479,7 +479,7 @@ public enum Wayland: Renderer {
     let textHeight = glyphH * text.scale
 
     drawQuad(
-      Quad(
+      RenderableQuad(
         dst_p0: (penX, penY),
         dst_p1: (penX + totalWidth, penY + textHeight),
         tex_tl: (0, 0),
@@ -490,9 +490,9 @@ public enum Wayland: Renderer {
 
     // Draw text
     glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
-    var symbols = ContiguousArray<Quad>(
+    var symbols = ContiguousArray<RenderableQuad>(
       repeating:
-        Quad(
+        RenderableQuad(
           dst_p0: (0, 0),
           dst_p1: (0, 0),
           tex_tl: (0, 0),
@@ -506,7 +506,7 @@ public enum Wayland: Renderer {
       let (u0, v0, u1, v1) = glyphUV(c)
       let w = glyphW * text.scale
       let h = glyphH * text.scale
-      symbols[i] = Quad(
+      symbols[i] = RenderableQuad(
         dst_p0: (penX, penY),
         dst_p1: (penX + w, penY + h),
         tex_tl: (u0, v0),
@@ -521,7 +521,7 @@ public enum Wayland: Renderer {
     unsafe symbols.withUnsafeBytes { buf in
       glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
       unsafe glBufferSubData(
-        GLenum(GL_ARRAY_BUFFER), 0, symbols.count * MemoryLayout<Quad>.stride, buf.baseAddress)
+        GLenum(GL_ARRAY_BUFFER), 0, symbols.count * MemoryLayout<RenderableQuad>.stride, buf.baseAddress)
     }
     glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(symbols.count))
   }

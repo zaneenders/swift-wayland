@@ -1,4 +1,4 @@
-struct Quad: BitwiseCopyable {
+struct RenderableQuad: BitwiseCopyable {
   var dst_p0: (Float, Float)
   var dst_p1: (Float, Float)
   var tex_tl: (Float, Float)

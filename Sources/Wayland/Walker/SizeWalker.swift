@@ -22,8 +22,7 @@ struct SizeWalker: Walker {
 
     if let attributes = attributes[currentId] {
       apply(attributes: attributes, block)
-    }
-    if block is any HasAttributes {
+    } else if block is any HasAttributes {
       // Skip over attributes blocks
     } else if let text = block as? Text {
       guard !text.label.contains("\n") else {
