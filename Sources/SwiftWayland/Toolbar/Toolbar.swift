@@ -24,7 +24,7 @@ func runToolbar() async {
       Wayland.preDraw()
       let today = formatter.string(from: Date())
       let block = SystemClock(time: today)
-      Wayland.render(block)
+      Wayland.render(block, height: winH, width: winw)
       Wayland.postDraw()
     }
   }
