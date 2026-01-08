@@ -3,6 +3,9 @@ import Testing
 
 @testable import Wayland
 
+let width: UInt = 600
+let height: UInt = 400
+
 /// Test utilities to reduce duplication and improve test reliability
 @MainActor
 enum TestUtils {
@@ -42,7 +45,7 @@ enum TestUtils {
   }
 
   /// Walk a block through all standard walkers
-  static func walkBlock(_ block: any Block) -> (
+  static func walkBlock(_ block: any Block, height: UInt, width: UInt) -> (
     attributes: AttributesWalker, sizes: SizeWalker, positions: PositionWalker, grower: GrowWalker
   ) {
     var attributesWalker = AttributesWalker()
@@ -62,10 +65,10 @@ enum TestUtils {
   }
 
   /// Render a block with specified renderer
-  static func renderBlock(_ block: any Block, with renderer: any Renderer.Type) -> (
+  static func renderBlock(_ block: any Block, height: UInt, width: UInt, with renderer: any Renderer.Type) -> (
     attributes: AttributesWalker, sizes: SizeWalker, positions: PositionWalker, grower: GrowWalker
   ) {
-    let result = walkBlock(block)
+    let result = walkBlock(block, height: height, width: width)
 
     // Reset renderer if it has a reset method
     if let resettableRenderer = renderer as? any TestResettableRenderer.Type {
