@@ -29,6 +29,23 @@ struct AttributesTests {
     }
   }
 
+  @Test
+  func basicGrow() {
+    let padding: UInt = 15
+    let test = Grow()
+    let (attributes, sizes, positions, grower) = TestUtils.walkBlock(test, height: height, width: width)
+    let root = attributes.tree[0]![0]
+    let node = sizes.sizes[root]!
+    print(node)
+  }
+
+  struct Grow: Block {
+    var layer: some Block {
+      Rect().height(.grow).width(.grow)
+        .background(.red)
+    }
+  }
+
   struct IDK: Block {
     var layer: some Block {
       Text("IDk")

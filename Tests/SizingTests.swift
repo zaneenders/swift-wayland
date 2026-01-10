@@ -268,6 +268,46 @@ struct SizingTests {
     #expect(texts[1].forground == .green)
     #expect(texts[2].forground == .blue)
   }
+
+  @Test("Basic grow sizing")
+  @MainActor
+  func basicGrow() {
+    let containerWidth: UInt = 600
+    let containerHeight: UInt = 400
+    let test = GrowTestBasic()
+    
+    var attributesWalker = AttributesWalker()
+    test.walk(with: &attributesWalker)
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    test.walk(with: &sizer)
+    
+    // Set the root container size (simulating what Wayland.render does)
+    let rootId = attributesWalker.tree[0]![0]
+    let orientation: Orientation
+    switch sizer.sizes[rootId]! {
+    case .known(let container):
+      orientation = container.orientation
+    case .unknown(let o):
+      orientation = o
+    }
+    sizer.sizes[rootId] = .known(Container(height: containerHeight, width: containerWidth, orientation: orientation))
+    
+    // Apply grow sizing
+    let containers = sizer.sizes.convert()
+    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+    test.walk(with: &grower)
+    
+    // Navigate to the grow element
+    let growElement = attributesWalker.tree[rootId]![0]
+    
+    // Verify the grow element fills the container
+    if let grownSize = grower.sizes[growElement] {
+      #expect(grownSize.width == containerWidth)
+      #expect(grownSize.height == containerHeight)
+    } else {
+      Issue.record("Grow element not found in grower.sizes")
+    }
+  }
 }
 
 struct ScaledText: Block {
@@ -458,6 +498,95 @@ struct TextTestScaling: Block {
         .foreground(.green)
       Text("Large")
         .foreground(.blue)
+    }
+  }
+}
+
+struct GrowTestBasic: Block {
+  var layer: some Block {
+    Rect()
+      .width(.grow)
+      .height(.grow)
+      .background(.red)
+  }
+}
+
+@Test("Grow with fixed parent")
+@MainActor
+func growWithFixedParent() {
+  let containerWidth: UInt = 600
+  let containerHeight: UInt = 400
+  let test = GrowTestWithFixedParent()
+  
+  var attributesWalker = AttributesWalker()
+  test.walk(with: &attributesWalker)
+  var sizer = SizeWalker(attributes: attributesWalker.attributes)
+  test.walk(with: &sizer)
+  
+  // Apply grow sizing
+  let containers = sizer.sizes.convert()
+  var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+  test.walk(with: &grower)
+  
+  // Navigate to the elements - need to go through Direction group
+  let rootId = attributesWalker.tree[0]![0]
+  let directionGroup = attributesWalker.tree[rootId]![0]  // Direction group
+  let tupleBlock = attributesWalker.tree[directionGroup]![0]  // Tuple block
+  let children = attributesWalker.tree[tupleBlock]!
+  
+  // Find the fixed parent and grow child
+  guard children.count >= 2 else {
+    Issue.record("Expected at least 2 children, got \(children.count)")
+    return
+  }
+  let fixedRect = children[0]  // 200x100 fixed rect
+  let growRect = children[1]   // grow rect
+  
+  // Fixed rect should keep its size
+  if let fixedSize = grower.sizes[fixedRect] {
+    #expect(fixedSize.width == 200)
+    #expect(fixedSize.height == 100)
+  } else {
+    Issue.record("Fixed rect not found in grower.sizes")
+  }
+  
+  // Grow rect should get the parent's size
+  if let growSize = grower.sizes[growRect] {
+    // Current implementation: GrowWalker sets grow element to immediate parent's size
+    // The parent (horizontal group) has size 200x100 from the fixed rect
+    #expect(growSize.width == 200)
+    #expect(growSize.height == 100)
+  } else {
+    Issue.record("Grow rect not found in grower.sizes")
+  }
+}
+
+struct GrowTestWithFixedParent: Block {
+  var layer: some Block {
+    Direction(.horizontal) {
+      Rect()
+        .width(.fixed(200))
+        .height(.fixed(100))
+        .background(.red)
+      Rect()
+        .width(.grow)
+        .height(.grow)
+        .background(.blue)
+    }
+  }
+}
+
+struct GrowTestMultipleHorizontal: Block {
+  var layer: some Block {
+    Direction(.horizontal) {
+      Rect()
+        .width(.grow)
+        .height(.grow)
+        .background(.red)
+      Rect()
+        .width(.grow)
+        .height(.grow)
+        .background(.blue)
     }
   }
 }

@@ -5,7 +5,8 @@ import Wayland
 struct SystemClock: Block {
   var time: String
   var layer: some Block {
-    // TODO display to the right side of the screen
+    // TODO: Display to the right side of the screen
+    // TODO: Could the height be sepcified here and passed in here instead of hardcoded to 20
     Text(time).scale(2)
       .foreground(.teal)
       .background(.black)

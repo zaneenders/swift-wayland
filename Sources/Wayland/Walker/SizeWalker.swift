@@ -57,11 +57,22 @@ struct SizeWalker: Walker {
       width = text.width(attributes.scale ?? defaultScale)
       height = text.height(attributes.scale ?? defaultScale)
     } else {
-      if case .fixed(let w) = attributes.width {
+      switch attributes.width {
+      case .fixed(let w):
         width = w
+      case .grow:
+        width = 0
+      case .fit:
+        width = 0
       }
-      if case .fixed(let h) = attributes.height {
+
+      switch attributes.height {
+      case .fixed(let h):
         height = h
+      case .grow:
+        height = 0
+      case .fit:
+        height = 0
       }
     }
     if let padding = attributes.padding {
@@ -119,7 +130,7 @@ enum Size: Equatable, CustomStringConvertible {
 }
 
 struct Container: Equatable {
-  let height: UInt
-  let width: UInt
-  let orientation: Orientation
+  var height: UInt
+  var width: UInt
+  var orientation: Orientation
 }

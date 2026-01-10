@@ -32,7 +32,13 @@ struct Screen: Block {
       }
       Borders(scale: scale)
       Rect()
+        .background(.orange)
+        .width(.grow)
+        .height(.grow)
     }
+    .background(.pink)
+    .height(.grow)
+    .width(.grow)
   }
 }
 

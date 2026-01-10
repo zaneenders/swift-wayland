@@ -16,15 +16,24 @@ extension Wayland {
     // TODO: TO many allocations here
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
+    let root = attributesWalker.tree[0]![0]
     var sizer = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
+    let orientation: Orientation
+    switch sizer.sizes[root]! {
+    case .known(let container):
+      orientation = container.orientation
+    case .unknown(let o):
+      orientation = o
+    }
+    sizer.sizes[root] = .known(Container(height: height, width: width, orientation: orientation))
     let containers = sizer.sizes.convert()
     var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
     block.walk(with: &grower)
-    var positioner = PositionWalker(sizes: containers, attributes: attributesWalker.attributes)
+    var positioner = PositionWalker(sizes: grower.sizes, attributes: attributesWalker.attributes)
     block.walk(with: &positioner)
     var renderer = RenderWalker(
-      positions: positioner.positions, sizes: sizer.sizes.convert(), Wayland.self, logLevel: logLevel)
+      positions: positioner.positions, sizes: grower.sizes, Wayland.self, logLevel: logLevel)
     block.walk(with: &renderer)
   }
 }

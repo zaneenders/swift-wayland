@@ -4,15 +4,28 @@ import Logging
 struct GrowWalker: Walker {
   var currentId: Hash = 0
   var parentId: Hash = 0
-  let sizes: [Hash: Container]
+  var sizes: [Hash: Container]
   let attributes: [Hash: Attributes]
 
   mutating func action() {
-    let container = sizes[currentId]!
+    guard let parent = sizes[parentId] else {
+      return
+    }
+    guard var container = sizes[currentId] else {
+      return
+    }
     if let attributes = attributes[currentId] {
+      var shouldUpdate = false
       if case .grow = attributes.height {
+        container.height = parent.height
+        shouldUpdate = true
       }
       if case .grow = attributes.width {
+        container.width = parent.width
+        shouldUpdate = true
+      }
+      if shouldUpdate {
+        sizes[currentId] = container
       }
     }
   }
@@ -21,9 +34,7 @@ struct GrowWalker: Walker {
     action()
   }
 
-  mutating func after(_ block: some Block) {
-    action()
-  }
+  mutating func after(_ block: some Block) {}
 
   mutating func before(child block: some Block) {}
   mutating func after(child block: some Block) {}
