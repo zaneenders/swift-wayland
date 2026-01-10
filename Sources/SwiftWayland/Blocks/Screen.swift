@@ -1,5 +1,15 @@
 import Wayland
 
+struct PaddedText: Block {
+  let text: String
+  let padding: UInt
+  var layer: some Block {
+    // BUG: Should not have default background color
+    Text(text)
+      .padding(padding)
+  }
+}
+
 struct Screen: Block {
   let scale: UInt
   let ips: [String]
@@ -14,10 +24,13 @@ struct Screen: Block {
   var layer: some Block {
     Direction(.vertical) {  // TODO: This group should be implict
       EmptyBlock()
-      if !fps.isEmpty {
-        Text(fps)
-          .foreground(.green)
-          .padding(5)
+      Direction(.horizontal) {
+        // BUG: Should place PaddedText on right hand side
+        EmptyBlock().width(.grow)
+        if !fps.isEmpty {
+          PaddedText(text: fps, padding: 5)
+            .background(.green)
+        }
       }
       Text("Zane was here")
         .scale(scale)

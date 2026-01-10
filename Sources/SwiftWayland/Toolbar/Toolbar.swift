@@ -5,11 +5,15 @@ import Wayland
 struct SystemClock: Block {
   var time: String
   var layer: some Block {
-    // TODO: Display to the right side of the screen
     // TODO: Could the height be sepcified here and passed in here instead of hardcoded to 20
-    Text(time).scale(2)
-      .foreground(.teal)
-      .background(.black)
+    Direction(.horizontal) {
+      // BUG: Should place text on right side of the screen
+      Rect()
+        .width(.grow)
+      Text(time).scale(2)
+        .foreground(.teal)
+        .background(.black)
+    }
   }
 }
 
@@ -25,7 +29,7 @@ func runToolbar() async {
       Wayland.preDraw()
       let today = formatter.string(from: Date())
       let block = SystemClock(time: today)
-      Wayland.render(block, height: winH, width: winw)
+      Wayland.render(block, height: winH, width: winW)
       Wayland.postDraw()
     }
   }
