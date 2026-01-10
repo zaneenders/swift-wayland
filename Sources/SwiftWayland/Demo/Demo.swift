@@ -14,8 +14,7 @@ func runDemo() async {
     switch ev {
     case .frame(let height, let width):
       Wayland.preDraw()
-      //let screen = Screen(scale: 2, ips: ips, fps: String(format: "%.1f FPS", Wayland.currentFPS))
-      let block = MultipleGrowDemo()
+      let block = Screen(scale: 2, ips: ips, fps: String(format: "%.1f FPS", Wayland.currentFPS))
       Wayland.render(block, height: height, width: width)
       Wayland.postDraw()
       if Wayland.elapsed > Wayland.refresh_rate {
