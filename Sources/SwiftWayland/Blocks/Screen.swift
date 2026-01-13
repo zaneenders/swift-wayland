@@ -3,10 +3,15 @@ import Wayland
 struct PaddedText: Block {
   let text: String
   let padding: UInt
+  let foreground: Color
+  let background: Color
   var layer: some Block {
     // BUG: Should not have default background color
     Text(text)
+      .scale(2)
       .padding(padding)
+      .foreground(foreground)
+      .background(background)
   }
 }
 
@@ -28,7 +33,8 @@ struct Screen: Block {
         // BUG: Should place PaddedText on right hand side
         EmptyBlock().width(.grow)
         if !fps.isEmpty {
-          PaddedText(text: fps, padding: 5)
+          // NOTE: This is a little bit verbose for text with colored padding around it.
+          PaddedText(text: fps, padding: 5, foreground: .black, background: .green)
             .background(.green)
         }
       }
