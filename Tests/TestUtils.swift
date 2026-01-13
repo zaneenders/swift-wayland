@@ -3,6 +3,9 @@ import Testing
 
 @testable import Wayland
 
+let width: UInt = 600
+let height: UInt = 400
+
 /// Test utilities to reduce duplication and improve test reliability
 @MainActor
 enum TestUtils {
@@ -42,8 +45,8 @@ enum TestUtils {
   }
 
   /// Walk a block through all standard walkers
-  static func walkBlock(_ block: any Block) -> (
-    attributes: AttributesWalker, sizes: SizeWalker, positions: PositionWalker
+  static func walkBlock(_ block: any Block, height: UInt, width: UInt) -> (
+    attributes: AttributesWalker, sizes: SizeWalker, positions: PositionWalker, grower: GrowWalker
   ) {
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
@@ -51,25 +54,21 @@ enum TestUtils {
     var sizeWalker = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizeWalker)
 
-    // Convert Size to Container for PositionWalker
-    var containers: [Hash: Container] = [:]
-    for (id, size) in sizeWalker.sizes {
-      if case .known(let container) = size {
-        containers[id] = container
-      }
-    }
+    let containers = sizeWalker.sizes.convert()
+    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+    block.walk(with: &grower)
 
     var positionWalker = PositionWalker(sizes: containers, attributes: attributesWalker.attributes)
     block.walk(with: &positionWalker)
 
-    return (attributes: attributesWalker, sizes: sizeWalker, positions: positionWalker)
+    return (attributes: attributesWalker, sizes: sizeWalker, positions: positionWalker, grower: grower)
   }
 
   /// Render a block with specified renderer
-  static func renderBlock(_ block: any Block, with renderer: any Renderer.Type) -> (
-    attributes: AttributesWalker, sizes: SizeWalker, positions: PositionWalker
+  static func renderBlock(_ block: any Block, height: UInt, width: UInt, with renderer: any Renderer.Type) -> (
+    attributes: AttributesWalker, sizes: SizeWalker, positions: PositionWalker, grower: GrowWalker
   ) {
-    let result = walkBlock(block)
+    let result = walkBlock(block, height: height, width: width)
 
     // Reset renderer if it has a reset method
     if let resettableRenderer = renderer as? any TestResettableRenderer.Type {

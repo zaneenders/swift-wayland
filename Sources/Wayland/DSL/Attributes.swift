@@ -28,9 +28,15 @@ struct Padding: Equatable {
   }
 }
 
+public enum Sizing {
+  case fixed(UInt)  // Specify a specify size
+  case fit  // Fit to the size needed
+  case grow  // Grow to the space allowed
+}
+
 struct Attributes {
-  var width: UInt?
-  var height: UInt?
+  var width: Sizing
+  var height: Sizing
   var foreground: Color?
   var background: Color?
   var borderColor: Color?
@@ -39,10 +45,8 @@ struct Attributes {
   var scale: UInt?
   var padding: Padding?
 
-  init() {}
-
   init(
-    width: UInt? = nil, height: UInt? = nil, foreground: Color? = nil, background: Color? = nil,
+    width: Sizing = .fit, height: Sizing = .fit, foreground: Color? = nil, background: Color? = nil,
     borderColor: Color? = nil, borderWidth: UInt? = nil, borderRadius: UInt? = nil, scale: UInt? = nil,
     padding: Padding? = nil
   ) {
@@ -86,13 +90,13 @@ public struct AttributedBlock<B: Block>: Block, HasAttributes {
 }
 
 extension Block {
-  public func width(_ width: UInt) -> AttributedBlock<Self> {
+  public func width(_ width: Sizing) -> AttributedBlock<Self> {
     var newBlock = AttributedBlock(wrapped: self)
     newBlock.attributes.width = width
     return newBlock
   }
 
-  public func height(_ height: UInt) -> AttributedBlock<Self> {
+  public func height(_ height: Sizing) -> AttributedBlock<Self> {
     var newBlock = AttributedBlock(wrapped: self)
     newBlock.attributes.height = height
     return newBlock
@@ -188,13 +192,14 @@ extension Text {
 
 // Support for chaining on AttributedBlock
 extension AttributedBlock {
-  public func width(_ width: UInt) -> Self {
+
+  public func width(_ width: Sizing) -> Self {
     var copy = self
     copy.attributes.width = width
     return copy
   }
 
-  public func height(_ height: UInt) -> Self {
+  public func height(_ height: Sizing) -> Self {
     var copy = self
     copy.attributes.height = height
     return copy

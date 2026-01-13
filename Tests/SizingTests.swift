@@ -268,6 +268,46 @@ struct SizingTests {
     #expect(texts[1].forground == .green)
     #expect(texts[2].forground == .blue)
   }
+
+  @Test("Basic grow sizing")
+  @MainActor
+  func basicGrow() {
+    let containerWidth: UInt = 600
+    let containerHeight: UInt = 400
+    let test = GrowTestBasic()
+    
+    var attributesWalker = AttributesWalker()
+    test.walk(with: &attributesWalker)
+    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    test.walk(with: &sizer)
+    
+    // Set the root container size (simulating what Wayland.render does)
+    let rootId = attributesWalker.tree[0]![0]
+    let orientation: Orientation
+    switch sizer.sizes[rootId]! {
+    case .known(let container):
+      orientation = container.orientation
+    case .unknown(let o):
+      orientation = o
+    }
+    sizer.sizes[rootId] = .known(Container(height: containerHeight, width: containerWidth, orientation: orientation))
+    
+    // Apply grow sizing
+    let containers = sizer.sizes.convert()
+    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+    test.walk(with: &grower)
+    
+    // Navigate to the grow element
+    let growElement = attributesWalker.tree[rootId]![0]
+    
+    // Verify the grow element fills the container
+    if let grownSize = grower.sizes[growElement] {
+      #expect(grownSize.width == containerWidth)
+      #expect(grownSize.height == containerHeight)
+    } else {
+      Issue.record("Grow element not found in grower.sizes")
+    }
+  }
 }
 
 struct ScaledText: Block {
@@ -282,16 +322,16 @@ struct RectTestMultiple: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Rect()
-        .width(50)
-        .height(30)
+        .width(.fixed(50))
+        .height(.fixed(30))
         .background(.red)
       Rect()
-        .width(40)
-        .height(60)
+        .width(.fixed(40))
+        .height(.fixed(60))
         .background(.blue)
       Rect()
-        .width(30)
-        .height(40)
+        .width(.fixed(30))
+        .height(.fixed(40))
         .background(.green)
     }
   }
@@ -301,22 +341,22 @@ struct RectTestNested: Block {
   var layer: some Block {
     Direction(.vertical) {
       Rect()
-        .width(100)
-        .height(20)
+        .width(.fixed(100))
+        .height(.fixed(20))
         .background(.red)
       Direction(.horizontal) {
         Rect()
-          .width(30)
-          .height(30)
+          .width(.fixed(30))
+          .height(.fixed(30))
           .background(.blue)
         Rect()
-          .width(30)
-          .height(30)
+          .width(.fixed(30))
+          .height(.fixed(30))
           .background(.green)
       }
       Rect()
-        .width(100)
-        .height(20)
+        .width(.fixed(100))
+        .height(.fixed(20))
         .background(.yellow)
     }
   }
@@ -343,8 +383,8 @@ struct SpacingTestWordRectMixed: Block {
       Text("Hello")
         .scale(scale)
       Rect()
-        .width(20 * scale)
-        .height(20 * scale)
+        .width(.fixed(20 * scale))
+        .height(.fixed(20 * scale))
         .background(.red)
       Text("World")
         .scale(scale)
@@ -358,23 +398,23 @@ struct SpacingTestComplexNesting: Block {
       Text("Top")
       Direction(.horizontal) {
         Rect()
-          .width(15)
-          .height(15)
+          .width(.fixed(15))
+          .height(.fixed(15))
           .background(.red)
         Text("Middle")
         Rect()
-          .width(15)
-          .height(15)
+          .width(.fixed(15))
+          .height(.fixed(15))
           .background(.blue)
       }
       Direction(.horizontal) {
         Rect()
-          .width(10)
-          .height(10)
+          .width(.fixed(10))
+          .height(.fixed(10))
           .background(.green)
         Rect()
-          .width(10)
-          .height(10)
+          .width(.fixed(10))
+          .height(.fixed(10))
           .background(.yellow)
       }
       Text("Bottom")
@@ -386,16 +426,16 @@ struct SpacingTestLargeGap: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Rect()
-        .width(5)
-        .height(5)
+        .width(.fixed(5))
+        .height(.fixed(5))
         .background(.red)
       Rect()
-        .width(100)
-        .height(100)
+        .width(.fixed(100))
+        .height(.fixed(100))
         .background(.green)
       Rect()
-        .width(5)
-        .height(5)
+        .width(.fixed(5))
+        .height(.fixed(5))
         .background(.blue)
     }
   }
@@ -405,16 +445,16 @@ struct QuadTestScaling: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.red)
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.blue)
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.green)
     }
   }
@@ -424,8 +464,8 @@ struct RectTestBasic: Block {
   var scale: UInt = 1
   var layer: some Block {
     Rect()
-      .width(100 * scale)
-      .height(50 * scale)
+      .width(.fixed(100 * scale))
+      .height(.fixed(50 * scale))
       .background(.red)
   }
 }
@@ -434,16 +474,16 @@ struct RectTestScaled: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.red)
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.blue)
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.green)
     }
   }
@@ -458,6 +498,95 @@ struct TextTestScaling: Block {
         .foreground(.green)
       Text("Large")
         .foreground(.blue)
+    }
+  }
+}
+
+struct GrowTestBasic: Block {
+  var layer: some Block {
+    Rect()
+      .width(.grow)
+      .height(.grow)
+      .background(.red)
+  }
+}
+
+@Test("Grow with fixed parent")
+@MainActor
+func growWithFixedParent() {
+  let containerWidth: UInt = 600
+  let containerHeight: UInt = 400
+  let test = GrowTestWithFixedParent()
+  
+  var attributesWalker = AttributesWalker()
+  test.walk(with: &attributesWalker)
+  var sizer = SizeWalker(attributes: attributesWalker.attributes)
+  test.walk(with: &sizer)
+  
+  // Apply grow sizing
+  let containers = sizer.sizes.convert()
+  var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+  test.walk(with: &grower)
+  
+  // Navigate to the elements - need to go through Direction group
+  let rootId = attributesWalker.tree[0]![0]
+  let directionGroup = attributesWalker.tree[rootId]![0]  // Direction group
+  let tupleBlock = attributesWalker.tree[directionGroup]![0]  // Tuple block
+  let children = attributesWalker.tree[tupleBlock]!
+  
+  // Find the fixed parent and grow child
+  guard children.count >= 2 else {
+    Issue.record("Expected at least 2 children, got \(children.count)")
+    return
+  }
+  let fixedRect = children[0]  // 200x100 fixed rect
+  let growRect = children[1]   // grow rect
+  
+  // Fixed rect should keep its size
+  if let fixedSize = grower.sizes[fixedRect] {
+    #expect(fixedSize.width == 200)
+    #expect(fixedSize.height == 100)
+  } else {
+    Issue.record("Fixed rect not found in grower.sizes")
+  }
+  
+  // Grow rect should get the parent's size
+  if let growSize = grower.sizes[growRect] {
+    // Current implementation: GrowWalker sets grow element to immediate parent's size
+    // The parent (horizontal group) has size 200x100 from the fixed rect
+    #expect(growSize.width == 200)
+    #expect(growSize.height == 100)
+  } else {
+    Issue.record("Grow rect not found in grower.sizes")
+  }
+}
+
+struct GrowTestWithFixedParent: Block {
+  var layer: some Block {
+    Direction(.horizontal) {
+      Rect()
+        .width(.fixed(200))
+        .height(.fixed(100))
+        .background(.red)
+      Rect()
+        .width(.grow)
+        .height(.grow)
+        .background(.blue)
+    }
+  }
+}
+
+struct GrowTestMultipleHorizontal: Block {
+  var layer: some Block {
+    Direction(.horizontal) {
+      Rect()
+        .width(.grow)
+        .height(.grow)
+        .background(.red)
+      Rect()
+        .width(.grow)
+        .height(.grow)
+        .background(.blue)
     }
   }
 }

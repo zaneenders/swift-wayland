@@ -121,9 +121,9 @@ struct PositionTests {
     struct OverflowTest: Block {
       var layer: some Block {
         Direction(.horizontal) {
-          Rect().width(100).height(100).background(.red)
-          Rect().width(200).height(200).background(.blue)
-          Rect().width(300).height(300).background(.green)
+          Rect().width(.fixed(100)).height(.fixed(100)).background(.red)
+          Rect().width(.fixed(200)).height(.fixed(200)).background(.blue)
+          Rect().width(.fixed(300)).height(.fixed(300)).background(.green)
         }
       }
     }
@@ -144,16 +144,16 @@ struct PositionTestSimpleHorizontal: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.red)
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.blue)
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.green)
     }
   }
@@ -163,16 +163,16 @@ struct PositionTestSimpleVertical: Block {
   var layer: some Block {
     Direction(.vertical) {
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.red)
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.blue)
       Rect()
-        .width(10)
-        .height(10)
+        .width(.fixed(10))
+        .height(.fixed(10))
         .background(.green)
     }
   }
@@ -181,8 +181,8 @@ struct PositionTestSimpleVertical: Block {
 struct EdgeCaseZeroSize: Block {
   var layer: some Block {
     Rect()
-      .width(0)
-      .height(0)
+      .width(.fixed(0))
+      .height(.fixed(0))
       .background(.red)
   }
 }
@@ -190,8 +190,8 @@ struct EdgeCaseZeroSize: Block {
 struct EdgeCaseVeryLarge: Block {
   var layer: some Block {
     Rect()
-      .width(UInt.max / 2)
-      .height(UInt.max / 2)
+      .width(.fixed(UInt.max / 2))
+      .height(.fixed(UInt.max / 2))
       .background(.red)
   }
 }
@@ -203,8 +203,8 @@ struct EdgeCaseDeepNesting: Block {
         Direction(.horizontal) {
           Direction(.vertical) {
             Rect()
-              .width(10)
-              .height(10)
+              .width(.fixed(10))
+              .height(.fixed(10))
               .background(.red)
           }
         }

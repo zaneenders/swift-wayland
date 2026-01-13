@@ -10,7 +10,7 @@ struct IntegrationTests {
   @Test("Full mock render pass")
   func fullMockRenderPass() {
     let test = Layout(scale: 1)
-    let result = TestUtils.renderBlock(test, with: TestUtils.QuadCaptureRenderer.self)
+    let result = TestUtils.renderBlock(test, height: height, width: width, with: TestUtils.QuadCaptureRenderer.self)
 
     #expect(!result.sizes.sizes.isEmpty, "Should have calculated sizes")
 
@@ -58,7 +58,7 @@ struct ColorAndUtilityTests {
     }
 
     let test = ColorTestLayout()
-    _ = TestUtils.renderBlock(test, with: TestUtils.TextCaptureRenderer.self)
+    _ = TestUtils.renderBlock(test, height: height, width: width, with: TestUtils.TextCaptureRenderer.self)
 
     #expect(
       TestUtils.TextCaptureRenderer.capturedTexts.count >= 3,

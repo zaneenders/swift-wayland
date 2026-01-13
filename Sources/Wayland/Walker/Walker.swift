@@ -12,16 +12,28 @@ protocol Walker {
 
 @MainActor
 extension Wayland {
-  public static func render(_ block: some Block, logLevel: Logger.Level = .warning) {
+  public static func render(_ block: some Block, height: UInt, width: UInt, logLevel: Logger.Level = .warning) {
     // TODO: TO many allocations here
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
+    let root = attributesWalker.tree[0]![0]
     var sizer = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
-    var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
+    let orientation: Orientation
+    switch sizer.sizes[root]! {
+    case .known(let container):
+      orientation = container.orientation
+    case .unknown(let o):
+      orientation = o
+    }
+    sizer.sizes[root] = .known(Container(height: height, width: width, orientation: orientation))
+    let containers = sizer.sizes.convert()
+    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+    block.walk(with: &grower)
+    var positioner = PositionWalker(sizes: grower.sizes, attributes: attributesWalker.attributes)
     block.walk(with: &positioner)
     var renderer = RenderWalker(
-      positions: positioner.positions, sizes: sizer.sizes.convert(), Wayland.self, logLevel: logLevel)
+      positions: positioner.positions, sizes: grower.sizes, Wayland.self, logLevel: logLevel)
     block.walk(with: &renderer)
   }
 }

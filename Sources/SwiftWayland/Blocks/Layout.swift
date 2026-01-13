@@ -5,8 +5,8 @@ struct Layout: Block {
   var layer: some Block {
     Direction(.horizontal) {
       Rect()
-        .width(25 * scale)
-        .height(25 * scale)
+        .width(.fixed(25 * scale))
+        .height(.fixed(25 * scale))
         .background(.yellow)
       Direction(.horizontal) {
         Text("Left").scale(scale)
@@ -20,16 +20,16 @@ struct Layout: Block {
             }
           }
           Rect()
-            .width(25 * scale)
-            .height(25 * scale)
+            .width(.fixed(25 * scale))
+            .height(.fixed(25 * scale))
             .background(.magenta)
           Text("Bottom").scale(scale)
         }
         Text("Right").scale(scale)
       }
       Rect()
-        .width(25 * scale)
-        .height(25 * scale)
+        .width(.fixed(25 * scale))
+        .height(.fixed(25 * scale))
         .background(.cyan)
     }
   }

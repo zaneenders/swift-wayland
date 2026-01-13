@@ -12,10 +12,10 @@ func runDemo() async {
   Wayland.setup()
   event_loop: for await ev in Wayland.events() {
     switch ev {
-    case .frame(_, _):
+    case .frame(let height, let width):
       Wayland.preDraw()
-      let screen = Screen(scale: 2, ips: ips, fps: String(format: "%.1f FPS", Wayland.currentFPS))
-      Wayland.render(screen)
+      let block = Screen(scale: 2, ips: ips, fps: String(format: "%.1f FPS", Wayland.currentFPS))
+      Wayland.render(block, height: height, width: width)
       Wayland.postDraw()
       if Wayland.elapsed > Wayland.refresh_rate {
         frameLogger.warning("\(Wayland.elapsed)")

@@ -17,7 +17,7 @@ struct AttributesTests {
   func testBasicPadding() {
     let padding: UInt = 15
     let test = PaddingTest(padding: padding)
-    let (attributes, sizes, positions) = TestUtils.walkBlock(test)
+    let (attributes, sizes, positions, grower) = TestUtils.walkBlock(test, height: height, width: width)
     let root = attributes.tree[0]![0]
     let node = sizes.sizes[root]!
     switch node {
@@ -26,6 +26,23 @@ struct AttributesTests {
       #expect(container.width == 41 + (padding * 2))
     case .unknown(_):
       Issue.record("unknown size")
+    }
+  }
+
+  @Test
+  func basicGrow() {
+    let padding: UInt = 15
+    let test = Grow()
+    let (attributes, sizes, positions, grower) = TestUtils.walkBlock(test, height: height, width: width)
+    let root = attributes.tree[0]![0]
+    let node = sizes.sizes[root]!
+    print(node)
+  }
+
+  struct Grow: Block {
+    var layer: some Block {
+      Rect().height(.grow).width(.grow)
+        .background(.red)
     }
   }
 
@@ -39,7 +56,7 @@ struct AttributesTests {
   @Test("Text with scale and foreground color attributes")
   func idk() {
     let test = IDK()
-    let result = TestUtils.walkBlock(test)
+    let result = TestUtils.walkBlock(test, height: height, width: width)
 
     // Find the Text block and check if scale is properly applied
     guard let tupleBlock = TestUtils.TreeNavigator.findTupleBlock(in: result.attributes),
