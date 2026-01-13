@@ -10,7 +10,7 @@ struct FullGrowDemo: Block {
   }
 }
 
-// A small red rectangle with a blue rectangle extending to the edge of teh screen
+// A small red rectangle with a blue rectangle extending to the edge of the screen
 struct MixedGrowDemo: Block {
   // BUG: Blue rectangle does not extend to the edge of the screen
   var layer: some Block {

@@ -7,7 +7,7 @@ struct GrowWalker: Walker {
   var sizes: [Hash: Container]
   let attributes: [Hash: Attributes]
 
-  mutating func action() {
+  mutating func before(_ block: some Block) {
     guard let parent = sizes[parentId] else {
       return
     }
@@ -28,10 +28,6 @@ struct GrowWalker: Walker {
         sizes[currentId] = container
       }
     }
-  }
-
-  mutating func before(_ block: some Block) {
-    action()
   }
 
   mutating func after(_ block: some Block) {}
