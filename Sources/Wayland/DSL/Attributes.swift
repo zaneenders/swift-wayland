@@ -28,7 +28,7 @@ struct Padding: Equatable {
   }
 }
 
-public enum Sizing {
+public enum Sizing: Equatable {
   case fixed(UInt)  // Specify a specify size
   case fit  // Fit to the size needed
   case grow  // Grow to the space allowed
@@ -61,17 +61,37 @@ struct Attributes {
     self.padding = padding
   }
 
-  func apply(_ other: Attributes) -> Attributes {
+  func merge(_ other: Attributes) -> Attributes {
     var copy = self
-    copy.width = other.width
-    copy.height = other.height
-    copy.foreground = other.foreground
-    copy.background = other.background
-    copy.borderColor = other.borderColor
-    copy.borderWidth = other.borderWidth
-    copy.borderRadius = other.borderRadius
-    copy.scale = other.scale
-    copy.padding = other.padding
+    // NOTE: should width and height override here?
+    if other.width != .fit {
+      copy.width = other.width
+    }
+    if other.height != .fit {
+      copy.height = other.height
+    }
+    if other.foreground != nil {
+      copy.foreground = other.foreground
+    }
+    if other.background != nil {
+      copy.background = other.background
+    }
+    if other.borderColor != nil {
+      copy.borderColor = other.borderColor
+    }
+    if other.borderWidth != nil {
+      copy.borderWidth = other.borderWidth
+    }
+    if other.borderRadius != nil {
+      copy.borderRadius = other.borderRadius
+    }
+    if other.scale != nil {
+      copy.scale = other.scale
+    }
+    if other.padding != nil {
+      copy.padding = other.padding
+    }
+
     return copy
   }
 }
