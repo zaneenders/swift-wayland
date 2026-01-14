@@ -6,7 +6,7 @@ struct AttributesWalker: Walker {
   var parentId: Hash = 0
   var tree: [Hash: [Hash]] = [:]
   var attributes: [Hash: Attributes] = [:]
-  var current: Attributes = Attributes()
+  private var current: Attributes = Attributes()
 
   private mutating func connect(parent: Hash, current: Hash) {
     if var sibilings = tree[parent] {
@@ -20,7 +20,7 @@ struct AttributesWalker: Walker {
   mutating func before(_ block: some Block) {
     connect(parent: parentId, current: currentId)
     if let attributedBlock = block as? any HasAttributes {
-      current = current.apply(attributedBlock.attributes)
+      current = current.merge(attributedBlock.attributes)
       attributes[currentId] = current
     }
   }
