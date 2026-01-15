@@ -14,7 +14,7 @@ struct IntegrationTests {
 
     #expect(!result.sizes.sizes.isEmpty, "Should have calculated sizes")
 
-    guard let tupleBlock = TestUtils.TreeNavigator.findTupleBlock(in: result.attributes),
+    guard let tupleBlock = TestUtils.TreeNavigator.findFirstTupleBlock(in: result.attributes),
       let size = result.sizes.sizes[tupleBlock]
     else {
       Issue.record("Failed to find tuple block or get size")

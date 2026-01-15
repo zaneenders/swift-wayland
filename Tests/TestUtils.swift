@@ -97,7 +97,7 @@ enum TestUtils {
   /// Navigate through tree structure to find specific elements
   @MainActor
   enum TreeNavigator {
-    static func findTupleBlock(in attributes: AttributesWalker) -> Hash? {
+    static func findFirstTupleBlock(in attributes: AttributesWalker) -> Hash? {
       return attributes.tree[0]?.first
     }
 
