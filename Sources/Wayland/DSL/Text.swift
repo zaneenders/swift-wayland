@@ -14,13 +14,13 @@ public struct Text: Block {
     Wayland.glyphH * scale
   }
 
-  func draw(at: (y: UInt, x: UInt), scale: UInt = 1, forground: Color = .white, background: Color = .black)
+  func draw(at: (y: UInt, x: UInt), scale: UInt = 1, foreground: Color = .white, background: Color = .black)
     -> RenderableText
   {
     return RenderableText(
       label, at: (x: at.x, y: at.y),
       scale: scale,
-      forground: forground,
+      foreground: foreground,
       background: background)
   }
 }

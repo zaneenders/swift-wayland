@@ -88,7 +88,7 @@ llvm-cov report .build/debug/swift-waylandPackageTests.xctest --instr-profile=.b
 Currently I am using `wayland-client.h` to get this up and running but ideally 
 this will be down without this dependency. The goal of removing this dependency
 is for 
-[static cross complication](https://www.swift.org/documentation/articles/static-linux-getting-started.html)
+[static cross compilation](https://www.swift.org/documentation/articles/static-linux-getting-started.html)
  .
 
 # Bugs
@@ -115,4 +115,4 @@ and figured I could come back to the feature.
 
 # TODO
 
-- [ ] Support adding boarders.
+- [ ] Support adding borders.

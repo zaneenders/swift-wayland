@@ -38,7 +38,7 @@ struct RenderWalker: Walker {
       let px = padding.left ?? 0
       let py = padding.top ?? 0
       drawer.drawText(
-        word.draw(at: (pos.y + py, pos.x + px), scale: scale, forground: foreground, background: background))
+        word.draw(at: (pos.y + py, pos.x + px), scale: scale, foreground: foreground, background: background))
       return
     }
 
