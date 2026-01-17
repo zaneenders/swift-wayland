@@ -27,7 +27,7 @@ struct Screen: Block {
   }
 
   var layer: some Block {
-    Direction(.vertical) {  // TODO: This group should be implict
+    Direction(.vertical) {  // TODO: This group should be implicit
       EmptyBlock()
       Direction(.horizontal) {
         // BUG: Should place PaddedText on right hand side

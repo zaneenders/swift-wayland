@@ -59,7 +59,7 @@ struct AttributesTests {
     let result = TestUtils.walkBlock(test, height: height, width: width)
 
     // Find the Text block and check if scale is properly applied
-    guard let tupleBlock = TestUtils.TreeNavigator.findTupleBlock(in: result.attributes),
+    guard let tupleBlock = TestUtils.TreeNavigator.findFirstTupleBlock(in: result.attributes),
       let size = result.sizes.sizes[tupleBlock],
       case .known(let container) = size
     else {
@@ -146,5 +146,31 @@ struct AttributesTests {
     #expect(result.borderRadius == 8, "BorderRadius should remain unchanged")
     #expect(result.scale == 3, "Scale should remain unchanged")
     #expect(result.padding == Padding(horizontal: 12, vertical: 6), "Padding should remain unchanged")
+  }
+
+  struct AttributeChainTest: Block {
+    var layer: some Block {
+      Text("Hello").background(.red).foreground(.blue)
+    }
+  }
+
+  @Test
+  func testAttributeAccumulation() {
+    let test = AttributeChainTest()
+    let result = TestUtils.walkBlock(test, height: height, width: width)
+    let root = result.attributes.tree[0]![0]
+    let text = result.attributes.tree[root]![0]
+    #expect(result.attributes.attributes[text]!.background == .red)
+    #expect(result.attributes.attributes[text]!.foreground == .blue)
+  }
+
+  @Test
+  func testProposedAttributeAccumulation() {
+    let baseAttributes = Attributes(background: .red)
+    let additionalAttributes = Attributes(foreground: .blue)
+    let mergedAttributes = baseAttributes.merge(additionalAttributes)
+
+    #expect(mergedAttributes.background == .red, "Merged attributes should preserve background")
+    #expect(mergedAttributes.foreground == .blue, "Merged attributes should include foreground")
   }
 }

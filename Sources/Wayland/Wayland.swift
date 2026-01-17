@@ -29,8 +29,8 @@ struct Glyph {
   var rows: [String] = Array(repeating: "", count: Int(Wayland.glyphH))
 }
 
-/// There is alot of global state here to setup and conform to Wayland's patterns.
-/// Their might be better ways to abstract this and clean it up a bit. But it's
+/// There is a lot of global state here to setup and conform to Wayland's patterns.
+/// There might be better ways to abstract this and clean it up a bit. But it's
 /// working for now.
 @MainActor
 public enum Wayland: Renderer {
@@ -173,7 +173,7 @@ public enum Wayland: Renderer {
   }
 
   static func loadText(resource name: String) -> String {
-    // TODO: Loaded sharders at compile time.
+    // TODO: Load shaders at compile time.
     let url = Bundle.module.url(forResource: name, withExtension: nil)!
     let data = try! Data(contentsOf: url)
     return String(decoding: data, as: UTF8.self)
@@ -497,7 +497,7 @@ public enum Wayland: Renderer {
           dst_p1: (0, 0),
           tex_tl: (0, 0),
           tex_br: (0, 0),
-          color: text.forground
+          color: text.foreground
         ), count: text.text.length)
 
     penX = text.pos.x
@@ -511,7 +511,7 @@ public enum Wayland: Renderer {
         dst_p1: (penX + w, penY + h),
         tex_tl: (u0, v0),
         tex_br: (u1, v1),
-        color: text.forground
+        color: text.foreground
       )
       penX += w + glyphSpacing * text.scale
     }

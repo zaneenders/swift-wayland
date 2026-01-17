@@ -13,7 +13,7 @@ protocol Walker {
 @MainActor
 extension Wayland {
   public static func render(_ block: some Block, height: UInt, width: UInt, logLevel: Logger.Level = .warning) {
-    // TODO: TO many allocations here
+    // TODO: Too many allocations here
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
     let root = attributesWalker.tree[0]![0]

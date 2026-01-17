@@ -8,6 +8,7 @@ A minimal dependency graphics client using Wayland.
 - [x] Render colored rectangles
 - [x] ASCII 5x7 character rendering
 - [x] Swift concurrency support
+- [x] Flexible layout algorithm (inspired by Clay)
 - [x] Toolbar and Windowed Applications.
 
 ## Example
@@ -88,7 +89,7 @@ llvm-cov report .build/debug/swift-waylandPackageTests.xctest --instr-profile=.b
 Currently I am using `wayland-client.h` to get this up and running but ideally 
 this will be down without this dependency. The goal of removing this dependency
 is for 
-[static cross complication](https://www.swift.org/documentation/articles/static-linux-getting-started.html)
+[static cross compilation](https://www.swift.org/documentation/articles/static-linux-getting-started.html)
  .
 
 # Bugs
@@ -115,4 +116,19 @@ and figured I could come back to the feature.
 
 # TODO
 
-- [ ] Support adding boarders.
+- [ ] Support adding borders.
+
+# Resources & References
+
+Helpful resources for getting to this point in the project.
+
+**[The Interaction Medium by Ryan Fleury](https://www.rfleury.com/p/ui-part-1-the-interaction-medium)**
+- Good series about programming UI
+- Starting point for shader code
+
+**[Clay Layout Algorithm by Nic Barker](https://www.youtube.com/watch?v=by9lQvpvMIc)**
+- Inspired the layout algorithm implementation
+
+**[Learn Wayland by writing a GUI from scratch](https://gaultier.github.io/blog/wayland_from_scratch.html)**
+- Step-by-step guide to setting up a Wayland client
+
