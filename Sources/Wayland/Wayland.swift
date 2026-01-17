@@ -173,7 +173,7 @@ public enum Wayland: Renderer {
   }
 
   static func loadText(resource name: String) -> String {
-    // TODO: Loaded sharders at compile time.
+    // TODO: Load shaders at compile time.
     let url = Bundle.module.url(forResource: name, withExtension: nil)!
     let data = try! Data(contentsOf: url)
     return String(decoding: data, as: UTF8.self)

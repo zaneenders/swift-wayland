@@ -1,5 +1,3 @@
-import Logging
-
 @MainActor
 struct GrowWalker: Walker {
   var currentId: Hash = 0

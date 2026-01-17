@@ -1,5 +1,3 @@
-import Logging
-
 @MainActor
 struct AttributesWalker: Walker {
   var currentId: Hash = 0
