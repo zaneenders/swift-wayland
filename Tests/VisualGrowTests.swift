@@ -8,8 +8,6 @@ struct VisualGrowTests {
 
   @Test("GrowDemo functionality test")
   func growDemoFunctionalityTest() {
-    // Test the same scenarios that GrowDemo uses
-    //let block = VisualGrowTestBasic()
     let block = FullGrowDemo()
 
     var attributesWalker = AttributesWalker()
@@ -17,7 +15,6 @@ struct VisualGrowTests {
     var sizer = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
 
-    // Set container size and apply grow
     let rootId = attributesWalker.tree[0]![0]
     sizer.sizes[rootId] = .known(Container(height: 400, width: 600, orientation: .vertical))
 

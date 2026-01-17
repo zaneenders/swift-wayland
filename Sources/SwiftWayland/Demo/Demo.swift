@@ -15,6 +15,7 @@ func runDemo() async {
     case .frame(let height, let width):
       Wayland.preDraw()
       let block = Screen(scale: 2, ips: ips, fps: String(format: "%.1f FPS", Wayland.currentFPS))
+      // let block = LeftPadding() // BUG: This doesn't work.
       Wayland.render(block, height: height, width: width)
       Wayland.postDraw()
       if Wayland.elapsed > Wayland.refresh_rate {

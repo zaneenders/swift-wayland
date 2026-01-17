@@ -1,5 +1,22 @@
 import Logging
 
+public struct Layout {
+  public let positions: [Hash: (x: UInt, y: UInt)]
+  public let sizes: [Hash: Container]
+  public let attributes: [Hash: Attributes]
+  public let tree: [Hash: [Hash]]
+
+  public init(
+    positions: [Hash: (x: UInt, y: UInt)], sizes: [Hash: Container],
+    attributes: [Hash: Attributes], tree: [Hash: [Hash]]
+  ) {
+    self.positions = positions
+    self.sizes = sizes
+    self.attributes = attributes
+    self.tree = tree
+  }
+}
+
 @MainActor
 protocol Walker {
   var currentId: Hash { get set }
@@ -12,13 +29,14 @@ protocol Walker {
 
 @MainActor
 extension Wayland {
-  public static func render(_ block: some Block, height: UInt, width: UInt, logLevel: Logger.Level = .warning) {
-    // TODO: Too many allocations here
+  public static func calculateLayout(_ block: some Block, height: UInt, width: UInt) -> Layout {
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
+
     let root = attributesWalker.tree[0]![0]
     var sizer = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
+
     let orientation: Orientation
     switch sizer.sizes[root]! {
     case .known(let container):
@@ -27,14 +45,36 @@ extension Wayland {
       orientation = o
     }
     sizer.sizes[root] = .known(Container(height: height, width: width, orientation: orientation))
+
     let containers = sizer.sizes.convert()
+
     var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
     block.walk(with: &grower)
+
     var positioner = PositionWalker(sizes: grower.sizes, attributes: attributesWalker.attributes)
     block.walk(with: &positioner)
+
+    return Layout(
+      positions: positioner.positions,
+      sizes: grower.sizes,
+      attributes: attributesWalker.attributes,
+      tree: attributesWalker.tree
+    )
+  }
+
+  public static func renderLayout(_ block: some Block, layout: Layout, logLevel: Logger.Level = .warning) {
     var renderer = RenderWalker(
-      positions: positioner.positions, sizes: grower.sizes, Wayland.self, logLevel: logLevel)
+      positions: layout.positions,
+      sizes: layout.sizes,
+      Wayland.self,
+      logLevel: logLevel
+    )
     block.walk(with: &renderer)
+  }
+
+  public static func render(_ block: some Block, height: UInt, width: UInt, logLevel: Logger.Level = .warning) {
+    let layout = calculateLayout(block, height: height, width: width)
+    renderLayout(block, layout: layout, logLevel: logLevel)
   }
 }
 

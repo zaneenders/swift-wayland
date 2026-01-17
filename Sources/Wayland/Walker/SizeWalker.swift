@@ -129,8 +129,14 @@ enum Size: Equatable, CustomStringConvertible {
   }
 }
 
-struct Container: Equatable {
-  var height: UInt
-  var width: UInt
-  var orientation: Orientation
+public struct Container: Equatable {
+  public var height: UInt
+  public var width: UInt
+  public var orientation: Orientation
+
+  public init(height: UInt, width: UInt, orientation: Orientation) {
+    self.height = height
+    self.width = width
+    self.orientation = orientation
+  }
 }

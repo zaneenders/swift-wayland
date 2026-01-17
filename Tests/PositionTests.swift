@@ -1,5 +1,6 @@
 import Testing
 
+@testable import SwiftWayland
 @testable import Wayland
 
 @MainActor
@@ -17,23 +18,17 @@ struct PositionTests {
     var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
     test.walk(with: &positioner)
 
-    // Get the tuple block containing the rectangles
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
     let tupleBlock = attributesWalker.tree[group]![0]
 
-    // Get the rectangle IDs
     let rectIds = attributesWalker.tree[tupleBlock]!
     let rectPositions = rectIds.map { positioner.positions[$0]! }.sorted { $0.x < $1.x }
 
-    // First rect should be at (0, 0)
     #expect(rectPositions[0] == (x: 0, y: 0))
-    // Second rect should be at (10, 0) - to the right (width 10)
     #expect(rectPositions[1] == (x: 10, y: 0))
-    // Third rect should be at (20, 0) - further right (10 + 10)
     #expect(rectPositions[2] == (x: 20, y: 0))
 
-    // All positions should be valid
     rectPositions.forEach { TestUtils.Assert.validPosition((Int($0.x), Int($0.y))) }
   }
 
@@ -48,23 +43,17 @@ struct PositionTests {
     var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
     test.walk(with: &positioner)
 
-    // Get the tuple block containing rectangles
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
     let tupleBlock = attributesWalker.tree[group]![0]
 
-    // Get the rectangle IDs
     let rectIds = attributesWalker.tree[tupleBlock]!
     let rectPositions = rectIds.map { positioner.positions[$0]! }.sorted { $0.y < $1.y }
 
-    // First rect should be at (0, 0)
     #expect(rectPositions[0] == (x: 0, y: 0))
-    // Second rect should be at (0, 10) - below
     #expect(rectPositions[1] == (x: 0, y: 10))
-    // Third rect should be at (0, 20) - further below
     #expect(rectPositions[2] == (x: 0, y: 20))
 
-    // All positions should be valid
     rectPositions.forEach { TestUtils.Assert.validPosition((Int($0.x), Int($0.y))) }
   }
 
@@ -109,7 +98,6 @@ struct PositionTests {
     let testStruct = attributesWalker.tree[0]![0]
     let tupleBlock = attributesWalker.tree[testStruct]![0]
     if case .known(let container) = sizer.sizes[tupleBlock]! {
-      // Verify large values don't cause overflow or crashes
       #expect(container.width > 0, "Width should be positive for large values")
       #expect(container.height > 0, "Height should be positive for large values")
     }
@@ -117,7 +105,6 @@ struct PositionTests {
 
   @Test("Edge case: overflow protection")
   func edgeCaseOverflowProtection() {
-    // Test that adding elements with very large values doesn't crash
     struct OverflowTest: Block {
       var layer: some Block {
         Direction(.horizontal) {
@@ -134,9 +121,17 @@ struct PositionTests {
     var sizer = SizeWalker(attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
-    // Should not crash
     #expect(!sizer.sizes.isEmpty, "Should calculate sizes without crashing")
   }
+}
+
+@Test
+@MainActor
+func leftPaddingTest() {
+  let block = LeftPadding()
+  let (attributes, sizes, positions, grow) = TestUtils.renderBlock(
+    block, height: height, width: width, with: TestUtils.TextCaptureRenderer.self)
+  print(positions)
 }
 
 struct PositionTestSimpleHorizontal: Block {
@@ -197,6 +192,7 @@ struct EdgeCaseVeryLarge: Block {
 }
 
 struct EdgeCaseDeepNesting: Block {
+  // NOTE: This test is dumb what is it even testing
   var layer: some Block {
     Direction(.horizontal) {
       Direction(.vertical) {

@@ -53,12 +53,23 @@ enum TestUtils {
 
     var sizeWalker = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizeWalker)
+    
+    // Set root container size to screen dimensions (missing step)
+    let root = attributesWalker.tree[0]![0]
+    let orientation: Orientation
+    switch sizeWalker.sizes[root]! {
+    case .known(let container):
+      orientation = container.orientation
+    case .unknown(let o):
+      orientation = o
+    }
+    sizeWalker.sizes[root] = .known(Container(height: height, width: width, orientation: orientation))
 
     let containers = sizeWalker.sizes.convert()
     var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
     block.walk(with: &grower)
 
-    var positionWalker = PositionWalker(sizes: containers, attributes: attributesWalker.attributes)
+    var positionWalker = PositionWalker(sizes: grower.sizes, attributes: attributesWalker.attributes)
     block.walk(with: &positionWalker)
 
     return (attributes: attributesWalker, sizes: sizeWalker, positions: positionWalker, grower: grower)

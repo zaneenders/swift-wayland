@@ -58,7 +58,6 @@ struct AttributesTests {
     let test = IDK()
     let result = TestUtils.walkBlock(test, height: height, width: width)
 
-    // Find the Text block and check if scale is properly applied
     guard let tupleBlock = TestUtils.TreeNavigator.findFirstTupleBlock(in: result.attributes),
       let size = result.sizes.sizes[tupleBlock],
       case .known(let container) = size
@@ -67,7 +66,6 @@ struct AttributesTests {
       return
     }
 
-    // Scale is now applied to text (scale=3)
     let expectedWidth = (3 * Wayland.glyphW * 3) + (3 * 3) - 3  // 45 + 9 - 3 = 51
     let expectedHeight = Wayland.glyphH * 3  // 21
 

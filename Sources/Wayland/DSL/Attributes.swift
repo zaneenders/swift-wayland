@@ -1,26 +1,26 @@
-struct Padding: Equatable {
-  var top: UInt?
-  var right: UInt?
-  var bottom: UInt?
-  var left: UInt?
+public struct Padding: Equatable {
+  public var top: UInt?
+  public var right: UInt?
+  public var bottom: UInt?
+  public var left: UInt?
 
-  init() {}
+  public init() {}
 
-  init(all: UInt) {
+  public init(all: UInt) {
     self.top = all
     self.right = all
     self.bottom = all
     self.left = all
   }
 
-  init(top: UInt? = nil, right: UInt? = nil, bottom: UInt? = nil, left: UInt? = nil) {
+  public init(top: UInt? = nil, right: UInt? = nil, bottom: UInt? = nil, left: UInt? = nil) {
     self.top = top
     self.right = right
     self.bottom = bottom
     self.left = left
   }
 
-  init(horizontal: UInt, vertical: UInt) {
+  public init(horizontal: UInt, vertical: UInt) {
     self.top = vertical
     self.bottom = vertical
     self.left = horizontal
@@ -34,18 +34,18 @@ public enum Sizing: Equatable {
   case grow  // Grow to the space allowed
 }
 
-struct Attributes {
-  var width: Sizing
-  var height: Sizing
-  var foreground: Color?
-  var background: Color?
-  var borderColor: Color?
-  var borderWidth: UInt?
-  var borderRadius: UInt?
-  var scale: UInt?
-  var padding: Padding?
+public struct Attributes {
+  public var width: Sizing
+  public var height: Sizing
+  public var foreground: Color?
+  public var background: Color?
+  public var borderColor: Color?
+  public var borderWidth: UInt?
+  public var borderRadius: UInt?
+  public var scale: UInt?
+  public var padding: Padding?
 
-  init(
+  public init(
     width: Sizing = .fit, height: Sizing = .fit, foreground: Color? = nil, background: Color? = nil,
     borderColor: Color? = nil, borderWidth: UInt? = nil, borderRadius: UInt? = nil, scale: UInt? = nil,
     padding: Padding? = nil
@@ -61,7 +61,7 @@ struct Attributes {
     self.padding = padding
   }
 
-  func merge(_ other: Attributes) -> Attributes {
+  public func merge(_ other: Attributes) -> Attributes {
     var copy = self
     // NOTE: should width and height override here?
     if other.width != .fit {
