@@ -1,3 +1,4 @@
+import Fixtures
 import Logging
 import ShapeTree
 import Wayland

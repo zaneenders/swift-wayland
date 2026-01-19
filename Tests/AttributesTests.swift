@@ -1,3 +1,4 @@
+import Fixtures
 import Testing
 
 @testable import ShapeTree
@@ -6,13 +7,6 @@ import Testing
 @Suite
 @MainActor
 struct AttributesTests {
-  struct PaddingTest: Block {
-    let padding: UInt
-    var layer: some Block {
-      Text("Padding")
-        .padding(padding)
-    }
-  }
 
   @Test
   func testBasicPadding() {
@@ -43,20 +37,6 @@ struct AttributesTests {
     let root = attributes.tree[0]![0]
     let node = sizes.sizes[root]!
     print(node)
-  }
-
-  struct Grow: Block {
-    var layer: some Block {
-      Rect().height(.grow).width(.grow)
-        .background(.red)
-    }
-  }
-
-  struct IDK: Block {
-    var layer: some Block {
-      Text("IDk")
-        .scale(3)
-    }
   }
 
   @Test("Text with scale and foreground color attributes")

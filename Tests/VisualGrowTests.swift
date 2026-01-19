@@ -1,3 +1,4 @@
+import Fixtures
 import Testing
 
 @testable import ShapeTree
@@ -7,7 +8,7 @@ import Testing
 @MainActor
 struct VisualGrowTests {
 
-  @Test("GrowDemo functionality test")
+  @Test
   func growDemoFunctionalityTest() {
     let block = FullGrowDemo()
 

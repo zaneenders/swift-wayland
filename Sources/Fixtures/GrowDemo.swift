@@ -1,9 +1,8 @@
 import ShapeTree
-import Wayland
 
-// Red background
-struct FullGrowDemo: Block {
-  var layer: some Block {
+public struct FullGrowDemo: Block {
+  public init() {}
+  public var layer: some Block {
     Rect()
       .width(.grow)
       .height(.grow)
@@ -12,9 +11,10 @@ struct FullGrowDemo: Block {
 }
 
 // A small red rectangle with a blue rectangle extending to the edge of the screen
-struct MixedGrowDemo: Block {
+public struct MixedGrowDemo: Block {
   // BUG: Blue rectangle does not extend to the edge of the screen
-  var layer: some Block {
+  public init() {}
+  public var layer: some Block {
     Direction(.horizontal) {
       Rect()
         .width(.fixed(200))
@@ -29,9 +29,10 @@ struct MixedGrowDemo: Block {
 }
 
 // Should be 3 vertical bars of equal width
-struct MultipleGrowDemo: Block {
+public struct MultipleGrowDemo: Block {
   // BUG: doesn't display at all
-  var layer: some Block {
+  public init() {}
+  public var layer: some Block {
     Direction(.horizontal) {
       Rect()
         .width(.grow)

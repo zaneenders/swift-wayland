@@ -2,6 +2,7 @@
 import ShapeTree
 import Foundation
 import Wayland
+import Fixtures
 
 struct SystemClock: Block {
   var time: String

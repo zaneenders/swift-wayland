@@ -23,6 +23,7 @@ let package = Package(
       dependencies: [
         "Wayland",
         "ShapeTree",
+        "Fixtures",
         .product(name: "AsyncHTTPClient", package: "async-http-client"),
       ],
       swiftSettings: swiftSettings
@@ -33,6 +34,7 @@ let package = Package(
         .product(name: "XXH3", package: "swift-xxh3"),
         .product(name: "Logging", package: "swift-log"),
       ]),
+    .target(name: "Fixtures", dependencies: ["ShapeTree"]),
     .target(
       name: "Wayland",
       dependencies: [
@@ -53,7 +55,9 @@ let package = Package(
     ),
     .testTarget(
       name: "WaylandTests",
-      dependencies: ["Wayland", "SwiftWayland"],
+      dependencies: [
+        "Wayland", "SwiftWayland", "Fixtures",
+      ],
       swiftSettings: swiftSettings),
     // Linked Libraries
     .systemLibrary(

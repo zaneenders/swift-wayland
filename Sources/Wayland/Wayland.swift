@@ -59,7 +59,8 @@ public enum Wayland: Renderer {
 
   static var windowWidth: UInt = 800
   #if Toolbar
-  static var windowHeight: UInt32 = UInt32(toolbar_height)
+  public static let toolbar_height: UInt = 20
+  static var windowHeight: UInt = toolbar_height
   #else
   static var windowHeight: UInt = 600
   #endif
@@ -94,7 +95,6 @@ public enum Wayland: Renderer {
   static var layerShell: OpaquePointer?
   static var layerSurface: OpaquePointer?
 
-  public static let toolbar_height: UInt = 20
   #else
   static var xdgSurface: OpaquePointer!
   #endif
@@ -700,15 +700,15 @@ public enum Wayland: Renderer {
   #else
   static var layerSurfaceListener = unsafe zwlr_layer_surface_v1_listener(
     configure: { data, _surface, serial, width, height in
-      winW = width
-      winH = height
+      windowWidth = UInt(width)
+      windowHeight = UInt(height)
       unsafe zwlr_layer_surface_v1_ack_configure(_surface, serial)
 
       if let eglWin = unsafe eglWindow {
-        unsafe wl_egl_window_resize(eglWin, Int32(winW), Int32(winH), 0, 0)
+        unsafe wl_egl_window_resize(eglWin, Int32(windowWidth), Int32(windowHeight), 0, 0)
       }
 
-      glViewport(0, 0, GLsizei(winW), GLsizei(winH))
+      glViewport(0, 0, GLsizei(windowWidth), GLsizei(windowHeight))
     },
     closed: { data, _surface in
       print("Layer surface closed")

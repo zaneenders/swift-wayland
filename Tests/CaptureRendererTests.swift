@@ -1,3 +1,4 @@
+import Fixtures
 import Testing
 
 @testable import ShapeTree
@@ -46,15 +47,6 @@ struct CaptureRendererTests {
   @Test
   func verifyBrightBackgroundColors() {
     TestUtils.CaptureRenderer.reset()
-    struct ColorTestLayout: Block {
-      var layer: some Block {
-        Direction(.vertical) {
-          Text("Red Background").background(.red)
-          Text("Bright Yellow Background").background(.yellow)
-          Text("Cyan Background").background(.cyan)
-        }
-      }
-    }
 
     let test = ColorTestLayout()
     _ = TestUtils.renderBlock(

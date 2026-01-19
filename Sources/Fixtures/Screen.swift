@@ -1,12 +1,19 @@
 import ShapeTree
-import Wayland
 
-struct PaddedText: Block {
+public struct PaddedText: Block {
   let text: String
   let padding: UInt
   let foreground: Color
   let background: Color
-  var layer: some Block {
+
+  public init(text: String, padding: UInt, foreground: Color, background: Color) {
+    self.text = text
+    self.padding = padding
+    self.foreground = foreground
+    self.background = background
+  }
+
+  public var layer: some Block {
     // BUG: Should not have default background color
     Text(text)
       .scale(2)
@@ -16,18 +23,18 @@ struct PaddedText: Block {
   }
 }
 
-struct Screen: Block {
+public struct Screen: Block {
   let scale: UInt
   let ips: [String]
   let fps: String
 
-  init(scale: UInt, ips: [String], fps: String = "") {
+  public init(scale: UInt, ips: [String], fps: String = "") {
     self.scale = scale
     self.ips = ips
     self.fps = fps
   }
 
-  var layer: some Block {
+  public var layer: some Block {
     Direction(.vertical) {  // TODO: This group should be implicit
       EmptyBlock()
       Direction(.horizontal) {
@@ -62,6 +69,7 @@ struct Screen: Block {
   }
 }
 
-struct EmptyBlock: Block {
-  var layer: some Block {}
+public struct EmptyBlock: Block {
+  public init() {}
+  public var layer: some Block {}
 }

@@ -68,7 +68,6 @@ enum TestUtils {
       resettableRenderer.reset()
     }
 
-    // Convert Size to Container for RenderWalker
     var containers: [Hash: Container] = [:]
     for (id, size) in result.sizes.sizes {
       if case .known(let container) = size {
@@ -88,7 +87,6 @@ enum TestUtils {
     return result
   }
 
-  /// Navigate through tree structure to find specific elements
   @MainActor
   enum TreeNavigator {
     static func findFirstTupleBlock(in attributes: AttributesWalker) -> Hash? {
@@ -113,7 +111,6 @@ enum TestUtils {
     }
   }
 
-  /// Common test data generators
   enum TestData {
     static let basicColors: [Color] = [.red, .green, .blue, .yellow, .cyan, .magenta]
     static let testTexts = ["Hello", "World", "Test", "Swift", "Wayland"]
@@ -132,7 +129,6 @@ enum TestUtils {
     }
   }
 
-  /// Assertion helpers
   enum Assert {
     static func validPosition(_ position: (x: Int, y: Int)) {
       #expect(position.x >= 0 && position.y >= 0, "Position should be non-negative")
@@ -157,10 +153,7 @@ enum TestUtils {
   }
 }
 
-/// Protocol for renderers that can be reset
 protocol TestResettableRenderer {
   static func reset()
 }
-
-// Make our renderers conform to the reset protocol
 extension TestUtils.CaptureRenderer: TestResettableRenderer {}

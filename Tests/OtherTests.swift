@@ -4,29 +4,29 @@ import Testing
 @testable import SwiftWayland
 @testable import Wayland
 
-@Suite("Network and Utility Tests")
+@Suite
 struct NetworkAndUtilityTests {
 
-  @Test("CloudFlare IP lookup")
+  @Test
   func cloudFlare() async {
     let ips = await getIps()
-    #expect(ips.count > 0, "Should return at least one IP address")
-    #expect(ips.allSatisfy { $0.contains(".") }, "All IPs should contain dots")
+    #expect(ips.count > 0)
+    #expect(ips.allSatisfy { $0.contains(".") })
   }
 
-  @Test("Hash function consistency")
+  @Test
   func hashing() async {
-    let chromaHash = hash("Chroma")
-    #expect(chromaHash == 4_247_990_530_641_679_754, "Hash should match expected value")
+    let chromaHash = hash("ShapeTree")
+    #expect(chromaHash == 4_247_990_530_641_679_754)
 
-    let chromaHash2 = hash("Chroma")
-    #expect(chromaHash == chromaHash2, "Same input should produce same hash")
+    let chromaHash2 = hash("ShapeTree")
+    #expect(chromaHash == chromaHash2)
 
     let rehash = hash(chromaHash)
-    #expect(chromaHash != rehash, "Hashing a hash should produce different result")
+    #expect(chromaHash != rehash)
 
     // Test edge cases
-    #expect(hash("") != hash(" "), "Empty string should hash differently from space")
-    #expect(hash("a") != hash("A"), "Case sensitivity should be preserved")
+    #expect(hash("") != hash(" "))
+    #expect(hash("a") != hash("A"))
   }
 }

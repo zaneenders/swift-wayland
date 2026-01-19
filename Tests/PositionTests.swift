@@ -1,3 +1,4 @@
+import Fixtures
 import Testing
 
 @testable import ShapeTree
@@ -133,79 +134,4 @@ func leftPaddingTest() {
   let (attributes, sizes, positions, grow) = TestUtils.walkBlock(
     block, height: Wayland.windowHeight, width: Wayland.windowWidth)
   print(attributes, sizes, positions, grow)
-}
-
-struct PositionTestSimpleHorizontal: Block {
-  let scale: UInt = 5
-  var layer: some Block {
-    Direction(.horizontal) {
-      Rect()
-        .width(.fixed(10))
-        .height(.fixed(10))
-        .background(.red)
-      Rect()
-        .width(.fixed(10))
-        .height(.fixed(10))
-        .background(.blue)
-      Rect()
-        .width(.fixed(10))
-        .height(.fixed(10))
-        .background(.green)
-    }
-  }
-}
-
-struct PositionTestSimpleVertical: Block {
-  var layer: some Block {
-    Direction(.vertical) {
-      Rect()
-        .width(.fixed(10))
-        .height(.fixed(10))
-        .background(.red)
-      Rect()
-        .width(.fixed(10))
-        .height(.fixed(10))
-        .background(.blue)
-      Rect()
-        .width(.fixed(10))
-        .height(.fixed(10))
-        .background(.green)
-    }
-  }
-}
-
-struct EdgeCaseZeroSize: Block {
-  var layer: some Block {
-    Rect()
-      .width(.fixed(0))
-      .height(.fixed(0))
-      .background(.red)
-  }
-}
-
-struct EdgeCaseVeryLarge: Block {
-  var layer: some Block {
-    Rect()
-      .width(.fixed(UInt.max / 2))
-      .height(.fixed(UInt.max / 2))
-      .background(.red)
-  }
-}
-
-struct EdgeCaseDeepNesting: Block {
-  // NOTE: This test is dumb what is it even testing
-  var layer: some Block {
-    Direction(.horizontal) {
-      Direction(.vertical) {
-        Direction(.horizontal) {
-          Direction(.vertical) {
-            Rect()
-              .width(.fixed(10))
-              .height(.fixed(10))
-              .background(.red)
-          }
-        }
-      }
-    }
-  }
 }
