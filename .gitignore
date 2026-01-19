@@ -4,6 +4,6 @@
 .DS_Store
 # Swift Package Manger
 /.swiftpm
-Package.resolved
+#Package.resolved
 # VS Code generated files
 /.vscode
