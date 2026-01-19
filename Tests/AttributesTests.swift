@@ -56,7 +56,6 @@ struct AttributesTests {
     #expect(container.width == Wayland.windowWidth, "Text width should be calculated correctly")
     #expect(container.height == Wayland.windowHeight, "Text height should be calculated correctly")
     #expect(container.orientation == .vertical, "Text orientation should be vertical")
-
   }
 
   @Test

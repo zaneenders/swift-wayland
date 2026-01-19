@@ -103,7 +103,7 @@ struct CaptureRendererTests {
 
     TestUtils.CaptureRenderer.capturedQuads.forEach { TestUtils.Assert.quadHasValidCoordinates($0) }
 
-    #expect(TestUtils.CaptureRenderer.capturedQuads.count == 6, "Should draw at least 3 quads")
+    #expect(TestUtils.CaptureRenderer.capturedQuads.count == 3, "Should draw at least 3 quads")
     #expect(
       TestUtils.CaptureRenderer.capturedQuads.allSatisfy { $0.width == 25 && $0.height == 25 },
       "All quads should be 25x25")

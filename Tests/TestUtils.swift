@@ -22,6 +22,7 @@ enum TestUtils {
     nonisolated static func reset() {
       Task { @MainActor in
         capturedTexts.removeAll()
+        capturedQuads.removeAll()
       }
     }
   }
