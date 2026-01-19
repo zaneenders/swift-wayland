@@ -3,7 +3,7 @@ import ShapeTree
 
 @MainActor
 extension Wayland {
-  public static func renderLayout(
+  static func renderLayout(
     _ block: some Block, layout: Layout, settings: FontMetrics, logLevel: Logger.Level = .warning
   ) {
     var renderer = RenderWalker(
@@ -16,15 +16,21 @@ extension Wayland {
     block.walk(with: &renderer)
   }
 
-  public static func calculateLayout(_ block: some Block, height: UInt, width: UInt, settings: FontMetrics) -> Layout {
+  static func calculateLayout(
+    _ block: some Block,
+    height: UInt = Wayland.windowHeight,
+    width: UInt = Wayland.windowWidth,
+    settings: FontMetrics
+  ) -> Layout {
     return ShapeTree.calculateLayout(block, height: height, width: width, settings: settings)
   }
 
   public static func render(
-    _ block: some Block, height: UInt, width: UInt, settings: FontMetrics, logLevel: Logger.Level = .warning
+    _ block: some Block,
+    logLevel: Logger.Level = .warning
   ) {
-    let layout = calculateLayout(block, height: height, width: width, settings: settings)
-    renderLayout(block, layout: layout, settings: settings, logLevel: logLevel)
+    let layout = calculateLayout(block, settings: Wayland.fontSettings)
+    renderLayout(block, layout: layout, settings: Wayland.fontSettings, logLevel: logLevel)
   }
 }
 
