@@ -100,4 +100,3 @@ enum ShaderGenerationError: Error, CustomStringConvertible {
     }
   }
 }
-
