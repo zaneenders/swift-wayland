@@ -52,7 +52,7 @@ enum TestUtils {
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
 
-    var sizeWalker = SizeWalker(attributes: attributesWalker.attributes)
+    var sizeWalker = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     block.walk(with: &sizeWalker)
 
     // Set root container size to screen dimensions (missing step)

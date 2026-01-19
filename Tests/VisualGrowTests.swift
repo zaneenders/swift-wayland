@@ -13,7 +13,7 @@ struct VisualGrowTests {
 
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
 
     let rootId = attributesWalker.tree[0]![0]

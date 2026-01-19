@@ -13,7 +13,7 @@ struct PositionTests {
     let test = PositionTestSimpleHorizontal()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
     var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
@@ -38,7 +38,7 @@ struct PositionTests {
     let test = PositionTestSimpleVertical()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
     var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
@@ -63,7 +63,7 @@ struct PositionTests {
     let test = EdgeCaseZeroSize()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let tupleBlock = attributesWalker.tree[testStruct]![0]
@@ -75,7 +75,7 @@ struct PositionTests {
     let test = EdgeCaseDeepNesting()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group1 = attributesWalker.tree[testStruct]![0]
@@ -94,7 +94,7 @@ struct PositionTests {
     let test = EdgeCaseVeryLarge()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let tupleBlock = attributesWalker.tree[testStruct]![0]
@@ -119,7 +119,7 @@ struct PositionTests {
     let test = OverflowTest()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
     #expect(!sizer.sizes.isEmpty, "Should calculate sizes without crashing")

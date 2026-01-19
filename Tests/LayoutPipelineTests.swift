@@ -12,7 +12,7 @@ struct LayoutPipelineTests {
     let height: UInt = 100
     let width: UInt = 200
 
-    let layout = Wayland.calculateLayout(block, height: height, width: width)
+    let layout = Wayland.calculateLayout(block, height: height, width: width, settings: Wayland.fontSettings)
 
     #expect(layout.positions.count > 0)
     #expect(layout.sizes.count > 0)
@@ -38,7 +38,7 @@ struct LayoutPipelineTests {
     let height: UInt = 100
     let width: UInt = 200
 
-    let layout = Wayland.calculateLayout(block, height: height, width: width)
+    let layout = Wayland.calculateLayout(block, height: height, width: width, settings: Wayland.fontSettings)
 
     #expect(layout.positions.count > 0)
     #expect(layout.sizes.count > 0)
@@ -48,7 +48,7 @@ struct LayoutPipelineTests {
   func testLayoutPipelineSeparation() {
     let block = Text("Pipeline Test")
 
-    let layout = Wayland.calculateLayout(block, height: 50, width: 300)
+    let layout = Wayland.calculateLayout(block, height: 50, width: 300, settings: Wayland.fontSettings)
 
     #expect(layout.positions.count == layout.sizes.count)
     #expect(layout.tree.count > 0)

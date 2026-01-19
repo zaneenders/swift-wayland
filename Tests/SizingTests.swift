@@ -12,7 +12,7 @@ struct SizingTests {
     let test = RectTestBasic(scale: scale)
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let tupleBlock = attributesWalker.tree[testStruct]![0]
@@ -25,7 +25,7 @@ struct SizingTests {
     let test = RectTestMultiple()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
     // Navigate to the actual group containing the rectangles
@@ -46,7 +46,7 @@ struct SizingTests {
     let test = RectTestNested()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
@@ -60,7 +60,7 @@ struct SizingTests {
     let test = RectTestScaled()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
@@ -74,7 +74,7 @@ struct SizingTests {
     let test = SpacingTestEmptyGroup()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
@@ -87,7 +87,7 @@ struct SizingTests {
     let test = SpacingTestSingleElement()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
@@ -103,7 +103,7 @@ struct SizingTests {
     let test = SpacingTestWordRectMixed(scale: 1)
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
@@ -116,7 +116,7 @@ struct SizingTests {
     let test = SpacingTestComplexNesting()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
@@ -133,7 +133,7 @@ struct SizingTests {
     let test = SpacingTestLargeGap()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
@@ -148,7 +148,7 @@ struct SizingTests {
     let test = RectTestBasic(scale: scale)
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let tupleBlock = attributesWalker.tree[testStruct]![0]
@@ -164,7 +164,7 @@ struct SizingTests {
     let test = RectTestScaled()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
     let testStruct = attributesWalker.tree[0]![0]
     let group = attributesWalker.tree[testStruct]![0]
@@ -182,7 +182,7 @@ struct SizingTests {
     let test = QuadTestScaling()
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
     var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
@@ -220,7 +220,7 @@ struct SizingTests {
 
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
 
     let testStruct = attributesWalker.tree[0]![0]
@@ -238,7 +238,7 @@ struct SizingTests {
 
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
 
     var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
@@ -279,7 +279,7 @@ struct SizingTests {
 
     var attributesWalker = AttributesWalker()
     test.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
     // Set the root container size (simulating what Wayland.render does)
@@ -521,29 +521,25 @@ func growWithFixedParent() {
 
   var attributesWalker = AttributesWalker()
   test.walk(with: &attributesWalker)
-  var sizer = SizeWalker(attributes: attributesWalker.attributes)
+  var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
   test.walk(with: &sizer)
 
-  // Apply grow sizing
   let containers = sizer.sizes.convert()
   var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
   test.walk(with: &grower)
 
-  // Navigate to the elements - need to go through Direction group
   let rootId = attributesWalker.tree[0]![0]
-  let directionGroup = attributesWalker.tree[rootId]![0]  // Direction group
-  let tupleBlock = attributesWalker.tree[directionGroup]![0]  // Tuple block
+  let directionGroup = attributesWalker.tree[rootId]![0]
+  let tupleBlock = attributesWalker.tree[directionGroup]![0]
   let children = attributesWalker.tree[tupleBlock]!
 
-  // Find the fixed parent and grow child
   guard children.count >= 2 else {
     Issue.record("Expected at least 2 children, got \(children.count)")
     return
   }
-  let fixedRect = children[0]  // 200x100 fixed rect
-  let growRect = children[1]  // grow rect
+  let fixedRect = children[0]
+  let growRect = children[1]
 
-  // Fixed rect should keep its size
   if let fixedSize = grower.sizes[fixedRect] {
     #expect(fixedSize.width == 200)
     #expect(fixedSize.height == 100)
@@ -551,12 +547,9 @@ func growWithFixedParent() {
     Issue.record("Fixed rect not found in grower.sizes")
   }
 
-  // Grow rect should get the parent's size
   if let growSize = grower.sizes[growRect] {
-    // Current implementation: GrowWalker sets grow element to immediate parent's size
-    // The parent (horizontal group) has size 200x100 from the fixed rect
-    #expect(growSize.width == 200)
-    #expect(growSize.height == 100)
+    #expect(growSize.width == containerWidth)
+    #expect(growSize.height == containerHeight)
   } else {
     Issue.record("Grow rect not found in grower.sizes")
   }
