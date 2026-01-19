@@ -45,7 +45,6 @@ struct ShaderGeneratorTool {
       fragmentShader: fragmentShader
     )
 
-    // Create output directory if it doesn't exist
     try FileManager.default.createDirectory(
       at: outputFile.deletingLastPathComponent(),
       withIntermediateDirectories: true
