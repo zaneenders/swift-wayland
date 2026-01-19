@@ -18,9 +18,10 @@ struct AttributesTests {
   func testBasicPadding() {
     let padding: UInt = 15
     let test = PaddingTest(padding: padding)
-    let (attributes, sizes, positions, grower) = TestUtils.walkBlock(test, height: height, width: width)
+    let (attributes, sizes, positions, grower) = TestUtils.walkBlock(
+      test, height: Wayland.windowHeight, width: Wayland.windowWidth)
     guard let paddingTestHash = TestUtils.TreeNavigator.findFirstTupleBlock(in: attributes),
-          let node = sizes.sizes[paddingTestHash]
+      let node = sizes.sizes[paddingTestHash]
     else {
       Issue.record("Failed to find PaddingTest block")
       return
@@ -36,9 +37,9 @@ struct AttributesTests {
 
   @Test
   func basicGrow() {
-    let padding: UInt = 15
     let test = Grow()
-    let (attributes, sizes, positions, grower) = TestUtils.walkBlock(test, height: height, width: width)
+    let (attributes, sizes, positions, grower) = TestUtils.walkBlock(
+      test, height: Wayland.windowHeight, width: Wayland.windowWidth)
     let root = attributes.tree[0]![0]
     let node = sizes.sizes[root]!
     print(node)
@@ -61,7 +62,7 @@ struct AttributesTests {
   @Test("Text with scale and foreground color attributes")
   func idk() {
     let test = IDK()
-    let result = TestUtils.walkBlock(test, height: height, width: width)
+    let result = TestUtils.walkBlock(test, height: Wayland.windowHeight, width: Wayland.windowWidth)
 
     guard let tupleBlock = TestUtils.TreeNavigator.findFirstTupleBlock(in: result.attributes),
       let size = result.sizes.sizes[tupleBlock],
@@ -160,7 +161,7 @@ struct AttributesTests {
   @Test
   func testAttributeAccumulation() {
     let test = AttributeChainTest()
-    let result = TestUtils.walkBlock(test, height: height, width: width)
+    let result = TestUtils.walkBlock(test, height: Wayland.windowHeight, width: Wayland.windowWidth)
     let root = result.attributes.tree[0]![0]
     let text = result.attributes.tree[root]![0]
     #expect(result.attributes.attributes[text]!.background == .red)

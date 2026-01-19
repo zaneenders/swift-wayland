@@ -4,9 +4,6 @@ import Testing
 @testable import ShapeTree
 @testable import Wayland
 
-let width: UInt = 600
-let height: UInt = 400
-
 @MainActor
 enum TestUtils {
 

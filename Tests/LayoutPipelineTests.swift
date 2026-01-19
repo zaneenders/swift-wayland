@@ -1,7 +1,7 @@
 import Testing
-import Wayland
 
 @testable import ShapeTree
+@testable import Wayland
 
 @MainActor
 struct LayoutPipelineTests {
@@ -9,10 +9,9 @@ struct LayoutPipelineTests {
   @Test
   func testCalculateLayout() {
     let block = Text("Hello")
-    let height: UInt = 100
-    let width: UInt = 200
 
-    let layout = Wayland.calculateLayout(block, height: height, width: width, settings: Wayland.fontSettings)
+    let layout = Wayland.calculateLayout(
+      block, height: Wayland.windowHeight, width: Wayland.windowWidth, settings: Wayland.fontSettings)
 
     #expect(layout.positions.count > 0)
     #expect(layout.sizes.count > 0)
@@ -28,17 +27,16 @@ struct LayoutPipelineTests {
     #expect(pos.y == 0)
 
     let size = layout.sizes[root]!
-    #expect(size.width <= width)
-    #expect(size.height <= height)
+    #expect(size.width <= Wayland.windowWidth)
+    #expect(size.height <= Wayland.windowHeight)
   }
 
   @Test
   func testBackwardCompatibility() {
     let block = Text("Hello")
-    let height: UInt = 100
-    let width: UInt = 200
 
-    let layout = Wayland.calculateLayout(block, height: height, width: width, settings: Wayland.fontSettings)
+    let layout = Wayland.calculateLayout(
+      block, height: Wayland.windowHeight, width: Wayland.windowWidth, settings: Wayland.fontSettings)
 
     #expect(layout.positions.count > 0)
     #expect(layout.sizes.count > 0)

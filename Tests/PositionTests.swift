@@ -131,7 +131,7 @@ struct PositionTests {
 func leftPaddingTest() {
   let block = LeftPadding()
   let (attributes, sizes, positions, grow) = TestUtils.walkBlock(
-    block, height: height, width: width)
+    block, height: Wayland.windowHeight, width: Wayland.windowWidth)
   print(attributes, sizes, positions, grow)
 }
 

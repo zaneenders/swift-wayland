@@ -30,7 +30,6 @@ struct Glyph {
   var rows: [String] = Array(repeating: "", count: Int(Wayland.glyphH))
 }
 
-/// Wayland-specific font metrics implementation
 @MainActor
 public struct WaylandFontMetrics: FontMetrics {
   public let glyphWidth: UInt = Wayland.glyphW
@@ -58,11 +57,11 @@ public enum Wayland: Renderer {
   static var atlasW = Int(charCount * (glyphW + glyphSpacing))
   static var atlasH = Int(glyphH)
 
-  static var winW: UInt32 = 800
+  static var windowWidth: UInt = 800
   #if Toolbar
-  static var winH: UInt32 = UInt32(toolbar_height)
+  static var windowHeight: UInt32 = UInt32(toolbar_height)
   #else
-  static var winH: UInt32 = 600
+  static var windowHeight: UInt = 600
   #endif
 
   static var eglDisplay: EGLDisplay?
@@ -148,7 +147,7 @@ public enum Wayland: Renderer {
     }
     guard unsafe eglContext != EGL_NO_CONTEXT else { throw WaylandError.error(message: "eglCreateContext failed") }
 
-    unsafe eglWindow = wl_egl_window_create(surface, Int32(winW), Int32(winH))
+    unsafe eglWindow = wl_egl_window_create(surface, Int32(windowWidth), Int32(windowHeight))
     guard unsafe eglWindow != nil else { throw WaylandError.error(message: "wl_egl_window_create failed") }
 
     unsafe eglSurface = eglCreateWindowSurface(eglDisplay, cfg, EGLNativeWindowType(bitPattern: eglWindow), nil)
@@ -540,12 +539,12 @@ public enum Wayland: Renderer {
   public static func preDraw() {
     start = ContinuousClock.now
 
-    glViewport(0, 0, GLsizei(winW), GLsizei(winH))
+    glViewport(0, 0, GLsizei(windowWidth), GLsizei(windowHeight))
     glClearColor(0, 0, 0, 1)
     glClear(GLbitfield(GL_COLOR_BUFFER_BIT))
 
     glUseProgram(program)
-    glUniform2f(uRes, Float(winW), Float(winH))
+    glUniform2f(uRes, Float(windowWidth), Float(windowHeight))
     glUniform1i(uTex, 0)
 
     glBindVertexArray(vao)
@@ -665,7 +664,7 @@ public enum Wayland: Renderer {
         while unsafe wl_display_dispatch(display) != -1 {}
       }
 
-      send(.frame(height: UInt(winH), width: UInt(winW)))
+      send(.frame(height: UInt(windowHeight), width: UInt(windowWidth)))
     }
   }
 
@@ -685,8 +684,8 @@ public enum Wayland: Renderer {
       _ states: UnsafeMutablePointer<wl_array>?
     ) -> Void = { data, toplevel, width, height, states in
       if width > 0 && height > 0 {
-        winW = UInt32(width)
-        winH = UInt32(height)
+        windowWidth = UInt(width)
+        windowHeight = UInt(height)
         if unsafe eglWindow != nil {
           unsafe wl_egl_window_resize(eglWindow, width, height, 0, 0)
         }
@@ -811,7 +810,7 @@ public enum Wayland: Renderer {
           fpsUpdateTime = now
         }
 
-        send(.frame(height: UInt(winH), width: UInt(winW)))
+        send(.frame(height: UInt(windowHeight), width: UInt(windowWidth)))
       }
       continuation?.finish()
     }

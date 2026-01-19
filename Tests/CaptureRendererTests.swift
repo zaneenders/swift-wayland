@@ -12,7 +12,8 @@ struct CaptureRendererTests {
   func fullMockRenderPass() {
     TestUtils.CaptureRenderer.reset()
     let test = Layout(scale: 1)
-    let result = TestUtils.renderBlock(test, height: height, width: width, with: TestUtils.CaptureRenderer.self)
+    let result = TestUtils.renderBlock(
+      test, height: Wayland.windowHeight, width: Wayland.windowWidth, with: TestUtils.CaptureRenderer.self)
 
     #expect(!result.sizes.sizes.isEmpty, "Should have calculated sizes")
 
@@ -56,7 +57,8 @@ struct CaptureRendererTests {
     }
 
     let test = ColorTestLayout()
-    _ = TestUtils.renderBlock(test, height: height, width: width, with: TestUtils.CaptureRenderer.self)
+    _ = TestUtils.renderBlock(
+      test, height: Wayland.windowHeight, width: Wayland.windowWidth, with: TestUtils.CaptureRenderer.self)
 
     #expect(
       TestUtils.CaptureRenderer.capturedTexts.count >= 3,
