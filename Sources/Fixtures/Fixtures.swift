@@ -110,7 +110,7 @@ public struct Grow: Block {
   }
 }
 
-public struct IDK: Block {
+public struct ScaleTextBy3: Block {
   public init() {}
   public var layer: some Block {
     Text("IDk")
@@ -335,5 +335,44 @@ public struct GrowTestBasic: Block {
       .width(.grow)
       .height(.grow)
       .background(.red)
+  }
+}
+
+public struct AttributeChainTest: Block {
+  public init() {}
+  public var layer: some Block {
+    Text("Hello").background(.red).foreground(.blue)
+  }
+}
+
+public struct GrowTestWithFixedParent: Block {
+  public init() {}
+  public var layer: some Block {
+    Direction(.horizontal) {
+      Rect()
+        .width(.fixed(200))
+        .height(.fixed(100))
+        .background(.red)
+      Rect()
+        .width(.grow)
+        .height(.grow)
+        .background(.blue)
+    }
+  }
+}
+
+public struct GrowTestMultipleHorizontal: Block {
+  public init() {}
+  public var layer: some Block {
+    Direction(.horizontal) {
+      Rect()
+        .width(.grow)
+        .height(.grow)
+        .background(.red)
+      Rect()
+        .width(.grow)
+        .height(.grow)
+        .background(.blue)
+    }
   }
 }

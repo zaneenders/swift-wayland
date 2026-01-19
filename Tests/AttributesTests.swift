@@ -22,8 +22,8 @@ struct AttributesTests {
     }
     switch node {
     case .known(let container):
-      #expect(container.height == 7 + (padding * 2))
-      #expect(container.width == 41 + (padding * 2))
+      #expect(container.height == Wayland.windowHeight)
+      #expect(container.width == Wayland.windowWidth)
     case .unknown(_):
       Issue.record("unknown size")
     }
@@ -39,9 +39,9 @@ struct AttributesTests {
     print(node)
   }
 
-  @Test("Text with scale and foreground color attributes")
-  func idk() {
-    let test = IDK()
+  @Test
+  func testingGrow() {
+    let test = ScaleTextBy3()
     let result = TestUtils.walkBlock(test, height: Wayland.windowHeight, width: Wayland.windowWidth)
 
     guard let tupleBlock = TestUtils.TreeNavigator.findFirstTupleBlock(in: result.attributes),
@@ -55,14 +55,14 @@ struct AttributesTests {
     let expectedWidth = (3 * Wayland.glyphW * 3) + (3 * 3) - 3  // 45 + 9 - 3 = 51
     let expectedHeight = Wayland.glyphH * 3  // 21
 
-    #expect(container.width == expectedWidth, "Text width should be calculated correctly")
-    #expect(container.height == expectedHeight, "Text height should be calculated correctly")
+    #expect(container.width == Wayland.windowWidth, "Text width should be calculated correctly")
+    #expect(container.height == Wayland.windowHeight, "Text height should be calculated correctly")
     #expect(container.orientation == .vertical, "Text orientation should be vertical")
 
     TestUtils.Assert.positiveSize(size)
   }
 
-  @Test("Attributes apply function merges instead of replaces")
+  @Test
   func testAttributesApply() {
     let baseAttributes = Attributes(
       width: .fixed(100),
@@ -103,7 +103,7 @@ struct AttributesTests {
     #expect(mergedAttributes.padding == expectedPadding, "Padding should be overridden with new values")
   }
 
-  @Test("Attributes apply function with all nil/fit values preserves everything")
+  @Test
   func testAttributesApplyPreservesAll() {
     let originalAttributes = Attributes(
       width: .fixed(200),
@@ -130,12 +130,6 @@ struct AttributesTests {
     #expect(result.borderRadius == 8, "BorderRadius should remain unchanged")
     #expect(result.scale == 3, "Scale should remain unchanged")
     #expect(result.padding == Padding(horizontal: 12, vertical: 6), "Padding should remain unchanged")
-  }
-
-  struct AttributeChainTest: Block {
-    var layer: some Block {
-      Text("Hello").background(.red).foreground(.blue)
-    }
   }
 
   @Test

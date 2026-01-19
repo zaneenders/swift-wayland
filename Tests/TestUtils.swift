@@ -36,7 +36,6 @@ enum TestUtils {
     var sizeWalker = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     block.walk(with: &sizeWalker)
 
-    // Set root container size to screen dimensions (missing step)
     let root = attributesWalker.tree[0]![0]
     let orientation: Orientation
     switch sizeWalker.sizes[root]! {
@@ -57,16 +56,10 @@ enum TestUtils {
     return (attributes: attributesWalker, sizes: sizeWalker, positions: positionWalker, grower: grower)
   }
 
-  /// Render a block with specified renderer
   static func renderBlock(_ block: any Block, height: UInt, width: UInt, with renderer: any Renderer.Type) -> (
     attributes: AttributesWalker, sizes: SizeWalker, positions: PositionWalker, grower: GrowWalker
   ) {
     let result = walkBlock(block, height: height, width: width)
-
-    // Reset renderer if it has a reset method
-    if let resettableRenderer = renderer as? any TestResettableRenderer.Type {
-      resettableRenderer.reset()
-    }
 
     var containers: [Hash: Container] = [:]
     for (id, size) in result.sizes.sizes {

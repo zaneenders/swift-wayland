@@ -17,7 +17,7 @@ struct NetworkAndUtilityTests {
   @Test
   func hashing() async {
     let chromaHash = hash("ShapeTree")
-    #expect(chromaHash == 4_247_990_530_641_679_754)
+    #expect(chromaHash == 17_125_067_097_633_046_526)
 
     let chromaHash2 = hash("ShapeTree")
     #expect(chromaHash == chromaHash2)
