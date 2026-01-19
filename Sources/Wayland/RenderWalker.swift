@@ -1,13 +1,13 @@
 import Logging
 import ShapeTree
 
-// TODO: Delete
-let defaultScale: UInt = 1
-
 @MainActor
 extension Wayland {
-  public static func renderLayout(_ block: some Block, layout: Layout, logLevel: Logger.Level = .warning) {
+  public static func renderLayout(
+    _ block: some Block, layout: Layout, settings: FontMetrics, logLevel: Logger.Level = .warning
+  ) {
     var renderer = RenderWalker(
+      settings: settings,
       positions: layout.positions,
       sizes: layout.sizes,
       Self.self,
@@ -24,7 +24,7 @@ extension Wayland {
     _ block: some Block, height: UInt, width: UInt, settings: FontMetrics, logLevel: Logger.Level = .warning
   ) {
     let layout = calculateLayout(block, height: height, width: width, settings: settings)
-    renderLayout(block, layout: layout, logLevel: logLevel)
+    renderLayout(block, layout: layout, settings: settings, logLevel: logLevel)
   }
 }
 
@@ -35,13 +35,16 @@ struct RenderWalker: Walker {
   private var positions: [Hash: (x: UInt, y: UInt)] = [:]
   private var sizes: [Hash: Container]
   private let drawer: Renderer.Type
+  private let settings: FontMetrics
 
   init(
+    settings: FontMetrics,
     positions: [Hash: (x: UInt, y: UInt)],
     sizes: [Hash: Container],
     _ drawer: any Renderer.Type,
     logLevel: Logger.Level
   ) {
+    self.settings = settings
     self.positions = positions
     self.sizes = sizes
     self.drawer = drawer
@@ -57,7 +60,7 @@ struct RenderWalker: Walker {
     if let attributedBlock = block as? any HasAttributes,
       let word = attributedBlock.layer as? Text
     {
-      let scale = attributedBlock.attributes.scale ?? defaultScale
+      let scale = attributedBlock.attributes.scale ?? settings.scale
       let foreground = attributedBlock.attributes.foreground ?? .white
       let background = attributedBlock.attributes.background ?? .black
       let padding = attributedBlock.attributes.padding ?? Padding()

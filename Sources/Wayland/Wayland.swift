@@ -36,6 +36,7 @@ public struct WaylandFontMetrics: FontMetrics {
   public let glyphWidth: UInt = Wayland.glyphW
   public let glyphHeight: UInt = Wayland.glyphH
   public let glyphSpacing: UInt = Wayland.glyphSpacing
+  public let scale: UInt = 1
 }
 
 /// There is a lot of global state here to setup and conform to Wayland's patterns.

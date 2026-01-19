@@ -96,6 +96,7 @@ enum TestUtils {
     }
 
     var renderWalker = RenderWalker(
+      settings: Wayland.fontSettings,
       positions: result.positions.positions,
       sizes: containers,
       renderer,
@@ -137,8 +138,8 @@ enum TestUtils {
     static let testTexts = ["Hello", "World", "Test", "Swift", "Wayland"]
     static let commonScales: [UInt] = [1, 2, 3, 5, 10]
 
-    static func randomColor() -> Color {
-      basicColors.randomElement() ?? .black
+    static func randomColor() -> RGB {
+      (basicColors.randomElement() ?? Color.black).rgb()
     }
 
     static func randomText() -> String {

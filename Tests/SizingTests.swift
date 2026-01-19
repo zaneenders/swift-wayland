@@ -190,7 +190,9 @@ struct SizingTests {
 
     QuadCaptureRenderer.reset()
     var renderWalker = RenderWalker(
-      positions: positioner.positions, sizes: sizer.sizes.convert(), QuadCaptureRenderer.self, logLevel: .error)
+      settings: Wayland.fontSettings,
+      positions: positioner.positions, sizes: sizer.sizes.convert(),
+      QuadCaptureRenderer.self, logLevel: .error)
     test.walk(with: &renderWalker)
 
     let nonZeroQuads = QuadCaptureRenderer.capturedQuads.filter {
@@ -242,6 +244,7 @@ struct SizingTests {
     // Reset renderer and capture text
     TextCaptureRenderer.reset()
     var renderWalker = RenderWalker(
+      settings: Wayland.fontSettings,
       positions: positioner.positions, sizes: sizer.sizes.convert(), TextCaptureRenderer.self, logLevel: .error)
     block.walk(with: &renderWalker)
 

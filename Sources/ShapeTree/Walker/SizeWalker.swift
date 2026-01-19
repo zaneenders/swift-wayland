@@ -11,13 +11,11 @@ struct SizeWalker: Walker {
   var attributes: [Hash: Attributes]
   let logger: Logger
   let settings: FontMetrics
-  let scale: UInt
 
   init(settings: FontMetrics, attributes: [Hash: Attributes], logLevel: Logger.Level = .trace) {
     self.settings = settings
     self.attributes = attributes
     self.logger = Logger.create(logLevel: logLevel, label: "SizeWalker")
-    self.scale = 1
   }
 
   mutating func before(_ block: some Block) {
@@ -58,8 +56,8 @@ struct SizeWalker: Walker {
     var height: UInt = 0
 
     if let text = block.layer as? Text {
-      width = text.width(attributes.scale ?? scale, using: settings)
-      height = text.height(attributes.scale ?? scale, using: settings)
+      width = text.width(attributes.scale ?? settings.scale, using: settings)
+      height = text.height(attributes.scale ?? settings.scale, using: settings)
     } else {
       switch attributes.width {
       case .fixed(let w):
