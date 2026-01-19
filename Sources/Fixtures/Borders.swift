@@ -1,8 +1,11 @@
-import Wayland
+import ShapeTree
 
-struct Borders: Block {
+public struct Borders: Block {
   let scale: UInt
-  var layer: some Block {
+  public init(scale: UInt) {
+    self.scale = scale
+  }
+  public var layer: some Block {
     Direction(.horizontal) {
       Direction(.vertical) {
         Text("Sharp")

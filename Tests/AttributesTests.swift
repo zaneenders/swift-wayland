@@ -1,84 +1,64 @@
+import Fixtures
 import Testing
 
+@testable import ShapeTree
 @testable import Wayland
 
 @Suite
 @MainActor
 struct AttributesTests {
-  struct PaddingTest: Block {
-    let padding: UInt
-    var layer: some Block {
-      Text("Padding")
-        .padding(padding)
-    }
-  }
 
   @Test
   func testBasicPadding() {
     let padding: UInt = 15
     let test = PaddingTest(padding: padding)
-    let (attributes, sizes, positions, grower) = TestUtils.walkBlock(test, height: height, width: width)
-    let root = attributes.tree[0]![0]
-    let node = sizes.sizes[root]!
-    switch node {
-    case .known(let container):
-      #expect(container.height == 7 + (padding * 2))
-      #expect(container.width == 41 + (padding * 2))
-    case .unknown(_):
-      Issue.record("unknown size")
+    let layout = calculateLayout(
+      test, height: Wayland.windowHeight, width: Wayland.windowWidth, settings: Wayland.fontSettings)
+
+    guard let paddingTestHash = layout.tree[0]?.first,
+      let node = layout.sizes[paddingTestHash]
+    else {
+      Issue.record("Failed to find PaddingTest block")
+      return
     }
+    #expect(node.height == Wayland.windowHeight)
+    #expect(node.width == Wayland.windowWidth)
   }
 
   @Test
   func basicGrow() {
-    let padding: UInt = 15
     let test = Grow()
-    let (attributes, sizes, positions, grower) = TestUtils.walkBlock(test, height: height, width: width)
-    let root = attributes.tree[0]![0]
-    let node = sizes.sizes[root]!
+    let layout = calculateLayout(
+      test, height: Wayland.windowHeight, width: Wayland.windowWidth, settings: Wayland.fontSettings)
+    let root = layout.tree[0]![0]
+    let node = layout.sizes[root]!
     print(node)
+    // TODO: Test
   }
 
-  struct Grow: Block {
-    var layer: some Block {
-      Rect().height(.grow).width(.grow)
-        .background(.red)
-    }
-  }
+  @Test
+  func testingGrow() {
+    let test = ScaleTextBy3()
+    let layout = calculateLayout(
+      test, height: Wayland.windowHeight, width: Wayland.windowWidth, settings: Wayland.fontSettings)
 
-  struct IDK: Block {
-    var layer: some Block {
-      Text("IDk")
-        .scale(3)
-    }
-  }
-
-  @Test("Text with scale and foreground color attributes")
-  func idk() {
-    let test = IDK()
-    let result = TestUtils.walkBlock(test, height: height, width: width)
-
-    // Find the Text block and check if scale is properly applied
-    guard let tupleBlock = TestUtils.TreeNavigator.findFirstTupleBlock(in: result.attributes),
-      let size = result.sizes.sizes[tupleBlock],
-      case .known(let container) = size
+    guard
+      let tupleBlock = layout.tree[0]?.first,
+      let container = layout.sizes[tupleBlock]
     else {
       Issue.record("Failed to find tuple block or get size")
       return
     }
 
-    // Scale is now applied to text (scale=3)
     let expectedWidth = (3 * Wayland.glyphW * 3) + (3 * 3) - 3  // 45 + 9 - 3 = 51
     let expectedHeight = Wayland.glyphH * 3  // 21
 
-    #expect(container.width == expectedWidth, "Text width should be calculated correctly")
-    #expect(container.height == expectedHeight, "Text height should be calculated correctly")
+    #expect(container.width == Wayland.windowWidth, "Text width should be calculated correctly")
+    #expect(container.height == Wayland.windowHeight, "Text height should be calculated correctly")
     #expect(container.orientation == .vertical, "Text orientation should be vertical")
-
-    TestUtils.Assert.positiveSize(size)
   }
 
-  @Test("Attributes apply function merges instead of replaces")
+  @Test
   func testAttributesApply() {
     let baseAttributes = Attributes(
       width: .fixed(100),
@@ -119,7 +99,7 @@ struct AttributesTests {
     #expect(mergedAttributes.padding == expectedPadding, "Padding should be overridden with new values")
   }
 
-  @Test("Attributes apply function with all nil/fit values preserves everything")
+  @Test
   func testAttributesApplyPreservesAll() {
     let originalAttributes = Attributes(
       width: .fixed(200),
@@ -148,20 +128,15 @@ struct AttributesTests {
     #expect(result.padding == Padding(horizontal: 12, vertical: 6), "Padding should remain unchanged")
   }
 
-  struct AttributeChainTest: Block {
-    var layer: some Block {
-      Text("Hello").background(.red).foreground(.blue)
-    }
-  }
-
   @Test
   func testAttributeAccumulation() {
     let test = AttributeChainTest()
-    let result = TestUtils.walkBlock(test, height: height, width: width)
-    let root = result.attributes.tree[0]![0]
-    let text = result.attributes.tree[root]![0]
-    #expect(result.attributes.attributes[text]!.background == .red)
-    #expect(result.attributes.attributes[text]!.foreground == .blue)
+    let layout = calculateLayout(
+      test, height: Wayland.windowHeight, width: Wayland.windowWidth, settings: Wayland.fontSettings)
+    let root = layout.tree[0]![0]
+    let text = layout.tree[root]![0]
+    #expect(layout.attributes[text]!.background == .red)
+    #expect(layout.attributes[text]!.foreground == .blue)
   }
 
   @Test

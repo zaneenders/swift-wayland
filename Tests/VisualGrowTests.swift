@@ -1,23 +1,22 @@
+import Fixtures
 import Testing
 
+@testable import ShapeTree
 @testable import SwiftWayland
 @testable import Wayland
 
 @MainActor
 struct VisualGrowTests {
 
-  @Test("GrowDemo functionality test")
+  @Test
   func growDemoFunctionalityTest() {
-    // Test the same scenarios that GrowDemo uses
-    //let block = VisualGrowTestBasic()
     let block = FullGrowDemo()
 
     var attributesWalker = AttributesWalker()
     block.walk(with: &attributesWalker)
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
+    var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     block.walk(with: &sizer)
 
-    // Set container size and apply grow
     let rootId = attributesWalker.tree[0]![0]
     sizer.sizes[rootId] = .known(Container(height: 400, width: 600, orientation: .vertical))
 

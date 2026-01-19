@@ -1,10 +1,12 @@
+import ShapeTree
+
 struct RenderableQuad: BitwiseCopyable {
   var dst_p0: (Float, Float)
   var dst_p1: (Float, Float)
   var tex_tl: (Float, Float)
   var tex_br: (Float, Float)
-  var color: Color
-  var borderColor: Color
+  var color: RGB
+  var borderColor: RGB
   var borderWidth: Float
   var cornerRadius: Float
 
@@ -19,8 +21,8 @@ struct RenderableQuad: BitwiseCopyable {
     dst_p0: (UInt, UInt), dst_p1: (UInt, UInt),
     tex_tl: (Float, Float) = (0, 0),
     tex_br: (Float, Float) = (1, 1),
-    color: Color,
-    borderColor: Color = Color(r: 0, g: 0, b: 0, a: 0),
+    color: RGB,
+    borderColor: RGB = RGB(r: 0, g: 0, b: 0, a: 0),
     borderWidth: Float = 0.0,
     cornerRadius: Float = 0.0
   ) {

@@ -10,8 +10,10 @@ struct SizeWalker: Walker {
   var currentOrentation: Orientation = .vertical
   var attributes: [Hash: Attributes]
   let logger: Logger
+  let settings: FontMetrics
 
-  init(attributes: [Hash: Attributes], logLevel: Logger.Level = .trace) {
+  init(settings: FontMetrics, attributes: [Hash: Attributes], logLevel: Logger.Level = .trace) {
+    self.settings = settings
     self.attributes = attributes
     self.logger = Logger.create(logLevel: logLevel, label: "SizeWalker")
   }
@@ -30,8 +32,8 @@ struct SizeWalker: Walker {
       }
       sizes[currentId] = .known(
         Container(
-          height: text.height(defaultScale),
-          width: text.width(defaultScale),
+          height: text.height(1, using: settings),
+          width: text.width(1, using: settings),
           orientation: currentOrentation))
     } else if let group = block as? BlockGroup {
       if group.children.count < 1 {
@@ -54,8 +56,8 @@ struct SizeWalker: Walker {
     var height: UInt = 0
 
     if let text = block.layer as? Text {
-      width = text.width(attributes.scale ?? defaultScale)
-      height = text.height(attributes.scale ?? defaultScale)
+      width = text.width(attributes.scale ?? settings.scale, using: settings)
+      height = text.height(attributes.scale ?? settings.scale, using: settings)
     } else {
       switch attributes.width {
       case .fixed(let w):
@@ -129,8 +131,14 @@ enum Size: Equatable, CustomStringConvertible {
   }
 }
 
-struct Container: Equatable {
-  var height: UInt
-  var width: UInt
-  var orientation: Orientation
+public struct Container: Equatable {
+  public var height: UInt
+  public var width: UInt
+  public var orientation: Orientation
+
+  public init(height: UInt, width: UInt, orientation: Orientation) {
+    self.height = height
+    self.width = width
+    self.orientation = orientation
+  }
 }

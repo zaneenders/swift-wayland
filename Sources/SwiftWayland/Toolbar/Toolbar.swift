@@ -1,6 +1,8 @@
 #if Toolbar
+import ShapeTree
 import Foundation
 import Wayland
+import Fixtures
 
 struct SystemClock: Block {
   var time: String
@@ -29,7 +31,7 @@ func runToolbar() async {
       Wayland.preDraw()
       let today = formatter.string(from: Date())
       let block = SystemClock(time: today)
-      Wayland.render(block, height: winH, width: winW)
+      Wayland.render(block)
       Wayland.postDraw()
     }
   }

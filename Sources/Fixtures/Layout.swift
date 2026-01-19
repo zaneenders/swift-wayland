@@ -1,8 +1,11 @@
-import Wayland
+import ShapeTree
 
-struct Layout: Block {
+public struct Layout: Block {
+  public init(scale: UInt) {
+    self.scale = scale
+  }
   let scale: UInt
-  var layer: some Block {
+  public var layer: some Block {
     Direction(.horizontal) {
       Rect()
         .width(.fixed(25 * scale))

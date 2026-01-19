@@ -1,6 +1,38 @@
 import Logging
+import ShapeTree
 
-let defaultScale: UInt = 1
+@MainActor
+extension Wayland {
+  static func renderLayout(
+    _ block: some Block, layout: Layout, settings: FontMetrics, logLevel: Logger.Level = .warning
+  ) {
+    var renderer = RenderWalker(
+      settings: settings,
+      positions: layout.positions,
+      sizes: layout.sizes,
+      Self.self,
+      logLevel: logLevel
+    )
+    block.walk(with: &renderer)
+  }
+
+  static func calculateLayout(
+    _ block: some Block,
+    height: UInt = Wayland.windowHeight,
+    width: UInt = Wayland.windowWidth,
+    settings: FontMetrics
+  ) -> Layout {
+    return ShapeTree.calculateLayout(block, height: height, width: width, settings: settings)
+  }
+
+  public static func render(
+    _ block: some Block,
+    logLevel: Logger.Level = .warning
+  ) {
+    let layout = calculateLayout(block, settings: Wayland.fontSettings)
+    renderLayout(block, layout: layout, settings: Wayland.fontSettings, logLevel: logLevel)
+  }
+}
 
 struct RenderWalker: Walker {
   var currentId: Hash = 0
@@ -9,13 +41,16 @@ struct RenderWalker: Walker {
   private var positions: [Hash: (x: UInt, y: UInt)] = [:]
   private var sizes: [Hash: Container]
   private let drawer: Renderer.Type
+  private let settings: FontMetrics
 
   init(
+    settings: FontMetrics,
     positions: [Hash: (x: UInt, y: UInt)],
     sizes: [Hash: Container],
     _ drawer: any Renderer.Type,
     logLevel: Logger.Level
   ) {
+    self.settings = settings
     self.positions = positions
     self.sizes = sizes
     self.drawer = drawer
@@ -31,14 +66,15 @@ struct RenderWalker: Walker {
     if let attributedBlock = block as? any HasAttributes,
       let word = attributedBlock.layer as? Text
     {
-      let scale = attributedBlock.attributes.scale ?? defaultScale
+      let scale = attributedBlock.attributes.scale ?? settings.scale
       let foreground = attributedBlock.attributes.foreground ?? .white
       let background = attributedBlock.attributes.background ?? .black
       let padding = attributedBlock.attributes.padding ?? Padding()
       let px = padding.left ?? 0
       let py = padding.top ?? 0
       drawer.drawText(
-        word.draw(at: (pos.y + py, pos.x + px), scale: scale, foreground: foreground, background: background))
+        word.draw(
+          at: (pos.y + py, pos.x + px), scale: scale, foreground: foreground.rgb(), background: background.rgb()))
       return
     }
 
@@ -58,8 +94,8 @@ struct RenderWalker: Walker {
         dst_p1: (pos.x + px + size.width, pos.y + py + size.height),
         tex_tl: (0, 0),
         tex_br: (1, 1),
-        color: attributedBlock.attributes.background ?? .white,
-        borderColor: attributedBlock.attributes.borderColor ?? .black,
+        color: (attributedBlock.attributes.background ?? Color.white).rgb(),
+        borderColor: (attributedBlock.attributes.borderColor ?? Color.black).rgb(),
         borderWidth: Float(attributedBlock.attributes.borderWidth ?? 0),
         cornerRadius: Float(attributedBlock.attributes.borderRadius ?? 0)
       )
