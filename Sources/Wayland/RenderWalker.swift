@@ -15,17 +15,14 @@ extension Wayland {
     block.walk(with: &renderer)
   }
 
-  public static func calculateLayout(_ block: some Block, height: UInt, width: UInt) -> Layout {
-    // Temporarily set Wayland font metrics for layout calculation
-    let originalMetrics = ShapeTree.currentFontMetrics
-    ShapeTree.currentFontMetrics = WaylandFontMetrics()
-    defer { ShapeTree.currentFontMetrics = originalMetrics }
-
-    return ShapeTree.calculateLayout(block, height: height, width: width)
+  public static func calculateLayout(_ block: some Block, height: UInt, width: UInt, settings: FontMetrics) -> Layout {
+    return ShapeTree.calculateLayout(block, height: height, width: width, settings: settings)
   }
 
-  public static func render(_ block: some Block, height: UInt, width: UInt, logLevel: Logger.Level = .warning) {
-    let layout = calculateLayout(block, height: height, width: width)
+  public static func render(
+    _ block: some Block, height: UInt, width: UInt, settings: FontMetrics, logLevel: Logger.Level = .warning
+  ) {
+    let layout = calculateLayout(block, height: height, width: width, settings: settings)
     renderLayout(block, layout: layout, logLevel: logLevel)
   }
 }

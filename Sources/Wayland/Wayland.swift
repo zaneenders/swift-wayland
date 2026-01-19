@@ -32,10 +32,10 @@ struct Glyph {
 
 /// Wayland-specific font metrics implementation
 @MainActor
-struct WaylandFontMetrics: FontMetrics {
-  let glyphWidth: UInt = Wayland.glyphW
-  let glyphHeight: UInt = Wayland.glyphH
-  let glyphSpacing: UInt = Wayland.glyphSpacing
+public struct WaylandFontMetrics: FontMetrics {
+  public let glyphWidth: UInt = Wayland.glyphW
+  public let glyphHeight: UInt = Wayland.glyphH
+  public let glyphSpacing: UInt = Wayland.glyphSpacing
 }
 
 /// There is a lot of global state here to setup and conform to Wayland's patterns.
@@ -44,6 +44,7 @@ struct WaylandFontMetrics: FontMetrics {
 @MainActor
 public enum Wayland: Renderer {
 
+  public static let fontSettings: any FontMetrics = WaylandFontMetrics()
   public internal(set) static var state: State = .running
 
   public static let glyphW: UInt = 5
@@ -658,9 +659,6 @@ public enum Wayland: Renderer {
         return
       }
       initGL()
-
-      // Set up ShapeTree font metrics to use Wayland-specific values
-      ShapeTree.currentFontMetrics = WaylandFontMetrics()
 
       DispatchQueue.global().async {
         while unsafe wl_display_dispatch(display) != -1 {}

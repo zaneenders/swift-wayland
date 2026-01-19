@@ -10,10 +10,14 @@ struct SizeWalker: Walker {
   var currentOrentation: Orientation = .vertical
   var attributes: [Hash: Attributes]
   let logger: Logger
+  let settings: FontMetrics
+  let scale: UInt
 
-  init(attributes: [Hash: Attributes], logLevel: Logger.Level = .trace) {
+  init(settings: FontMetrics, attributes: [Hash: Attributes], logLevel: Logger.Level = .trace) {
+    self.settings = settings
     self.attributes = attributes
     self.logger = Logger.create(logLevel: logLevel, label: "SizeWalker")
+    self.scale = 1
   }
 
   mutating func before(_ block: some Block) {
@@ -30,8 +34,8 @@ struct SizeWalker: Walker {
       }
       sizes[currentId] = .known(
         Container(
-          height: text.height(defaultScale),
-          width: text.width(defaultScale),
+          height: text.height(1, using: settings),
+          width: text.width(1, using: settings),
           orientation: currentOrentation))
     } else if let group = block as? BlockGroup {
       if group.children.count < 1 {
@@ -54,8 +58,8 @@ struct SizeWalker: Walker {
     var height: UInt = 0
 
     if let text = block.layer as? Text {
-      width = text.width(attributes.scale ?? defaultScale)
-      height = text.height(attributes.scale ?? defaultScale)
+      width = text.width(attributes.scale ?? scale, using: settings)
+      height = text.height(attributes.scale ?? scale, using: settings)
     } else {
       switch attributes.width {
       case .fixed(let w):

@@ -1,7 +1,5 @@
 import Logging
 
-let defaultScale: UInt = 1
-
 public struct Layout {
   public let positions: [Hash: (x: UInt, y: UInt)]
   public let sizes: [Hash: Container]
@@ -30,12 +28,12 @@ public protocol Walker {
 }
 
 @MainActor
-public func calculateLayout(_ block: some Block, height: UInt, width: UInt) -> Layout {
+public func calculateLayout(_ block: some Block, height: UInt, width: UInt, settings: FontMetrics) -> Layout {
   var attributesWalker = AttributesWalker()
   block.walk(with: &attributesWalker)
 
   let root = attributesWalker.tree[0]![0]
-  var sizer = SizeWalker(attributes: attributesWalker.attributes)
+  var sizer = SizeWalker(settings: settings, attributes: attributesWalker.attributes)
   block.walk(with: &sizer)
 
   let orientation: Orientation
