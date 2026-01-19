@@ -7,6 +7,11 @@ import Foundation
 import ShapeTree
 
 @MainActor
+public func calculateLayout(_ block: some Block) -> Layout {
+  calculateLayout(block, height: Wayland.windowHeight, width: Wayland.windowWidth, settings: Wayland.fontSettings)
+}
+
+@MainActor
 protocol Renderer {
   static func drawText(_ text: RenderableText)
   static func drawQuad(_ quad: RenderableQuad)

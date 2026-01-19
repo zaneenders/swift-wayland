@@ -80,24 +80,23 @@ struct CaptureRendererTests {
   @Test
   func fullMockRenderPass() {
     let test = Layout(scale: 1)
-    let result = TestUtils.renderBlock(
-      test, height: Wayland.windowHeight, width: Wayland.windowWidth, with: TestUtils.CaptureRenderer.self)
+    let layout = calculateLayout(test)
+    _ = TestUtils.render(
+      test, layout: layout, with: TestUtils.CaptureRenderer.self)
 
-    #expect(!result.sizes.sizes.isEmpty, "Should have calculated sizes")
-
-    guard let tupleBlock = TestUtils.TreeNavigator.findFirstTupleBlock(in: result.attributes),
-      let size = result.sizes.sizes[tupleBlock]
+    guard let tupleBlock = layout.tree[0]?.first,
+      let size = layout.sizes[tupleBlock]
     else {
       Issue.record("Failed to find tuple block or get size")
       return
     }
 
     #expect(
-      size == Size.known(Container(height: Wayland.windowHeight, width: Wayland.windowWidth, orientation: .vertical)),
+      size == Container(height: Wayland.windowHeight, width: Wayland.windowWidth, orientation: .vertical),
       "Layout should have expected dimensions")
 
     #expect(
-      result.positions.positions.count == result.sizes.sizes.count,
+      layout.positions.count == layout.sizes.count,
       "Should have position for every sized element")
 
     #expect(!TestUtils.CaptureRenderer.capturedQuads.isEmpty, "Should have drawn quads")
@@ -114,8 +113,9 @@ struct CaptureRendererTests {
   func verifyBrightBackgroundColors() {
 
     let test = ColorTestLayout()
-    _ = TestUtils.renderBlock(
-      test, height: Wayland.windowHeight, width: Wayland.windowWidth, with: TestUtils.CaptureRenderer.self)
+    let layout = calculateLayout(test)
+    _ = TestUtils.render(
+      test, layout: layout, with: TestUtils.CaptureRenderer.self)
 
     #expect(
       TestUtils.CaptureRenderer.capturedTexts.count >= 3,

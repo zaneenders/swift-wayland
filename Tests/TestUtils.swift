@@ -26,65 +26,22 @@ enum TestUtils {
     }
   }
 
-  /// Walk a block through all standard walkers
-  static func walkBlock(_ block: any Block, height: UInt, width: UInt) -> (
-    attributes: AttributesWalker, sizes: SizeWalker, positions: PositionWalker, grower: GrowWalker
-  ) {
-    var attributesWalker = AttributesWalker()
-    block.walk(with: &attributesWalker)
-
-    var sizeWalker = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
-    block.walk(with: &sizeWalker)
-
-    let root = attributesWalker.tree[0]![0]
-    let orientation: Orientation
-    switch sizeWalker.sizes[root]! {
-    case .known(let container):
-      orientation = container.orientation
-    case .unknown(let o):
-      orientation = o
-    }
-    sizeWalker.sizes[root] = .known(Container(height: height, width: width, orientation: orientation))
-
-    let containers = sizeWalker.sizes.convert()
-    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
-    block.walk(with: &grower)
-
-    var positionWalker = PositionWalker(sizes: grower.sizes, attributes: attributesWalker.attributes)
-    block.walk(with: &positionWalker)
-
-    return (attributes: attributesWalker, sizes: sizeWalker, positions: positionWalker, grower: grower)
-  }
-
-  static func renderBlock(_ block: any Block, height: UInt, width: UInt, with renderer: any Renderer.Type) -> (
-    attributes: AttributesWalker, sizes: SizeWalker, positions: PositionWalker, grower: GrowWalker
-  ) {
-    let result = walkBlock(block, height: height, width: width)
-
-    var containers: [Hash: Container] = [:]
-    for (id, size) in result.sizes.sizes {
-      if case .known(let container) = size {
-        containers[id] = container
-      }
-    }
-
+  static func render(_ block: some Block, layout: Layout, with renderer: any Renderer.Type)
+    -> RenderWalker
+  {
     var renderWalker = RenderWalker(
       settings: Wayland.fontSettings,
-      positions: result.positions.positions,
-      sizes: containers,
+      positions: layout.positions,
+      sizes: layout.sizes,
       renderer,
       logLevel: .error
     )
     block.walk(with: &renderWalker)
-
-    return result
+    return renderWalker
   }
 
   @MainActor
   enum TreeNavigator {
-    static func findFirstTupleBlock(in attributes: AttributesWalker) -> Hash? {
-      return attributes.tree[0]?.first
-    }
 
     static func findChildren(in attributes: AttributesWalker, parentId: Hash) -> [Hash]? {
       return attributes.tree[parentId]
@@ -125,12 +82,6 @@ enum TestUtils {
   enum Assert {
     static func validPosition(_ position: (x: Int, y: Int)) {
       #expect(position.x >= 0 && position.y >= 0, "Position should be non-negative")
-    }
-
-    static func positiveSize(_ size: Size) {
-      if case .known(let container) = size {
-        #expect(container.width > 0 && container.height > 0, "Size should be positive")
-      }
     }
 
     static func quadHasValidCoordinates(_ quad: RenderableQuad) {

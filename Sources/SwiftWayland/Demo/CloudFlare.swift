@@ -29,8 +29,8 @@ func getIps() async -> [String] {
   let start = ContinuousClock.now
   let url = "https://api.cloudflare.com/client/v4/ips"
   let request = HTTPClientRequest(url: url)
-  guard let response = try? await HTTPClient.shared.execute(request, timeout: .seconds(5)) else {
-    print("ERRROR")
+  guard let response = try? await HTTPClient.shared.execute(request, timeout: .seconds(3)) else {
+    print("ERROR")
     return []
   }
   guard let buffer = try? await response.body.collect(upTo: .max) else {

@@ -12,41 +12,39 @@ struct AttributesTests {
   func testBasicPadding() {
     let padding: UInt = 15
     let test = PaddingTest(padding: padding)
-    let (attributes, sizes, positions, grower) = TestUtils.walkBlock(
-      test, height: Wayland.windowHeight, width: Wayland.windowWidth)
-    guard let paddingTestHash = TestUtils.TreeNavigator.findFirstTupleBlock(in: attributes),
-      let node = sizes.sizes[paddingTestHash]
+    let layout = calculateLayout(
+      test, height: Wayland.windowHeight, width: Wayland.windowWidth, settings: Wayland.fontSettings)
+
+    guard let paddingTestHash = layout.tree[0]?.first,
+      let node = layout.sizes[paddingTestHash]
     else {
       Issue.record("Failed to find PaddingTest block")
       return
     }
-    switch node {
-    case .known(let container):
-      #expect(container.height == Wayland.windowHeight)
-      #expect(container.width == Wayland.windowWidth)
-    case .unknown(_):
-      Issue.record("unknown size")
-    }
+    #expect(node.height == Wayland.windowHeight)
+    #expect(node.width == Wayland.windowWidth)
   }
 
   @Test
   func basicGrow() {
     let test = Grow()
-    let (attributes, sizes, positions, grower) = TestUtils.walkBlock(
-      test, height: Wayland.windowHeight, width: Wayland.windowWidth)
-    let root = attributes.tree[0]![0]
-    let node = sizes.sizes[root]!
+    let layout = calculateLayout(
+      test, height: Wayland.windowHeight, width: Wayland.windowWidth, settings: Wayland.fontSettings)
+    let root = layout.tree[0]![0]
+    let node = layout.sizes[root]!
     print(node)
+    // TODO: Test
   }
 
   @Test
   func testingGrow() {
     let test = ScaleTextBy3()
-    let result = TestUtils.walkBlock(test, height: Wayland.windowHeight, width: Wayland.windowWidth)
+    let layout = calculateLayout(
+      test, height: Wayland.windowHeight, width: Wayland.windowWidth, settings: Wayland.fontSettings)
 
-    guard let tupleBlock = TestUtils.TreeNavigator.findFirstTupleBlock(in: result.attributes),
-      let size = result.sizes.sizes[tupleBlock],
-      case .known(let container) = size
+    guard
+      let tupleBlock = layout.tree[0]?.first,
+      let container = layout.sizes[tupleBlock]
     else {
       Issue.record("Failed to find tuple block or get size")
       return
@@ -59,7 +57,6 @@ struct AttributesTests {
     #expect(container.height == Wayland.windowHeight, "Text height should be calculated correctly")
     #expect(container.orientation == .vertical, "Text orientation should be vertical")
 
-    TestUtils.Assert.positiveSize(size)
   }
 
   @Test
@@ -135,11 +132,12 @@ struct AttributesTests {
   @Test
   func testAttributeAccumulation() {
     let test = AttributeChainTest()
-    let result = TestUtils.walkBlock(test, height: Wayland.windowHeight, width: Wayland.windowWidth)
-    let root = result.attributes.tree[0]![0]
-    let text = result.attributes.tree[root]![0]
-    #expect(result.attributes.attributes[text]!.background == .red)
-    #expect(result.attributes.attributes[text]!.foreground == .blue)
+    let layout = calculateLayout(
+      test, height: Wayland.windowHeight, width: Wayland.windowWidth, settings: Wayland.fontSettings)
+    let root = layout.tree[0]![0]
+    let text = layout.tree[root]![0]
+    #expect(layout.attributes[text]!.background == .red)
+    #expect(layout.attributes[text]!.foreground == .blue)
   }
 
   @Test
