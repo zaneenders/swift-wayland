@@ -26,7 +26,7 @@ struct CaptureRendererTests {
     }
 
     #expect(
-      size == Size.known(Container(height: 46, width: 137, orientation: .vertical)),
+      size == Size.known(Container(height: Wayland.windowHeight, width: Wayland.windowWidth, orientation: .vertical)),
       "Layout should have expected dimensions")
 
     #expect(
