@@ -66,9 +66,9 @@ struct ColorAndUtilityTests {
       "Should capture at least 3 texts with backgrounds")
 
     let expectedColors = [
-      ("Red Background", Color(r: 1.0, g: 0.0, b: 0.0, a: 1.0)),
-      ("Bright Yellow Background", Color(r: 1.0, g: 1.0, b: 0.0, a: 1.0)),
-      ("Cyan Background", Color(r: 0.0, g: 1.0, b: 1.0, a: 1.0)),
+      ("Red Background", RGB(r: 1.0, g: 0.0, b: 0.0, a: 1.0)),
+      ("Bright Yellow Background", RGB(r: 1.0, g: 1.0, b: 0.0, a: 1.0)),
+      ("Cyan Background", RGB(r: 0.0, g: 1.0, b: 1.0, a: 1.0)),
     ]
 
     for (text, expectedColor) in expectedColors {

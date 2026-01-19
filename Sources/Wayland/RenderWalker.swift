@@ -1,6 +1,7 @@
 import Logging
 import ShapeTree
 
+// TODO: Delete
 let defaultScale: UInt = 1
 
 @MainActor
@@ -63,7 +64,8 @@ struct RenderWalker: Walker {
       let px = padding.left ?? 0
       let py = padding.top ?? 0
       drawer.drawText(
-        word.draw(at: (pos.y + py, pos.x + px), scale: scale, foreground: foreground, background: background))
+        word.draw(
+          at: (pos.y + py, pos.x + px), scale: scale, foreground: foreground.rgb(), background: background.rgb()))
       return
     }
 
@@ -83,8 +85,8 @@ struct RenderWalker: Walker {
         dst_p1: (pos.x + px + size.width, pos.y + py + size.height),
         tex_tl: (0, 0),
         tex_br: (1, 1),
-        color: attributedBlock.attributes.background ?? .white,
-        borderColor: attributedBlock.attributes.borderColor ?? .black,
+        color: (attributedBlock.attributes.background ?? Color.white).rgb(),
+        borderColor: (attributedBlock.attributes.borderColor ?? Color.black).rgb(),
         borderWidth: Float(attributedBlock.attributes.borderWidth ?? 0),
         cornerRadius: Float(attributedBlock.attributes.borderRadius ?? 0)
       )

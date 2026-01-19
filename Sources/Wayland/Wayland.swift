@@ -272,13 +272,13 @@ public enum Wayland: Renderer {
       5, 4, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_color))
     glVertexAttribDivisor(5, 1)
 
-    let off_border_color = off_color + MemoryLayout<Color>.stride
+    let off_border_color = off_color + MemoryLayout<RGB>.stride
     glEnableVertexAttribArray(6)
     unsafe glVertexAttribPointer(
       6, 4, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_border_color))
     glVertexAttribDivisor(6, 1)
 
-    let off_border_width = off_border_color + MemoryLayout<Color>.stride
+    let off_border_width = off_border_color + MemoryLayout<RGB>.stride
     glEnableVertexAttribArray(7)
     unsafe glVertexAttribPointer(
       7, 1, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_border_width))

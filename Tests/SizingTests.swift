@@ -188,24 +188,19 @@ struct SizingTests {
     var positioner = PositionWalker(sizes: sizer.sizes.convert(), attributes: attributesWalker.attributes)
     test.walk(with: &positioner)
 
-    // Reset renderer and capture quads
     QuadCaptureRenderer.reset()
     var renderWalker = RenderWalker(
       positions: positioner.positions, sizes: sizer.sizes.convert(), QuadCaptureRenderer.self, logLevel: .error)
     test.walk(with: &renderWalker)
 
-    // Filter out 0x0 quads (from empty containers)
     let nonZeroQuads = QuadCaptureRenderer.capturedQuads.filter {
       $0.width > 0 && $0.height > 0
     }
 
-    // Verify we captured 3 non-zero quads
     #expect(nonZeroQuads.count == 3)
 
-    // Sort by width to get predictable order
     let quads = nonZeroQuads.sorted { $0.width < $1.width }
 
-    // Verify rectangle dimensions (no scaling for Rect)
     #expect(quads[0].width == 10)
     #expect(quads[0].height == 10)
     #expect(quads[1].width == 10)
@@ -265,9 +260,9 @@ struct SizingTests {
     #expect(texts[2].text == "Large")
 
     // Verify colors are applied
-    #expect(texts[0].foreground == .red)
-    #expect(texts[1].foreground == .green)
-    #expect(texts[2].foreground == .blue)
+    #expect(texts[0].foreground == Color.red.rgb())
+    #expect(texts[1].foreground == Color.green.rgb())
+    #expect(texts[2].foreground == Color.blue.rgb())
   }
 
   @Test("Basic grow sizing")
