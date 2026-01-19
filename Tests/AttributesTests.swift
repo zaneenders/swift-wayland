@@ -1,5 +1,6 @@
 import Testing
 
+@testable import ShapeTree
 @testable import Wayland
 
 @Suite
@@ -18,8 +19,12 @@ struct AttributesTests {
     let padding: UInt = 15
     let test = PaddingTest(padding: padding)
     let (attributes, sizes, positions, grower) = TestUtils.walkBlock(test, height: height, width: width)
-    let root = attributes.tree[0]![0]
-    let node = sizes.sizes[root]!
+    guard let paddingTestHash = TestUtils.TreeNavigator.findFirstTupleBlock(in: attributes),
+          let node = sizes.sizes[paddingTestHash]
+    else {
+      Issue.record("Failed to find PaddingTest block")
+      return
+    }
     switch node {
     case .known(let container):
       #expect(container.height == 7 + (padding * 2))

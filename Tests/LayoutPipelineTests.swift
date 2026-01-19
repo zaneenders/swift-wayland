@@ -1,6 +1,8 @@
 import Testing
 import Wayland
 
+@testable import ShapeTree
+
 @MainActor
 struct LayoutPipelineTests {
 
@@ -56,4 +58,3 @@ struct LayoutPipelineTests {
     }
   }
 }
-

@@ -1,5 +1,7 @@
 import Logging
 
+let defaultScale: UInt = 1
+
 public struct Layout {
   public let positions: [Hash: (x: UInt, y: UInt)]
   public let sizes: [Hash: Container]
@@ -18,7 +20,7 @@ public struct Layout {
 }
 
 @MainActor
-protocol Walker {
+public protocol Walker {
   var currentId: Hash { get set }
   var parentId: Hash { get set }
   mutating func before(_ block: some Block)
@@ -28,54 +30,37 @@ protocol Walker {
 }
 
 @MainActor
-extension Wayland {
-  public static func calculateLayout(_ block: some Block, height: UInt, width: UInt) -> Layout {
-    var attributesWalker = AttributesWalker()
-    block.walk(with: &attributesWalker)
+public func calculateLayout(_ block: some Block, height: UInt, width: UInt) -> Layout {
+  var attributesWalker = AttributesWalker()
+  block.walk(with: &attributesWalker)
 
-    let root = attributesWalker.tree[0]![0]
-    var sizer = SizeWalker(attributes: attributesWalker.attributes)
-    block.walk(with: &sizer)
+  let root = attributesWalker.tree[0]![0]
+  var sizer = SizeWalker(attributes: attributesWalker.attributes)
+  block.walk(with: &sizer)
 
-    let orientation: Orientation
-    switch sizer.sizes[root]! {
-    case .known(let container):
-      orientation = container.orientation
-    case .unknown(let o):
-      orientation = o
-    }
-    sizer.sizes[root] = .known(Container(height: height, width: width, orientation: orientation))
-
-    let containers = sizer.sizes.convert()
-
-    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
-    block.walk(with: &grower)
-
-    var positioner = PositionWalker(sizes: grower.sizes, attributes: attributesWalker.attributes)
-    block.walk(with: &positioner)
-
-    return Layout(
-      positions: positioner.positions,
-      sizes: grower.sizes,
-      attributes: attributesWalker.attributes,
-      tree: attributesWalker.tree
-    )
+  let orientation: Orientation
+  switch sizer.sizes[root]! {
+  case .known(let container):
+    orientation = container.orientation
+  case .unknown(let o):
+    orientation = o
   }
+  sizer.sizes[root] = .known(Container(height: height, width: width, orientation: orientation))
 
-  public static func renderLayout(_ block: some Block, layout: Layout, logLevel: Logger.Level = .warning) {
-    var renderer = RenderWalker(
-      positions: layout.positions,
-      sizes: layout.sizes,
-      Wayland.self,
-      logLevel: logLevel
-    )
-    block.walk(with: &renderer)
-  }
+  let containers = sizer.sizes.convert()
 
-  public static func render(_ block: some Block, height: UInt, width: UInt, logLevel: Logger.Level = .warning) {
-    let layout = calculateLayout(block, height: height, width: width)
-    renderLayout(block, layout: layout, logLevel: logLevel)
-  }
+  var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+  block.walk(with: &grower)
+
+  var positioner = PositionWalker(sizes: grower.sizes, attributes: attributesWalker.attributes)
+  block.walk(with: &positioner)
+
+  return Layout(
+    positions: positioner.positions,
+    sizes: grower.sizes,
+    attributes: attributesWalker.attributes,
+    tree: attributesWalker.tree
+  )
 }
 
 extension [Hash: Size] {
@@ -129,7 +114,7 @@ extension Block {
     walker.after(self)
   }
 
-  func walk(with walker: inout some Walker, _ orientation: Orientation = .vertical) {
+  public func walk(with walker: inout some Walker, _ orientation: Orientation = .vertical) {
     let parent = walker.parentId
     walker.parentId = walker.currentId
     walker.currentId = self.id(current: walker.currentId)

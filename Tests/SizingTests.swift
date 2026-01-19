@@ -1,5 +1,6 @@
 import Testing
 
+@testable import ShapeTree
 @testable import Wayland
 
 @MainActor

@@ -1,3 +1,5 @@
+import ShapeTree
+
 struct RenderableText {
   public let text: String
   public let pos: (x: UInt, y: UInt)

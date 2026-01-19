@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 
+@testable import ShapeTree
 @testable import Wayland
 
 let width: UInt = 600
@@ -53,7 +54,7 @@ enum TestUtils {
 
     var sizeWalker = SizeWalker(attributes: attributesWalker.attributes)
     block.walk(with: &sizeWalker)
-    
+
     // Set root container size to screen dimensions (missing step)
     let root = attributesWalker.tree[0]![0]
     let orientation: Orientation

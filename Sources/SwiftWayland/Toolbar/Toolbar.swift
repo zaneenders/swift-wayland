@@ -1,4 +1,5 @@
 #if Toolbar
+import ShapeTree
 import Foundation
 import Wayland
 

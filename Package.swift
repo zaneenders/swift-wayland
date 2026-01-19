@@ -5,7 +5,8 @@ import PackageDescription
 let package = Package(
   name: "swift-wayland",
   products: [
-    .library(name: "Wayland", targets: ["Wayland"])
+    .library(name: "Wayland", targets: ["Wayland"]),
+    .library(name: "ShapeTree", targets: ["ShapeTree"]),
   ],
   traits: [
     "Toolbar",
@@ -21,13 +22,21 @@ let package = Package(
       name: "SwiftWayland",
       dependencies: [
         "Wayland",
+        "ShapeTree",
         .product(name: "AsyncHTTPClient", package: "async-http-client"),
       ],
       swiftSettings: swiftSettings
     ),
     .target(
+      name: "ShapeTree",
+      dependencies: [
+        .product(name: "XXH3", package: "swift-xxh3"),
+        .product(name: "Logging", package: "swift-log"),
+      ]),
+    .target(
       name: "Wayland",
       dependencies: [
+        "ShapeTree",
         "CWaylandClient",
         "CWaylandEGL",
         "CEGL",

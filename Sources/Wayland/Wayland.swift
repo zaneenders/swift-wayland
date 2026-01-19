@@ -4,6 +4,7 @@ import CWaylandClient
 import CWaylandEGL
 import CWaylandProtocols
 import Foundation
+import ShapeTree
 
 @MainActor
 protocol Renderer {
@@ -27,6 +28,14 @@ public enum State {
 @MainActor
 struct Glyph {
   var rows: [String] = Array(repeating: "", count: Int(Wayland.glyphH))
+}
+
+/// Wayland-specific font metrics implementation
+@MainActor
+struct WaylandFontMetrics: FontMetrics {
+  let glyphWidth: UInt = Wayland.glyphW
+  let glyphHeight: UInt = Wayland.glyphH
+  let glyphSpacing: UInt = Wayland.glyphSpacing
 }
 
 /// There is a lot of global state here to setup and conform to Wayland's patterns.
@@ -649,6 +658,9 @@ public enum Wayland: Renderer {
         return
       }
       initGL()
+
+      // Set up ShapeTree font metrics to use Wayland-specific values
+      ShapeTree.currentFontMetrics = WaylandFontMetrics()
 
       DispatchQueue.global().async {
         while unsafe wl_display_dispatch(display) != -1 {}

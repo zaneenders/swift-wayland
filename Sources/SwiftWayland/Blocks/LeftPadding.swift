@@ -1,3 +1,4 @@
+import ShapeTree
 import Wayland
 
 struct LeftPadding: Block {

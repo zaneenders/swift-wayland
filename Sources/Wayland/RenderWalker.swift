@@ -1,6 +1,34 @@
 import Logging
+import ShapeTree
 
 let defaultScale: UInt = 1
+
+@MainActor
+extension Wayland {
+  public static func renderLayout(_ block: some Block, layout: Layout, logLevel: Logger.Level = .warning) {
+    var renderer = RenderWalker(
+      positions: layout.positions,
+      sizes: layout.sizes,
+      Self.self,
+      logLevel: logLevel
+    )
+    block.walk(with: &renderer)
+  }
+
+  public static func calculateLayout(_ block: some Block, height: UInt, width: UInt) -> Layout {
+    // Temporarily set Wayland font metrics for layout calculation
+    let originalMetrics = ShapeTree.currentFontMetrics
+    ShapeTree.currentFontMetrics = WaylandFontMetrics()
+    defer { ShapeTree.currentFontMetrics = originalMetrics }
+
+    return ShapeTree.calculateLayout(block, height: height, width: width)
+  }
+
+  public static func render(_ block: some Block, height: UInt, width: UInt, logLevel: Logger.Level = .warning) {
+    let layout = calculateLayout(block, height: height, width: width)
+    renderLayout(block, layout: layout, logLevel: logLevel)
+  }
+}
 
 struct RenderWalker: Walker {
   var currentId: Hash = 0

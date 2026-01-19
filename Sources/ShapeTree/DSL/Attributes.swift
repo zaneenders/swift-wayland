@@ -96,12 +96,12 @@ public struct Attributes {
   }
 }
 
-protocol HasAttributes: Block {
+public protocol HasAttributes: Block {
   var attributes: Attributes { get set }
 }
 
 public struct AttributedBlock<B: Block>: Block, HasAttributes {
-  var attributes = Attributes()
+  public var attributes = Attributes()
 
   var wrapped: B
   public var layer: B {

@@ -1,4 +1,5 @@
 import Logging
+import ShapeTree
 import Wayland
 
 #if !Toolbar
