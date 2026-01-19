@@ -7,32 +7,16 @@ import Testing
 let width: UInt = 600
 let height: UInt = 400
 
-/// Test utilities to reduce duplication and improve test reliability
 @MainActor
 enum TestUtils {
 
-  /// Common renderer for capturing quads during tests
-  enum QuadCaptureRenderer: Renderer {
+  enum CaptureRenderer: Renderer {
+    static var capturedTexts: [RenderableText] = []
     static var capturedQuads: [RenderableQuad] = []
 
     static func drawQuad(_ quad: RenderableQuad) {
       capturedQuads.append(quad)
     }
-
-    static func drawText(_ text: RenderableText) {}
-
-    nonisolated static func reset() {
-      Task { @MainActor in
-        capturedQuads.removeAll()
-      }
-    }
-  }
-
-  /// Common renderer for capturing text during tests
-  enum TextCaptureRenderer: Renderer {
-    static var capturedTexts: [RenderableText] = []
-
-    static func drawQuad(_ quad: RenderableQuad) {}
 
     static func drawText(_ text: RenderableText) {
       capturedTexts.append(text)
@@ -182,5 +166,4 @@ protocol TestResettableRenderer {
 }
 
 // Make our renderers conform to the reset protocol
-extension TestUtils.QuadCaptureRenderer: TestResettableRenderer {}
-extension TestUtils.TextCaptureRenderer: TestResettableRenderer {}
+extension TestUtils.CaptureRenderer: TestResettableRenderer {}

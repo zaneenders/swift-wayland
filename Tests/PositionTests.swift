@@ -130,9 +130,9 @@ struct PositionTests {
 @MainActor
 func leftPaddingTest() {
   let block = LeftPadding()
-  let (attributes, sizes, positions, grow) = TestUtils.renderBlock(
-    block, height: height, width: width, with: TestUtils.TextCaptureRenderer.self)
-  print(positions)
+  let (attributes, sizes, positions, grow) = TestUtils.walkBlock(
+    block, height: height, width: width)
+  print(attributes, sizes, positions, grow)
 }
 
 struct PositionTestSimpleHorizontal: Block {
