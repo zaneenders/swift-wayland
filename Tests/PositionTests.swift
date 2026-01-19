@@ -6,10 +6,10 @@ import Testing
 @testable import Wayland
 
 @MainActor
-@Suite("Position Walker Tests")
+@Suite
 struct PositionTests {
 
-  @Test("Horizontal positioning")
+  @Test
   func positionHorizontal() {
     let test = PositionTestSimpleHorizontal()
     var attributesWalker = AttributesWalker()
@@ -34,7 +34,7 @@ struct PositionTests {
     rectPositions.forEach { TestUtils.Assert.validPosition((Int($0.x), Int($0.y))) }
   }
 
-  @Test("Vertical positioning")
+  @Test
   func positionVertical() {
     let test = PositionTestSimpleVertical()
     var attributesWalker = AttributesWalker()
@@ -59,7 +59,7 @@ struct PositionTests {
     rectPositions.forEach { TestUtils.Assert.validPosition((Int($0.x), Int($0.y))) }
   }
 
-  @Test("Zero size rectangle")
+  @Test
   func edgeCaseZeroSize() {
     let test = EdgeCaseZeroSize()
     var attributesWalker = AttributesWalker()
@@ -71,7 +71,7 @@ struct PositionTests {
     #expect(sizer.sizes[tupleBlock]! == .known(Container(height: 0, width: 0, orientation: .vertical)))
   }
 
-  @Test("Deep nesting")
+  @Test
   func edgeCaseDeepNesting() {
     let test = EdgeCaseDeepNesting()
     var attributesWalker = AttributesWalker()
@@ -90,7 +90,7 @@ struct PositionTests {
     }
   }
 
-  @Test("Edge case: very large values")
+  @Test
   func edgeCaseVeryLarge() {
     let test = EdgeCaseVeryLarge()
     var attributesWalker = AttributesWalker()
@@ -105,7 +105,7 @@ struct PositionTests {
     }
   }
 
-  @Test("Edge case: overflow protection")
+  @Test
   func edgeCaseOverflowProtection() {
     struct OverflowTest: Block {
       var layer: some Block {
@@ -125,13 +125,12 @@ struct PositionTests {
 
     #expect(!sizer.sizes.isEmpty, "Should calculate sizes without crashing")
   }
-}
 
-@Test
-@MainActor
-func leftPaddingTest() {
-  let block = LeftPadding()
-  let layout = calculateLayout(block)
-  // TODO: write test
-  print(layout)
+  @Test
+  func leftPaddingTest() {
+    let block = LeftPadding()
+    let layout = calculateLayout(block)
+    // TODO: write test
+    print(layout)
+  }
 }
