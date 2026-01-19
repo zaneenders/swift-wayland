@@ -47,11 +47,10 @@ let package = Package(
         .product(name: "XXH3", package: "swift-xxh3"),
         .product(name: "Logging", package: "swift-log"),
       ],
-      resources: [
-        .process("../../shaders/vertex.glsl"),
-        .process("../../shaders/fragment.glsl"),
-      ],
-      swiftSettings: swiftSettings
+      swiftSettings: swiftSettings,
+      plugins: [
+        .plugin(name: "ShaderGenerator")
+      ]
     ),
     .testTarget(
       name: "WaylandTests",
@@ -97,6 +96,18 @@ let package = Package(
       path: "Sources/LinkedLibraries/CWaylandProtocols",
       publicHeadersPath: "include",
       swiftSettings: swiftSettings
+    ),
+    // Plugin targets
+    .executableTarget(
+      name: "ShaderGeneratorTool",
+      dependencies: []
+    ),
+    .plugin(
+      name: "ShaderGenerator",
+      capability: .buildTool(),
+      dependencies: [
+        "ShaderGeneratorTool"
+      ]
     ),
   ]
 )

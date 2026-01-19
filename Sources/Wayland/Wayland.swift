@@ -188,10 +188,14 @@ public enum Wayland: Renderer {
   }
 
   static func loadText(resource name: String) -> String {
-    // TODO: Load shaders at compile time.
-    let url = Bundle.module.url(forResource: name, withExtension: nil)!
-    let data = try! Data(contentsOf: url)
-    return String(decoding: data, as: UTF8.self)
+    switch name {
+    case "vertex.glsl":
+      return vertexShader
+    case "fragment.glsl":
+      return fragmentShader
+    default:
+      fatalError("Unknown shader resource: \(name)")
+    }
   }
 
   static func linkProgram(vs: GLuint, fs: GLuint) -> GLuint {
