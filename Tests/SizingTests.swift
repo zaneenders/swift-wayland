@@ -222,7 +222,7 @@ struct SizingTests {
 
     // Apply grow sizing
     let containers = sizer.sizes.convert()
-    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes, tree: attributesWalker.tree)
     test.walk(with: &grower)
 
     // Navigate to the grow element
@@ -247,17 +247,28 @@ struct SizingTests {
     var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
+    // Set the root container size to simulate what Wayland.render does
+    let rootId = attributesWalker.tree[0]![0]
+    let orientation: Orientation
+    switch sizer.sizes[rootId]! {
+    case .known(let container):
+      orientation = container.orientation
+    case .unknown(let o):
+      orientation = o
+    }
+    sizer.sizes[rootId] = .known(Container(height: 100, width: 400, orientation: orientation))
+
     let containers = sizer.sizes.convert()
-    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes, tree: attributesWalker.tree)
     test.walk(with: &grower)
 
-    let rootId = attributesWalker.tree[0]![0]
-    let directionGroup = attributesWalker.tree[rootId]![0]
+    let rootIdForNavigation = attributesWalker.tree[0]![0]
+    let directionGroup = attributesWalker.tree[rootIdForNavigation]![0]
     let tupleBlock = attributesWalker.tree[directionGroup]![0]
     let children = attributesWalker.tree[tupleBlock]!
 
     guard children.count >= 2 else {
-      Issue.record("Expected at least 2 children, got \(children.count)")
+      Issue.record("Expected at least 2 children, got \(String(children.count))")
       return
     }
     let fixedRect = children[0]

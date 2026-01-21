@@ -30,7 +30,7 @@ public func calculateLayout(_ block: some Block, height: UInt, width: UInt, sett
 
   let containers = sizer.sizes.convert()
 
-  var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+  var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes, tree: attributesWalker.tree)
   block.walk(with: &grower)
 
   var positioner = PositionWalker(sizes: grower.sizes, attributes: attributesWalker.attributes)

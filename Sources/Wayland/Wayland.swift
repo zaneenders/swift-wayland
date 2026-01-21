@@ -570,7 +570,6 @@ public enum Wayland: Renderer {
   static var frameListener = unsafe wl_callback_listener(
     done: { _, callback, _time in
       unsafe wl_callback_destroy(callback)
-      print("Callback")
     }
   )
 
@@ -719,9 +718,7 @@ public enum Wayland: Renderer {
 
       glViewport(0, 0, GLsizei(windowWidth), GLsizei(windowHeight))
     },
-    closed: { data, _surface in
-      print("Layer surface closed")
-    }
+    closed: { data, _surface in }
   )
   #endif
 

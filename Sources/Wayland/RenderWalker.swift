@@ -20,7 +20,7 @@ extension Wayland {
     _ block: some Block,
     height: UInt = Wayland.windowHeight,
     width: UInt = Wayland.windowWidth,
-    settings: FontMetrics
+    settings: FontMetrics = Wayland.fontSettings
   ) -> Layout {
     return ShapeTree.calculateLayout(block, height: height, width: width, settings: settings)
   }

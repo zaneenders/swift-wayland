@@ -21,7 +21,7 @@ struct VisualGrowTests {
     sizer.sizes[rootId] = .known(Container(height: 400, width: 600, orientation: .vertical))
 
     let containers = sizer.sizes.convert()
-    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes, tree: attributesWalker.tree)
     block.walk(with: &grower)
 
     let growElement = attributesWalker.tree[rootId]![0]

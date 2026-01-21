@@ -130,7 +130,23 @@ struct PositionTests {
   func leftPaddingTest() {
     let block = LeftPadding()
     let layout = calculateLayout(block)
-    // TODO: write test
-    print(layout)
+    let root = layout.tree[0]![0]
+    let node = layout.tree[root]![0]
+    let n1 = layout.tree[node]![0]
+    let n2 = layout.tree[n1]![1]
+    let c = layout.positions[n2]!
+    #expect(c.x == 800 - 29)
+  }
+
+  @Test
+  func growToolbar() {
+    let block = SystemClock()
+    let layout = calculateLayout(block)
+    let root = layout.tree[0]![0]
+    let node = layout.tree[root]![0]
+    let n1 = layout.tree[node]![0]
+    let n2 = layout.tree[n1]![1]
+    let c = layout.positions[n2]!
+    #expect(c.x == 800 - 202)  // 202 is width of clock
   }
 }
