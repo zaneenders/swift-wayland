@@ -22,36 +22,97 @@ struct GrowWalker: Walker {
         shouldUpdate = true
       }
       if case .grow = currentAttributes.width {
+
         // Calculate space for siblings using the tree structure
         if let siblings = tree[parentId] {
           let nonGrowingSiblings = siblings.filter { siblingId in
             guard let siblingAttrs = attributes[siblingId] else { return true }
-            return siblingId != currentId && siblingAttrs.width != .grow
+            return siblingAttrs.width != .grow
           }
-          
-          if !nonGrowingSiblings.isEmpty {
-            // Calculate total space needed for non-growing siblings
-            var fixedSpace: UInt = 0
-            for siblingId in nonGrowingSiblings {
-              if let siblingSize = sizes[siblingId] {
-                fixedSpace += siblingSize.width
+          // Calculate total space needed for non-growing siblings
+          var fixedSpace: UInt = 0
+          for siblingId in nonGrowingSiblings {
+            if let siblingSize = sizes[siblingId] {
+              fixedSpace += siblingSize.width
+            }
+          }
+
+          // Get all growing siblings including current
+          let growingSiblings = siblings.filter { siblingId in
+            guard let siblingAttrs = attributes[siblingId] else { return false }
+            return siblingAttrs.width == .grow
+          }
+
+          if !growingSiblings.isEmpty {
+            // Calculate available space for growing elements
+            let paddingSpace: UInt = 0  // TODO: Add padding calculation
+            let childGapSpace: UInt = 0  // TODO: Add child gap calculation
+            let totalFixedSize = fixedSpace + paddingSpace + childGapSpace
+            let availableSpace = parent.width > totalFixedSize ? parent.width - totalFixedSize : 0
+
+            // Apply equalization algorithm from transcript
+
+            // First pass: collect all growing elements with their current sizes
+            var growElements: [(id: Hash, size: UInt)] = []
+            for growId in growingSiblings {
+              if let growSize = sizes[growId] {
+                growElements.append((id: growId, size: growSize.width))
               }
             }
-            
-            // Remaining space goes to growing elements
-            let remainingSpace = parent.width > fixedSpace ? parent.width - fixedSpace : 0
-            let growingElementCount = siblings.filter { siblingId in
-              guard let siblingAttrs = attributes[siblingId] else { return false }
-              return siblingAttrs.width == .grow
-            }.count
-            
-            if growingElementCount > 0 {
-              container.width = remainingSpace / UInt(growingElementCount)
-            } else {
-              container.width = remainingSpace
+
+            // Sort by size to implement equalization algorithm
+            growElements.sort { $0.size < $1.size }
+
+            var remainingSpace = availableSpace
+            var currentIndex = 0
+
+            // Equalization: make all growing elements the same size
+            while currentIndex < growElements.count - 1 && remainingSpace > 0 {
+              let currentSize = growElements[currentIndex].size
+              let nextSize = growElements[currentIndex + 1].size
+
+              // Find how many elements have the current size
+              var endIndex = currentIndex
+              while endIndex < growElements.count && growElements[endIndex].size == currentSize {
+                endIndex += 1
+              }
+
+              let elementsToGrow = endIndex - currentIndex
+              let sizeNeeded = (nextSize - currentSize) * UInt(elementsToGrow)
+
+              if sizeNeeded <= remainingSpace {
+                // Grow these elements to match next size
+                for i in currentIndex..<endIndex {
+                  growElements[i].size = nextSize
+                }
+                remainingSpace -= sizeNeeded
+              } else {
+                // Can't reach next size, distribute remaining space equally
+                let additionalPerElement = remainingSpace / UInt(elementsToGrow)
+                for i in currentIndex..<endIndex {
+                  growElements[i].size += additionalPerElement
+                }
+                remainingSpace = 0
+                break
+              }
+
+              currentIndex = endIndex
+            }
+
+            // If all elements are the same size and still have space, distribute equally
+            if remainingSpace > 0 && currentIndex >= growElements.count - 1 {
+              let additionalPerElement = remainingSpace / UInt(growElements.count)
+              for i in 0..<growElements.count {
+                growElements[i].size += additionalPerElement
+              }
+            }
+
+            // Update current container's size
+            if let growIndex = growElements.firstIndex(where: { $0.id == currentId }) {
+              container.width = growElements[growIndex].size
             }
           } else {
-            // No non-growing siblings, use full parent width
+            // No growing siblings, this is the only one, use all available space
             container.width = parent.width
           }
         } else {
@@ -81,20 +142,14 @@ struct GrowWalker: Walker {
       return
     }
 
-    // For container elements (not leaf elements like Rect), expand to fill parent 
-    // if they don't have explicit grow attributes
-    let isContainerElement = block is DirectionGroup || block is BlockGroup
-    if isContainerElement {
-      if container.orientation == .horizontal && container.width < parent.width {
-        container.width = parent.width
-        container.height = parent.height
-        sizes[currentId] = container
-      } else if container.orientation == .vertical && container.height < parent.height {
-        container.height = parent.height
-        container.width = parent.width
-        sizes[currentId] = container
-      }
+    // BlockGroups (children of Direction containers) should also fill their parent
+    if block is BlockGroup {
+      container.width = parent.width
+      container.height = parent.height
+      sizes[currentId] = container
+      return
     }
+
   }
 
   mutating func after(_ block: some Block) {}

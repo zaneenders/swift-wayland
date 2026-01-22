@@ -18,6 +18,9 @@ struct AttributesWalker: Walker {
   mutating func before(_ block: some Block) {
     connect(parent: parentId, current: currentId)
     if let attributedBlock = block as? any HasAttributes {
+      // Reset current to default for this block, then merge with block's specific attributes
+      // Each block should have its own independent attributes, not inherit from siblings
+      current = Attributes()
       current = current.merge(attributedBlock.attributes)
       attributes[currentId] = current
     }
