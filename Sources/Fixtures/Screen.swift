@@ -36,33 +36,29 @@ public struct Screen: Block {
 
   public var layer: some Block {
     Direction(.vertical) {  // TODO: This group should be implicit
-      EmptyBlock()
       Direction(.horizontal) {
-        // BUG: Should place PaddedText on right hand side
         EmptyBlock().width(.grow)
-        if !fps.isEmpty {
-          // NOTE: This is a little bit verbose for text with colored padding around it.
-          PaddedText(text: fps, padding: 5, foreground: .black, background: .green)
-            .background(.green)
-        }
+        // NOTE: This is a little bit verbose for text with colored padding around it.
+        PaddedText(text: fps, padding: 5, foreground: .black, background: .green)
+          .background(.green)
       }
-      Text("Zane was here")
+      Text("Zane was here")  // Displayed on left side
         .scale(scale)
         .foreground(.cyan)
         .padding(15)
-      Layout(scale: scale)
       for ip in ips {
+        // Display IP's when available
         Text(ip).scale(4)
           .foreground(.random)
           .background(.white)
           .padding(5)
       }
-      Borders(scale: scale)
-      Rect()
+      Rect()  // Fill what is remaining of the bottom of the screen with orange
         .background(.orange)
         .width(.grow)
         .height(.grow)
     }
+    // Set the main background to pink
     .background(.pink)
     .height(.grow)
     .width(.grow)
