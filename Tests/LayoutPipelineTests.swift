@@ -63,17 +63,34 @@ struct LayoutPipelineTests {
     let block = VerticalSpacedText()
     let layout = Wayland.calculateLayout(block, height: 20, width: 600, settings: Wayland.fontSettings)
 
-    let containers = layout.sizes.map { $0.value }
-    #expect(containers.count == 10)
+    let targetRoot = layout.sizes.first { (hash, container) in
+      guard container.orientation == .vertical else { return false }
+      guard let children = layout.tree[hash] else { return false }
+      return children.count == 3
+    }!
 
-    let spacerContainers = containers.filter { $0.width == 0 && $0.height < 20 && $0.height > 0 }
-    let textContainers = containers.filter { $0.width == 34 && $0.height == 14 }
+    let rootHash = targetRoot.key
+    let children = layout.tree[rootHash]!
+    #expect(children.count == 3)
 
-    #expect(spacerContainers.count == 2)
-    #expect(textContainers.count == 1)
+    let childContainers = children.map { layout.sizes[$0]! }
 
-    let totalSpacerHeight = spacerContainers.reduce(0) { $0 + $1.height }
-    let expectedSpacerHeight = 20 - textContainers[0].height
-    #expect(abs(Int(totalSpacerHeight) - Int(expectedSpacerHeight)) == 1)
+    let firstSpacer = childContainers[0]
+    let textContainer = childContainers[1]
+    let secondSpacer = childContainers[2]
+
+    #expect(firstSpacer.width == 0)
+    #expect(firstSpacer.height > 0 && firstSpacer.height < 20)
+    #expect(textContainer.width == 34 && textContainer.height == 14)
+    #expect(secondSpacer.width == 0)
+    #expect(secondSpacer.height > 0 && secondSpacer.height < 20)
+
+    let firstSpacerPos = layout.positions[children[0]]!
+    let textPos = layout.positions[children[1]]!
+    let secondSpacerPos = layout.positions[children[2]]!
+
+    #expect(firstSpacerPos.y == 0)
+    #expect(textPos.y == firstSpacer.height)
+    #expect(secondSpacerPos.y == firstSpacer.height + textContainer.height)
   }
 }
