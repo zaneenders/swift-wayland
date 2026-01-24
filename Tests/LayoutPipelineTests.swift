@@ -1,5 +1,6 @@
 import Testing
 
+@testable import Fixtures
 @testable import ShapeTree
 @testable import Wayland
 
@@ -54,5 +55,25 @@ struct LayoutPipelineTests {
     for id in layout.positions.keys {
       #expect(layout.sizes[id] != nil)
     }
+  }
+
+  @Test func verticalGrowTest() {
+    // Text is height 14 so vertical spaced should center it with ~3 above and ~3 below
+    // Total height: 20, Text: 14, Remaining: 6 pixels distributed between two spacers
+    let block = VerticalSpacedText()
+    let layout = Wayland.calculateLayout(block, height: 20, width: 600, settings: Wayland.fontSettings)
+
+    let containers = layout.sizes.map { $0.value }
+    #expect(containers.count == 10)
+
+    let spacerContainers = containers.filter { $0.width == 0 && $0.height < 20 && $0.height > 0 }
+    let textContainers = containers.filter { $0.width == 34 && $0.height == 14 }
+
+    #expect(spacerContainers.count == 2)
+    #expect(textContainers.count == 1)
+
+    let totalSpacerHeight = spacerContainers.reduce(0) { $0 + $1.height }
+    let expectedSpacerHeight = 20 - textContainers[0].height
+    #expect(abs(Int(totalSpacerHeight) - Int(expectedSpacerHeight)) == 1)
   }
 }

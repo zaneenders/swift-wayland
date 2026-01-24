@@ -57,7 +57,7 @@ struct RenderWalker: Walker {
     self.logger = Logger.create(logLevel: logLevel)
   }
 
-  mutating func before(_ block: some Block) {
+  private mutating func draw(_ block: some Block) {
     guard let pos = positions[currentId] else {
       logger.warning("No position for \(currentId)")
       return
@@ -104,6 +104,9 @@ struct RenderWalker: Walker {
     }
   }
 
+  mutating func before(_ block: some Block) {
+    draw(block)
+  }
   mutating func after(_ block: some Block) {}
   mutating func before(child block: some Block) {}
   mutating func after(child block: some Block) {}

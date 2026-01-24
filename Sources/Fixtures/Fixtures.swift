@@ -376,3 +376,18 @@ public struct GrowTestMultipleHorizontal: Block {
     }
   }
 }
+
+public struct VerticalSpacedText: Block {
+  public init() {}
+  public var layer: some Block {
+    Direction(.vertical) {
+      Rect()  // Spacer
+        .height(.grow)
+      Text("69%")
+        .scale(2)
+        .foreground(.green)
+      Rect()  // Spacer
+        .height(.grow)
+    }
+  }
+}
