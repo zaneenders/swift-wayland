@@ -73,6 +73,9 @@ size will be through out the algorithm. If the child of the fixed size
 container are larger then the specified size they are to be clipped and not or 
 only partially visible.
 
+The sizing modes may be combined. For example `.grow` and `.fixed` could be
+combined to have a 200 height rectangle that fills the width of the window.
+
 #### Direction
 
 The direction blocks are a form of container that specify everything within 
