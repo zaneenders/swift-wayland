@@ -18,7 +18,7 @@ func runToolbar() async {
       let bp = await system.view().batteryPercent
       let battery = "\(bp)%"
       let today = formatter.string(from: Date())
-      let block = SystemClock(battery: battery, batteryColor: bp.batteryColor, time: today)
+      let block = SystemToolBar(battery: battery, batteryColor: bp.batteryColor, time: today)
       Wayland.render(block)
       Wayland.postDraw()
     }

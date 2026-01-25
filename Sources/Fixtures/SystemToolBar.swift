@@ -1,7 +1,7 @@
 import Foundation
 import ShapeTree
 
-public struct SystemClock: Block {
+public struct SystemToolBar: Block {
 
   public init(battery: String, batteryColor: Color, time: String) {
     self.time = time
@@ -23,14 +23,18 @@ public struct SystemClock: Block {
   public var layer: some Block {
     // TODO: Could the height be specified here and passed in here instead of hardcoded to 20
     Direction(.horizontal) {
+      //    Direction(.vertical) {
       Text(battery)
         .scale(scale)
         .foreground(batteryColor)
+      //     }
       Rect()  // Spacer
         .width(.grow)
+      //    Direction(.vertical) {
       Text(time).scale(scale)
         .foreground(.teal)
         .background(.black)
+      //   }
     }
   }
 }
