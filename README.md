@@ -11,6 +11,8 @@ A minimal dependency graphics client using Wayland.
 - [x] Flexible layout algorithm (inspired by Clay)
 - [x] Toolbar and Windowed example applications.
 
+-----
+
 ## Setup
 
 Install Dependencies
@@ -30,6 +32,8 @@ You should be able to run the toolbar example app now.
 swift run --traits Toolbar SwiftWayland
 ```
 
+-----
+
 ## Design
 
 As mentioned in the Resources and References section this is inspired from Clay
@@ -41,11 +45,11 @@ Block come together as a tree which is parsed by a few what I call Walkers.
 
 ### Attribute Walker
 
-This is the first walk over the tree which is responsible for collecting the
+This is the first walk over the tree which is responsible for collecting the 
 attributes and assembling the basic structure of the three. This step may be 
 unnecessary in the long run but the goal is to have all the attributes for a 
 given block known. This also builds up a tree structure which can be used in 
-following phases to look up the parent, siblings or children of the current
+following phases to look up the parent, siblings or children of the current 
 block.
 
 ### Size Walker
@@ -72,17 +76,17 @@ only partially visible.
 #### Direction
 
 The direction blocks are a form of container that specify everything within 
-this block will be laid out in this orientation defaulting to left to right 
-and top to bottom. These can be nested to create more complex layouts and are 
-`.fit` by default but can be specified with grow or fixed to create backgrounds 
+this block will be laid out in this orientation defaulting to left to right and
+top to bottom. These can be nested to create more complex layouts and are 
+`.fit` by default but can be specified with grow or fixed to create backgrounds
 or general rectangles.
 
 ### Grow Walker
 
 The Grow walker uses the attributes and sizes computed in the previous phases 
 to compute the sizes of the remaining elements that have a dynamic size. This 
-has to be after the sizing phase as we must know how but the siblings of a 
-grow element are to know how much area we have to expand to.
+has to be after the sizing phase as we must know how but the siblings of a grow
+element are to know how much area we have to expand to.
 
 ### Position Walker
 
@@ -90,6 +94,8 @@ This is the last phase as at this point we know all the sizes of all of the
 elements and can now compute there final positions. I’m not sure if it is best 
 to do this is in pre or post order. But after this phase we will have enough 
 information to start rendering the shapes and text on to the screen.
+
+-----
 
 ## Resources & References
 
@@ -108,7 +114,8 @@ Helpful resources for getting to this point in the project.
 
 - Step-by-step guide to setting up a Wayland client
 
+-----
+
 ## Development
 
 See `.dev/` directory for development setup, testing, and known issues.
-
