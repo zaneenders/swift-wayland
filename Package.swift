@@ -16,6 +16,7 @@ let package = Package(
     .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.30.0"),
     .package(url: "https://github.com/swift-cloud/swift-xxh3", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-log.git", from: "1.8.0"),
+    .package(url: "https://github.com/apple/swift-nio.git", from: "2.86.0"),
   ],
   targets: [
     .executableTarget(
@@ -25,6 +26,7 @@ let package = Package(
         "ShapeTree",
         "Fixtures",
         .product(name: "AsyncHTTPClient", package: "async-http-client"),
+        .product(name: "_NIOFileSystem", package: "swift-nio"),
       ],
       swiftSettings: swiftSettings
     ),
