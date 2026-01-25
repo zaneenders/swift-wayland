@@ -18,8 +18,7 @@ struct AttributesWalker: Walker {
   mutating func before(_ block: some Block) {
     connect(parent: parentId, current: currentId)
     if let attributedBlock = block as? any HasAttributes {
-      current = current.merge(attributedBlock.attributes)
-      attributes[currentId] = current
+      attributes[currentId] = attributedBlock.attributes
     }
   }
 

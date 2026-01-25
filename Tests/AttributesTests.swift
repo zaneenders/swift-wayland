@@ -4,9 +4,8 @@ import Testing
 @testable import ShapeTree
 @testable import Wayland
 
-@Suite
 @MainActor
-struct AttributesTests {
+@Suite struct AttributesTests {
 
   @Test
   func testBasicPadding() {

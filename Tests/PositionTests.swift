@@ -140,7 +140,7 @@ struct PositionTests {
 
   @Test
   func growToolbar() {
-    let block = SystemClock(battery: "69%", batteryColor: .pink)
+    let block = SystemToolbar(battery: "69%", batteryColor: .pink)
     let layout = calculateLayout(block)
     let root = layout.tree[0]![0]
     let node = layout.tree[root]![0]
