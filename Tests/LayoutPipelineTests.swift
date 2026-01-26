@@ -4,7 +4,7 @@ import Testing
 @testable import Wayland
 
 @MainActor
-struct LayoutPipelineTests {
+@Suite struct LayoutPipelineTests {
 
   @Test
   func testCalculateLayout() {

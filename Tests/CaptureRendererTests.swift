@@ -6,8 +6,7 @@ import Testing
 @testable import Wayland
 
 @MainActor
-@Suite(.serialized)
-struct CaptureRendererTests {
+@Suite(.serialized) struct CaptureRendererTests {
   init() {
     TestUtils.CaptureRenderer.reset()
   }
