@@ -6,7 +6,7 @@ import Testing
 @testable import Wayland
 
 @MainActor
-struct VisualGrowTests {
+@Suite struct VisualGrowTests {
 
   @Test
   func growDemoFunctionalityTest() {

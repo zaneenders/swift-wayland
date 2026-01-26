@@ -4,8 +4,7 @@ import Testing
 @testable import SwiftWayland
 @testable import Wayland
 
-@Suite
-struct NetworkAndUtilityTests {
+@Suite struct NetworkAndUtilityTests {
 
   @Test
   func cloudFlare() async {

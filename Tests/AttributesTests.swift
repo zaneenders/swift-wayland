@@ -7,6 +7,23 @@ import Testing
 @MainActor
 @Suite struct AttributesTests {
 
+  @Test func boarders() {
+    let block = Borders(scale: 1)
+    let layout = calculateLayout(block)
+    var viz = VisualizeWalker(layout: layout)
+    block.walk(with: &viz)
+    print(viz.display())
+  }
+
+  @Test
+  func colors() {
+    let block = ColorTestLayout()
+    let layout = calculateLayout(block)
+    var viz = VisualizeWalker(layout: layout)
+    block.walk(with: &viz)
+    print(viz.display())
+  }
+
   @Test
   func testBasicPadding() {
     let padding: UInt = 15
@@ -32,7 +49,6 @@ import Testing
     let root = layout.tree[0]![0]
     let node = layout.sizes[root]!
     print(node)
-    // TODO: Test
   }
 
   @Test

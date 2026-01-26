@@ -2,9 +2,11 @@ import ShapeTree
 
 public struct Borders: Block {
   let scale: UInt
+
   public init(scale: UInt) {
     self.scale = scale
   }
+
   public var layer: some Block {
     Direction(.horizontal) {
       Direction(.vertical) {
@@ -40,6 +42,7 @@ public struct Borders: Block {
           .border(color: .yellow)
           .border(radius: 15)
       }
-    }
+    }.background(.magenta)
+    // BUG: The entire background behind these elements should be magenta
   }
 }

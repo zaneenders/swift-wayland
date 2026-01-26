@@ -6,8 +6,7 @@ import Testing
 @testable import Wayland
 
 @MainActor
-@Suite
-struct PositionTests {
+@Suite struct PositionTests {
 
   @Test
   func positionHorizontal() {
