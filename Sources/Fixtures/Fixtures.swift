@@ -145,7 +145,7 @@ public struct RectTestMultiple: Block {
         .width(.fixed(30))
         .height(.fixed(40))
         .background(.green)
-    }
+    }.background(.magenta)
   }
 }
 
@@ -164,7 +164,7 @@ public struct RectTestNested: Block {
           .background(.blue)
         Rect()
           .width(.fixed(30))
-          .height(.fixed(30))
+          .height(.fixed(20))
           .background(.green)
       }
       Rect()

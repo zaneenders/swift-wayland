@@ -1,18 +1,21 @@
 public struct Layout {
-  public let positions: [Hash: (x: UInt, y: UInt)]
-  public let sizes: [Hash: Container]
-  public let attributes: [Hash: Attributes]
   public let tree: [Hash: [Hash]]
+  public let attributes: [Hash: Attributes]
+  public let sizes: [Hash: Container]
+  public let computedSizes: [Hash: Container]
+  public let positions: [Hash: (x: UInt, y: UInt)]
 
   public init(
-    positions: [Hash: (x: UInt, y: UInt)],
-    sizes: [Hash: Container],
+    tree: [Hash: [Hash]],
     attributes: [Hash: Attributes],
-    tree: [Hash: [Hash]]
+    sizes: [Hash: Container],
+    computedSizes: [Hash: Container],
+    positions: [Hash: (x: UInt, y: UInt)]
   ) {
-    self.positions = positions
-    self.sizes = sizes
-    self.attributes = attributes
     self.tree = tree
+    self.attributes = attributes
+    self.sizes = sizes
+    self.computedSizes = computedSizes
+    self.positions = positions
   }
 }

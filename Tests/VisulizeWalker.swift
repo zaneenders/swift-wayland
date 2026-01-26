@@ -49,7 +49,7 @@ struct VisualizeWalker: Walker {
       result.append("  Position: (\(pos.x), \(pos.y))")
     }
 
-    if let container = layout.sizes[id] {
+    if let container = layout.computedSizes[id] {
       result.append("  Size: \(container.width) x \(container.height)")
       result.append("  Orientation: \(container.orientation)")
     }
@@ -113,5 +113,14 @@ extension Attributes {
       parts.append(paddingStr)
     }
     return "Attributes(\(parts.joined(separator: ", ")))"
+  }
+}
+
+extension Block {
+  package var visualize: String {
+    let layout = calculateLayout(self)
+    var viz = VisualizeWalker(layout: layout)
+    self.walk(with: &viz)
+    return viz.display()
   }
 }

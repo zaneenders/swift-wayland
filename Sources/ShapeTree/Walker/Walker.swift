@@ -37,10 +37,11 @@ public func calculateLayout(_ block: some Block, height: UInt, width: UInt, sett
   block.walk(with: &positioner)
 
   return Layout(
-    positions: positioner.positions,
-    sizes: grower.sizes,
+    tree: attributesWalker.tree,
     attributes: attributesWalker.attributes,
-    tree: attributesWalker.tree
+    sizes: containers,
+    computedSizes: grower.sizes,
+    positions: positioner.positions
   )
 }
 

@@ -7,8 +7,5 @@ import Testing
 @MainActor
 @Test func demoVisulizeWalker() {
   let block = SystemToolbar(battery: "69%", batteryColor: .pink, time: "time")
-  let layout = calculateLayout(block)
-  var viz = VisualizeWalker(layout: layout)
-  block.walk(with: &viz)
-  print(viz.display())
+  print(block.visualize)
 }
