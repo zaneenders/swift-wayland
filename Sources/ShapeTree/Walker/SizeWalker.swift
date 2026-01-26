@@ -63,7 +63,7 @@ struct SizeWalker: Walker {
       case .fixed(let w):
         width = w
       case .grow:
-        width = 0
+        width = 0  // BUG: This might be a bug
       case .fit:
         width = 0
       }
@@ -72,7 +72,7 @@ struct SizeWalker: Walker {
       case .fixed(let h):
         height = h
       case .grow:
-        height = 0
+        height = 0  // BUG: This might be a bug
       case .fit:
         height = 0
       }
@@ -86,6 +86,7 @@ struct SizeWalker: Walker {
   }
 
   mutating func after(_ block: some Block) {
+    // NOTE: this might be best left to the grow walker sizing.
     guard let p = sizes[parentId], let me = sizes[currentId] else { return }
     switch (p, me) {
     case (.unknown(let o), .known(let container)):
@@ -93,13 +94,10 @@ struct SizeWalker: Walker {
     case (.known(let parentContainer), .known(let myContainer)):
       switch parentContainer.orientation {
       case .horizontal:
-        let newWidth = myContainer.width + parentContainer.width
-        let newHeight = max(myContainer.height, parentContainer.height)
-
         sizes[parentId] = .known(
           Container(
-            height: newHeight,
-            width: newWidth,
+            height: max(myContainer.height, parentContainer.height),
+            width: myContainer.width + parentContainer.width,
             orientation: .horizontal))
       case .vertical:
         sizes[parentId] = .known(
@@ -117,6 +115,7 @@ struct SizeWalker: Walker {
   mutating func after(child block: some Block) {}
 }
 
+// TODO: I wonder about replacing with with .fixed and .fit
 enum Size: Equatable, CustomStringConvertible {
   case unknown(Orientation)
   case known(Container)

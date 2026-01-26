@@ -29,7 +29,7 @@ public func calculateLayout(_ block: some Block, height: UInt, width: UInt, sett
   sizer.sizes[root] = .known(Container(height: height, width: width, orientation: orientation))
 
   let containers = sizer.sizes.convert()
-
+  // NOTE: Maybe instead of overiding the top level height and width I just pass them in here.
   var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
   block.walk(with: &grower)
 
