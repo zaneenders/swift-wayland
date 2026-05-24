@@ -1,4 +1,3 @@
-#if Toolbar
 struct LayerSurfaceAnchor: OptionSet {
   let rawValue: UInt32
 
@@ -7,4 +6,3 @@ struct LayerSurfaceAnchor: OptionSet {
   static let left = LayerSurfaceAnchor(rawValue: 1 << 2)
   static let right = LayerSurfaceAnchor(rawValue: 1 << 3)
 }
-#endif

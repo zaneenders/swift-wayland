@@ -15,12 +15,19 @@ public func calculateLayout(_ block: some Block, height: UInt, width: UInt, sett
   var attributesWalker = AttributesWalker()
   block.walk(with: &attributesWalker)
 
-  let root = attributesWalker.tree[0]![0]
+  guard let rootChildren = attributesWalker.tree[0], !rootChildren.isEmpty else {
+    fatalError("Layout tree has no root element")
+  }
+  let root = rootChildren[0]
+
   var sizer = SizeWalker(settings: settings, attributes: attributesWalker.attributes)
   block.walk(with: &sizer)
 
+  guard let rootSize = sizer.sizes[root] else {
+    fatalError("Root element has no computed size")
+  }
   let orientation: Orientation
-  switch sizer.sizes[root]! {
+  switch rootSize {
   case .known(let container):
     orientation = container.orientation
   case .unknown(let o):
@@ -30,7 +37,11 @@ public func calculateLayout(_ block: some Block, height: UInt, width: UInt, sett
 
   let containers = sizer.sizes.convert()
 
-  var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+  var grower = GrowWalker(
+    sizes: containers,
+    attributes: attributesWalker.attributes,
+    tree: attributesWalker.tree
+  )
   block.walk(with: &grower)
 
   var positioner = PositionWalker(sizes: grower.sizes, attributes: attributesWalker.attributes)

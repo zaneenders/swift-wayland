@@ -3,7 +3,6 @@ import Logging
 import ShapeTree
 import Wayland
 
-#if !Toolbar
 @MainActor
 func runDemo() async {
   let level: Logger.Level = .trace
@@ -49,5 +48,3 @@ func runDemo() async {
     ()
   }
 }
-
-#endif

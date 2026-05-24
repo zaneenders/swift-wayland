@@ -27,8 +27,9 @@ struct PositionWalker: Walker {
   mutating func after(_ block: some Block) {
     // For orientation blocks, pop the layout context and update parent position
     if block is DirectionGroup {
-      if let context = layoutStack.popLast() {
-        let size = sizes[currentId]!
+      if let context = layoutStack.popLast(),
+        let size = sizes[currentId]
+      {
         switch context.orientation {
         case .horizontal:
           currentX = context.x + size.width
@@ -40,12 +41,13 @@ struct PositionWalker: Walker {
       }
     } else {
       // For regular blocks, update current position based on their own orientation
-      let size = sizes[currentId]!
-      switch size.orientation {
-      case .horizontal:
-        currentX += size.width
-      case .vertical:
-        currentY += size.height
+      if let size = sizes[currentId] {
+        switch size.orientation {
+        case .horizontal:
+          currentX += size.width
+        case .vertical:
+          currentY += size.height
+        }
       }
     }
   }

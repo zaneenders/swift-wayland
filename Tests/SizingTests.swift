@@ -221,7 +221,7 @@ import Testing
 
     // Apply grow sizing
     let containers = sizer.sizes.convert()
-    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes, tree: attributesWalker.tree)
     test.walk(with: &grower)
 
     // Navigate to the grow element
@@ -238,7 +238,6 @@ import Testing
 
   @Test
   func growWithFixedParent() {
-    // BUG: I think this test is wrong
     let test = GrowTestWithFixedParent()
 
     var attributesWalker = AttributesWalker()
@@ -246,11 +245,14 @@ import Testing
     var sizer = SizeWalker(settings: Wayland.fontSettings, attributes: attributesWalker.attributes)
     test.walk(with: &sizer)
 
+    // Set the root container size so the grow element has a known reference frame.
+    let rootId = attributesWalker.tree[0]![0]
+    sizer.sizes[rootId] = .known(Container(height: 400, width: 800, orientation: .vertical))
+
     let containers = sizer.sizes.convert()
-    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes)
+    var grower = GrowWalker(sizes: containers, attributes: attributesWalker.attributes, tree: attributesWalker.tree)
     test.walk(with: &grower)
 
-    let rootId = attributesWalker.tree[0]![0]
     let directionGroup = attributesWalker.tree[rootId]![0]
     let tupleBlock = attributesWalker.tree[directionGroup]![0]
     let children = attributesWalker.tree[tupleBlock]!
@@ -262,6 +264,7 @@ import Testing
     let fixedRect = children[0]
     let growRect = children[1]
 
+    // Fixed rect keeps its declared 200×100.
     if let fixedSize = grower.sizes[fixedRect] {
       #expect(fixedSize.width == 200)
       #expect(fixedSize.height == 100)
@@ -269,9 +272,11 @@ import Testing
       Issue.record("Fixed rect not found in grower.sizes")
     }
 
+    // In a horizontal container, the grow rect fills the cross-axis (height = parent height = 400)
+    // and shares remaining primary-axis space (width = parent width - fixed = 800 - 200 = 600).
     if let growSize = grower.sizes[growRect] {
-      #expect(growSize.width == 200)
-      #expect(growSize.height == 100)
+      #expect(growSize.width == 600)
+      #expect(growSize.height == 400)
     } else {
       Issue.record("Grow rect not found in grower.sizes")
     }

@@ -17,6 +17,11 @@ protocol Renderer {
   static func drawQuad(_ quad: RenderableQuad)
 }
 
+public enum AppMode {
+  case windowed
+  case toolbar
+}
+
 public enum State {
   case running
   case error(reason: String)
@@ -66,13 +71,10 @@ public enum Wayland: Renderer {
 
   // MARK: - Window Dimensions
 
-  static var windowWidth: UInt = 800
-  #if Toolbar
-  public static let toolbar_height: UInt = 20
-  static var windowHeight: UInt = toolbar_height
-  #else
-  static var windowHeight: UInt = 600
-  #endif
+  public static var mode: AppMode = .windowed
+  public static let toolbarHeight: UInt = 20
+  public static var windowWidth: UInt = 800
+  public static var windowHeight: UInt = 600
 
   // MARK: - EGL State
 
@@ -104,15 +106,11 @@ public enum Wayland: Renderer {
   static var wmBase: OpaquePointer!
   static var seat: OpaquePointer!
   static var surface: OpaquePointer!
-  static var toplevel: OpaquePointer!
-  static var keyboard: OpaquePointer!
-  #if Toolbar
+  static var toplevel: OpaquePointer?
+  static var keyboard: OpaquePointer?
+  static var xdgSurface: OpaquePointer?
   static var layerShell: OpaquePointer?
   static var layerSurface: OpaquePointer?
-
-  #else
-  static var xdgSurface: OpaquePointer!
-  #endif
 
   // MARK: - Timing & FPS
 
@@ -182,7 +180,6 @@ public enum Wayland: Renderer {
     }
   )
 
-  #if !Toolbar
   static var xdgToplevelListener = unsafe xdg_toplevel_listener(
     configure: xdg_toplevel_configure_cb,
     close: { _, _ in
@@ -200,7 +197,6 @@ public enum Wayland: Renderer {
     modifiers: { _, _, _, _, _, _, _ in },
     repeat_info: { _, _, _, _ in }
   )
-  #endif
 
   static var seatListener = unsafe wl_seat_listener(
     capabilities: seat_capabilities_cb,
@@ -210,15 +206,16 @@ public enum Wayland: Renderer {
   static var _wl_seat_interface: wl_interface = unsafe wl_seat_interface
   static var _wl_compositor_interface: wl_interface = unsafe wl_compositor_interface
   static var _xdg_wm_base_interface: wl_interface = unsafe xdg_wm_base_interface
-  #if Toolbar
   static var _zwlr_layer_shell_v1_interface: wl_interface = unsafe zwlr_layer_shell_v1_interface
-  #endif
   static var registryListener = unsafe wl_registry_listener(global: onGlobal, global_remove: { _, _, _ in })
 
   // MARK: - Setup
 
   public static func setup(_ refresh_rate: Duration = refresh_rate) {
     self.refresh_rate = refresh_rate
+    if mode == .toolbar {
+      windowHeight = toolbarHeight
+    }
     Task {
       unsafe display = wl_display_connect(nil)
       guard unsafe display != nil else {
@@ -237,35 +234,35 @@ public enum Wayland: Renderer {
 
       unsafe surface = wl_compositor_create_surface(compositor)
 
-      #if Toolbar
-      guard unsafe layerShell != nil else {
-        state = .error(reason: "Layer shell not available")
-        return
+      if mode == .toolbar {
+        guard unsafe layerShell != nil else {
+          state = .error(reason: "Layer shell not available")
+          return
+        }
+
+        unsafe layerSurface = zwlr_layer_shell_v1_get_layer_surface(
+          layerShell,
+          surface,
+          nil,
+          2,
+          "my_app_namespace"
+        )
+
+        unsafe zwlr_layer_surface_v1_set_size(layerSurface, 0, UInt32(toolbarHeight))
+        unsafe zwlr_layer_surface_v1_set_anchor(
+          layerSurface,
+          LayerSurfaceAnchor.top.union(.left).union(.right).rawValue
+        )
+        unsafe zwlr_layer_surface_v1_set_exclusive_zone(layerSurface, Int32(toolbarHeight))
+        unsafe zwlr_layer_surface_v1_add_listener(layerSurface, &layerSurfaceListener, nil)
+      } else {
+        unsafe xdgSurface = xdg_wm_base_get_xdg_surface(wmBase, surface)
+        unsafe xdg_surface_add_listener(xdgSurface, &xdgSurfaceListener, nil)
+        unsafe toplevel = xdg_surface_get_toplevel(xdgSurface)
+        unsafe xdg_toplevel_add_listener(toplevel, &xdgToplevelListener, nil)
+        unsafe xdg_toplevel_set_title(toplevel, "Swift Wayland")
+        unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
       }
-
-      unsafe layerSurface = zwlr_layer_shell_v1_get_layer_surface(
-        layerShell,
-        surface,
-        nil,
-        2,
-        "my_app_namespace"
-      )
-
-      unsafe zwlr_layer_surface_v1_set_size(layerSurface, 0, UInt32(toolbar_height))
-      unsafe zwlr_layer_surface_v1_set_anchor(
-        layerSurface,
-        LayerSurfaceAnchor.top.union(.left).union(.right).rawValue
-      )
-      unsafe zwlr_layer_surface_v1_set_exclusive_zone(layerSurface, Int32(toolbar_height))
-      unsafe zwlr_layer_surface_v1_add_listener(layerSurface, &layerSurfaceListener, nil)
-      #else
-      unsafe xdgSurface = xdg_wm_base_get_xdg_surface(wmBase, surface)
-      unsafe xdg_surface_add_listener(xdgSurface, &xdgSurfaceListener, nil)
-      unsafe toplevel = xdg_surface_get_toplevel(xdgSurface)
-      unsafe xdg_toplevel_add_listener(toplevel, &xdgToplevelListener, nil)
-      unsafe xdg_toplevel_set_title(toplevel, "Swift Wayland")
-      unsafe wl_surface_damage_buffer(surface, 0, 0, INT32_MAX, INT32_MAX)
-      #endif
       unsafe wl_surface_commit(surface)
 
       do throws(WaylandError) {
@@ -295,7 +292,6 @@ public enum Wayland: Renderer {
     }
   )
 
-  #if !Toolbar
   static let xdg_toplevel_configure_cb:
     @convention(c) (
       _ data: UnsafeMutableRawPointer?,
@@ -318,7 +314,7 @@ public enum Wayland: Renderer {
       unsafe xdg_surface_ack_configure(surface, serial)
     }
   )
-  #else
+
   static var layerSurfaceListener = unsafe zwlr_layer_surface_v1_listener(
     configure: { data, _surface, serial, width, height in
       windowWidth = UInt(width)
@@ -335,7 +331,6 @@ public enum Wayland: Renderer {
       print("Layer surface closed")
     }
   )
-  #endif
 
   static let onGlobal:
     @convention(c) (
@@ -358,19 +353,16 @@ public enum Wayland: Renderer {
           wl_registry_bind(registry, id, &_wl_seat_interface, min(version, 5))
         )
         unsafe wl_seat_add_listener(seat, &seatListener, nil)
-      #if Toolbar
       case "zwlr_layer_shell_v1":
         unsafe layerShell = OpaquePointer(
           wl_registry_bind(registry, id, &_zwlr_layer_shell_v1_interface, min(version, 4))
         )
         unsafe zwlr_layer_surface_v1_add_listener(layerShell, &layerSurfaceListener, nil)
-      #endif
       default:
         ()
       }
     }
 
-  #if !Toolbar
   static let keyboard_keymap_cb:
     @convention(c) (
       UnsafeMutableRawPointer?, OpaquePointer?, UInt32, Int32, UInt32
@@ -384,19 +376,16 @@ public enum Wayland: Renderer {
     ) -> Void = { _, _, _, _, key, state in
       send(.key(code: UInt(key), state: UInt(state)))
     }
-  #endif
 
   static let seat_capabilities_cb:
     @convention(c) (
       UnsafeMutableRawPointer?, OpaquePointer?, UInt32
     ) -> Void = { _, s, caps in
-      #if !Toolbar
       let WL_SEAT_CAPABILITY_KEYBOARD: UInt32 = 1  // bit 0
       if unsafe (caps & WL_SEAT_CAPABILITY_KEYBOARD) != 0 && keyboard == nil {
         unsafe keyboard = wl_seat_get_keyboard(s)
         unsafe wl_keyboard_add_listener(keyboard, &keyboard_listener, nil)
       }
-      #endif
     }
 
   // MARK: - Event Loop
