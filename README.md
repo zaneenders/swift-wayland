@@ -26,10 +26,16 @@ Install Wayland headers
 sudo dnf install -y wayland-devel wayland-protocols-devel mesa-libEGL-devel mesa-libGLES-devel
 ```
 
-You should be able to run the toolbar example app now.
+You should be able to run the demo app now.
 
 ```
-swift run --traits Toolbar SwiftWayland
+swift run SwiftWayland
+```
+
+To run the toolbar example, pass the `--toolbar` flag:
+
+```
+swift run SwiftWayland --toolbar
 ```
 
 -----
