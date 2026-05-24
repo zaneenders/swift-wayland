@@ -1,4 +1,3 @@
-#if Toolbar
 import ShapeTree
 import Foundation
 import Wayland
@@ -13,7 +12,7 @@ func runToolbar() async {
   Wayland.setup()
   event_loop: for await ev in Wayland.events() {
     switch ev {
-    case .frame(let winH, let winW):
+    case .frame:
       Wayland.preDraw()
       let bp = await system.view().batteryPercent
       let battery = "\(bp)%"
@@ -21,6 +20,8 @@ func runToolbar() async {
       let block = SystemToolbar(battery: battery, batteryColor: bp.batteryColor, time: today)
       Wayland.render(block)
       Wayland.postDraw()
+    case .key:
+      break  // Keyboard events ignored in toolbar mode.
     }
   }
 
@@ -44,4 +45,3 @@ extension Int {
     }
   }
 }
-#endif

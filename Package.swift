@@ -8,10 +8,6 @@ let package = Package(
     .library(name: "Wayland", targets: ["Wayland"]),
     .library(name: "ShapeTree", targets: ["ShapeTree"]),
   ],
-  traits: [
-    "Toolbar",
-    .default(enabledTraits: []),
-  ],
   dependencies: [
     .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.30.0"),
     .package(url: "https://github.com/swift-cloud/swift-xxh3", from: "1.0.0"),
