@@ -49,6 +49,8 @@ public struct WaylandFontMetrics: FontMetrics {
 @MainActor
 public enum Wayland: Renderer {
 
+  // MARK: - Constants & Metrics
+
   public static let fontSettings: any FontMetrics = WaylandFontMetrics()
   public internal(set) static var state: State = .running
 
@@ -62,6 +64,8 @@ public enum Wayland: Renderer {
   static var atlasW = Int(charCount * (glyphW + glyphSpacing))
   static var atlasH = Int(glyphH)
 
+  // MARK: - Window Dimensions
+
   static var windowWidth: UInt = 800
   #if Toolbar
   public static let toolbar_height: UInt = 20
@@ -69,6 +73,8 @@ public enum Wayland: Renderer {
   #else
   static var windowHeight: UInt = 600
   #endif
+
+  // MARK: - EGL State
 
   static var eglDisplay: EGLDisplay?
   static var eglContext: EGLContext?
@@ -79,6 +85,8 @@ public enum Wayland: Renderer {
   static let EGL_NO_DISPLAY: EGLDisplay? = unsafe EGLDisplay(bitPattern: 0)
   static let EGL_NO_SURFACE: EGLSurface? = unsafe EGLSurface(bitPattern: 0)
 
+  // MARK: - OpenGL Handles
+
   static var program: GLuint = 0
   static var vao: GLuint = 0
   static var fontTex: GLuint = 0
@@ -87,6 +95,8 @@ public enum Wayland: Renderer {
   static var instanceVBO: GLuint = 0
   static var uRes: GLint = 0
   static var uTex: GLint = 0
+
+  // MARK: - Wayland Protocol Objects
 
   nonisolated(unsafe) static var display: OpaquePointer!
   static var registry: OpaquePointer!
@@ -104,6 +114,8 @@ public enum Wayland: Renderer {
   static var xdgSurface: OpaquePointer!
   #endif
 
+  // MARK: - Timing & FPS
+
   static var start = ContinuousClock.now
   static var end = ContinuousClock.now
   public internal(set) static var elapsed: Duration = end - start
@@ -114,6 +126,8 @@ public enum Wayland: Renderer {
   static var fps: Double = 0.0
   static var fpsUpdateTime: ContinuousClock.Instant = ContinuousClock.now
 
+  // MARK: - Public API
+
   public static func exit() {
     state = .exit
   }
@@ -122,70 +136,7 @@ public enum Wayland: Renderer {
     fps
   }
 
-  static func initEGL() throws(WaylandError) {
-    unsafe eglDisplay = eglGetDisplay(EGLNativeDisplayType(display))
-    guard unsafe eglDisplay != nil else { throw WaylandError.error(message: "eglGetDisplay failed") }
-    guard unsafe eglInitialize(eglDisplay, nil, nil) == EGL_TRUE else {
-      throw WaylandError.error(message: "eglInitialize failed")
-    }
-
-    guard eglBindAPI(EGLenum(EGL_OPENGL_ES_API)) == EGL_TRUE else {
-      throw WaylandError.error(message: "eglBindAPI failed")
-    }
-
-    var cfg: EGLConfig?
-    var num: EGLint = 0
-    var attrs: [EGLint] = [
-      EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-      EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
-      EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR,
-      EGL_NONE,
-    ]
-    unsafe attrs.withUnsafeMutableBufferPointer { p in
-      _ = unsafe eglChooseConfig(eglDisplay, p.baseAddress, &cfg, 1, &num)
-    }
-    guard num > 0, unsafe cfg != nil else { throw WaylandError.error(message: "eglChooseConfig failed") }
-
-    var ctxAttrs: [EGLint] = [EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE]
-    unsafe eglContext = ctxAttrs.withUnsafeMutableBufferPointer { p in
-      unsafe eglCreateContext(eglDisplay, cfg, EGL_NO_CONTEXT, p.baseAddress)
-    }
-    guard unsafe eglContext != EGL_NO_CONTEXT else { throw WaylandError.error(message: "eglCreateContext failed") }
-
-    unsafe eglWindow = wl_egl_window_create(surface, Int32(windowWidth), Int32(windowHeight))
-    guard unsafe eglWindow != nil else { throw WaylandError.error(message: "wl_egl_window_create failed") }
-
-    unsafe eglSurface = eglCreateWindowSurface(eglDisplay, cfg, EGLNativeWindowType(bitPattern: eglWindow), nil)
-    guard unsafe eglSurface != EGL_NO_SURFACE else {
-      throw WaylandError.error(message: "eglCreateWindowSurface failed")
-    }
-    guard unsafe eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext) == EGL_TRUE else {
-      throw WaylandError.error(message: "eglMakeCurrent failed")
-    }
-
-    _ = unsafe eglSwapInterval(eglDisplay, 1)
-  }
-
-  static func compileShader(_ type: GLenum, _ src: String) -> GLuint {
-    let s = glCreateShader(type)
-    unsafe src.withCString { cstr in
-      var p: UnsafePointer<GLchar>? = unsafe UnsafePointer(cstr)
-      var len = GLint(src.utf8.count)
-      unsafe glShaderSource(s, 1, &p, &len)
-    }
-    glCompileShader(s)
-    var ok: GLint = 0
-    unsafe glGetShaderiv(s, EGLenum(GL_COMPILE_STATUS), &ok)
-    if ok == 0 {
-      var logLen: GLint = 0
-      unsafe glGetShaderiv(s, EGLenum(GL_INFO_LOG_LENGTH), &logLen)
-      var buf = [UInt8](repeating: 0, count: Int(logLen))
-      unsafe glGetShaderInfoLog(s, logLen, nil, &buf)
-      let msg = String(decoding: buf, as: UTF8.self)
-      fatalError("Shader compile error: \(msg)")
-    }
-    return s
-  }
+  // MARK: - Shader Loading
 
   static func loadText(resource name: String) -> String {
     switch name {
@@ -198,352 +149,7 @@ public enum Wayland: Renderer {
     }
   }
 
-  static func linkProgram(vs: GLuint, fs: GLuint) -> GLuint {
-    let p = glCreateProgram()
-    glAttachShader(p, vs)
-    glAttachShader(p, fs)
-    glLinkProgram(p)
-    var ok: GLint = 0
-    unsafe glGetProgramiv(p, GLenum(GL_LINK_STATUS), &ok)
-    if ok == 0 {
-      var logLen: GLint = 0
-      unsafe glGetProgramiv(p, GLenum(GL_INFO_LOG_LENGTH), &logLen)
-      let buf = UnsafeMutablePointer<GLchar>.allocate(capacity: Int(logLen))
-      defer { unsafe buf.deallocate() }
-      unsafe glGetProgramInfoLog(p, GLsizei(logLen), nil, buf)
-      let msg = unsafe String(cString: buf)
-      fatalError("Program link error: \(msg)")
-    }
-    glDeleteShader(vs)
-    glDeleteShader(fs)
-    return p
-  }
-
-  static func initGL() {
-    let quadVerts: [Float] = [
-      -1.0, 1.0,  // TL
-      1.0, 1.0,  // TR
-      -1.0, -1.0,  // BL
-      1.0, -1.0,  // BR
-    ]
-    let vs = compileShader(GLenum(GL_VERTEX_SHADER), loadText(resource: "vertex.glsl"))
-    let fs = compileShader(GLenum(GL_FRAGMENT_SHADER), loadText(resource: "fragment.glsl"))
-    program = linkProgram(vs: vs, fs: fs)
-
-    glEnable(GLenum(GL_BLEND))
-    glBlendFunc(GLenum(GL_SRC_ALPHA), GLenum(GL_ONE_MINUS_SRC_ALPHA))
-
-    unsafe glGenVertexArrays(1, &vao)
-    glBindVertexArray(vao)
-
-    unsafe glGenBuffers(1, &quadVBO)
-    glBindBuffer(GLenum(GL_ARRAY_BUFFER), quadVBO)
-    unsafe quadVerts.withUnsafeBytes { ptr in
-      unsafe glBufferData(GLenum(GL_ARRAY_BUFFER), ptr.count, ptr.baseAddress, GLenum(GL_STATIC_DRAW))
-    }
-    glEnableVertexAttribArray(0)
-    unsafe glVertexAttribPointer(
-      0, 2, GLenum(GL_FLOAT), GLboolean(GL_FALSE), 2 * GLint(MemoryLayout<Float>.size),
-      UnsafeRawPointer(bitPattern: 0))
-
-    unsafe glGenBuffers(1, &instanceVBO)
-    glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-    glBufferData(
-      GLenum(GL_ARRAY_BUFFER), 4000 * MemoryLayout<RenderableQuad>.stride, nil, GLenum(GL_DYNAMIC_DRAW))
-
-    let stride = GLsizei(MemoryLayout<RenderableQuad>.stride)
-    glEnableVertexAttribArray(1)
-    unsafe glVertexAttribPointer(
-      1, 2, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: 0 + 0))
-    glVertexAttribDivisor(1, 1)
-
-    let off_dst_p1 = MemoryLayout<(Float, Float)>.stride
-    glEnableVertexAttribArray(2)
-    unsafe glVertexAttribPointer(
-      2, 2, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_dst_p1))
-    glVertexAttribDivisor(2, 1)
-
-    let off_tex_tl = off_dst_p1 + MemoryLayout<(Float, Float)>.stride
-    glEnableVertexAttribArray(3)
-    unsafe glVertexAttribPointer(
-      3, 2, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_tex_tl))
-    glVertexAttribDivisor(3, 1)
-
-    let off_tex_br = off_tex_tl + MemoryLayout<(Float, Float)>.stride
-    glEnableVertexAttribArray(4)
-    unsafe glVertexAttribPointer(
-      4, 2, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_tex_br))
-    glVertexAttribDivisor(4, 1)
-
-    let off_color = off_tex_br + MemoryLayout<(Float, Float)>.stride
-    glEnableVertexAttribArray(5)
-    unsafe glVertexAttribPointer(
-      5, 4, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_color))
-    glVertexAttribDivisor(5, 1)
-
-    let off_border_color = off_color + MemoryLayout<RGB>.stride
-    glEnableVertexAttribArray(6)
-    unsafe glVertexAttribPointer(
-      6, 4, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_border_color))
-    glVertexAttribDivisor(6, 1)
-
-    let off_border_width = off_border_color + MemoryLayout<RGB>.stride
-    glEnableVertexAttribArray(7)
-    unsafe glVertexAttribPointer(
-      7, 1, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_border_width))
-    glVertexAttribDivisor(7, 1)
-
-    let off_corner_radius = off_border_width + MemoryLayout<Float>.stride
-    glEnableVertexAttribArray(8)
-    unsafe glVertexAttribPointer(
-      8, 1, GLenum(GL_FLOAT), GLboolean(GL_FALSE), stride, UnsafeRawPointer(bitPattern: off_corner_radius))
-    glVertexAttribDivisor(8, 1)
-
-    unsafe glGenTextures(1, &whiteTex)
-    glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
-    let px: [UInt8] = [255, 255, 255, 255]
-    unsafe px.withUnsafeBytes { p in
-      unsafe glTexImage2D(
-        GLenum(GL_TEXTURE_2D), 0, GLint(GL_RGBA), 1, 1, 0, GLenum(GL_RGBA), GLenum(GL_UNSIGNED_BYTE),
-        p.baseAddress)
-    }
-    glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_MIN_FILTER), GL_NEAREST)
-    glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_MAG_FILTER), GL_NEAREST)
-    glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_WRAP_S), GL_CLAMP_TO_EDGE)
-    glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_WRAP_T), GL_CLAMP_TO_EDGE)
-
-    createFontAtlas()
-
-    uTex = unsafe glGetUniformLocation(program, "uTex")
-    uRes = unsafe glGetUniformLocation(program, "uRes")
-  }
-
-  static func initFont() -> [Glyph] {
-    var font5x7 = Array(repeating: Glyph(), count: 128)
-    func set(_ ch: Character, _ rows: [String]) {
-      let i = Int(ch.unicodeScalars.first!.value)
-      font5x7[i] = Glyph(rows: rows)
-    }
-    set(" ", ["00000", "00000", "00000", "00000", "00000", "00000", "00000"])
-    set("!", ["00100", "00100", "00100", "00100", "00100", "00000", "00100"])
-    set("\"", ["01010", "01010", "01010", "00000", "00000", "00000", "00000"])
-    set("#", ["01010", "01010", "11111", "01010", "11111", "01010", "01010"])
-    set("$", ["00100", "01111", "10100", "01110", "00101", "11110", "00100"])
-    set("%", ["11000", "11001", "00010", "00100", "01000", "10011", "00011"])
-    set("&", ["01100", "10010", "10100", "01000", "10101", "10010", "01101"])
-    set("'", ["00100", "00100", "00100", "00000", "00000", "00000", "00000"])
-    set("(", ["00010", "00100", "01000", "01000", "01000", "00100", "00010"])
-    set(")", ["01000", "00100", "00010", "00010", "00010", "00100", "01000"])
-    set("*", ["00100", "10101", "01110", "00100", "01110", "10101", "00100"])
-    set("+", ["00000", "00100", "00100", "11111", "00100", "00100", "00000"])
-    set(",", ["00000", "00000", "00000", "00000", "00100", "00100", "01000"])
-    set("-", ["00000", "00000", "00000", "11111", "00000", "00000", "00000"])
-    set(".", ["00000", "00000", "00000", "00000", "00000", "00110", "00110"])
-    set("/", ["00001", "00010", "00100", "01000", "10000", "00000", "00000"])
-    set("0", ["01110", "10001", "10011", "10101", "11001", "10001", "01110"])
-    set("1", ["00100", "01100", "00100", "00100", "00100", "00100", "01110"])
-    set("2", ["01110", "10001", "00001", "00110", "01000", "10000", "11111"])
-    set("3", ["11110", "00001", "00001", "01110", "00001", "00001", "11110"])
-    set("4", ["00010", "00110", "01010", "10010", "11111", "00010", "00010"])
-    set("5", ["11111", "10000", "11110", "00001", "00001", "10001", "01110"])
-    set("6", ["01110", "10000", "11110", "10001", "10001", "10001", "01110"])
-    set("7", ["11111", "00001", "00010", "00100", "01000", "01000", "01000"])
-    set("8", ["01110", "10001", "10001", "01110", "10001", "10001", "01110"])
-    set("9", ["01110", "10001", "10001", "01111", "00001", "00001", "01110"])
-    set(":", ["00000", "00110", "00110", "00000", "00110", "00110", "00000"])
-    set(";", ["00000", "00110", "00110", "00000", "00110", "00100", "01000"])
-    set("<", ["00010", "00100", "01000", "10000", "01000", "00100", "00010"])
-    set("=", ["00000", "00000", "11111", "00000", "11111", "00000", "00000"])
-    set(">", ["01000", "00100", "00010", "00001", "00010", "00100", "01000"])
-    set("?", ["01110", "10001", "00001", "00010", "00100", "00000", "00100"])
-    set("@", ["01110", "10001", "10111", "10101", "10111", "10000", "01110"])
-    set("A", ["01110", "10001", "10001", "11111", "10001", "10001", "10001"])
-    set("B", ["11110", "10001", "10001", "11110", "10001", "10001", "11110"])
-    set("C", ["01110", "10001", "10000", "10000", "10000", "10001", "01110"])
-    set("D", ["11110", "10001", "10001", "10001", "10001", "10001", "11110"])
-    set("E", ["11111", "10000", "10000", "11110", "10000", "10000", "11111"])
-    set("F", ["11111", "10000", "10000", "11110", "10000", "10000", "10000"])
-    set("G", ["01110", "10001", "10000", "10111", "10001", "10001", "01110"])
-    set("H", ["10001", "10001", "10001", "11111", "10001", "10001", "10001"])
-    set("I", ["01110", "00100", "00100", "00100", "00100", "00100", "01110"])
-    set("J", ["00001", "00001", "00001", "00001", "10001", "10001", "01110"])
-    set("K", ["10001", "10010", "10100", "11000", "10100", "10010", "10001"])
-    set("L", ["10000", "10000", "10000", "10000", "10000", "10000", "11111"])
-    set("M", ["10001", "11011", "10101", "10101", "10001", "10001", "10001"])
-    set("N", ["10001", "10001", "11001", "10101", "10011", "10001", "10001"])
-    set("O", ["01110", "10001", "10001", "10001", "10001", "10001", "01110"])
-    set("P", ["11110", "10001", "10001", "11110", "10000", "10000", "10000"])
-    set("Q", ["01110", "10001", "10001", "10001", "10101", "10010", "01101"])
-    set("R", ["11110", "10001", "10001", "11110", "10100", "10010", "10001"])
-    set("S", ["01110", "10001", "10000", "01110", "00001", "10001", "01110"])
-    set("T", ["11111", "00100", "00100", "00100", "00100", "00100", "00100"])
-    set("U", ["10001", "10001", "10001", "10001", "10001", "10001", "01110"])
-    set("V", ["10001", "10001", "10001", "10001", "10001", "01010", "00100"])
-    set("W", ["10001", "10001", "10001", "10101", "10101", "10101", "01010"])
-    set("X", ["10001", "10001", "01010", "00100", "01010", "10001", "10001"])
-    set("Y", ["10001", "10001", "01010", "00100", "00100", "00100", "00100"])
-    set("Z", ["11111", "00001", "00010", "00100", "01000", "10000", "11111"])
-    set("[", ["01110", "01000", "01000", "01000", "01000", "01000", "01110"])
-    set("\\", ["10000", "01000", "00100", "00010", "00001", "00000", "00000"])
-    set("]", ["01110", "00010", "00010", "00010", "00010", "00010", "01110"])
-    set("^", ["00100", "01010", "10001", "00000", "00000", "00000", "00000"])
-    set("_", ["00000", "00000", "00000", "00000", "00000", "00000", "11111"])
-    set("`", ["01000", "00100", "00010", "00000", "00000", "00000", "00000"])
-    set("a", ["00000", "00000", "01110", "00001", "01111", "10001", "01111"])
-    set("b", ["10000", "10000", "11110", "10001", "10001", "10001", "11110"])
-    set("c", ["00000", "00000", "01110", "10000", "10000", "10001", "01110"])
-    set("d", ["00001", "00001", "01111", "10001", "10001", "10001", "01111"])
-    set("e", ["00000", "00000", "01110", "10001", "11111", "10000", "01110"])
-    set("f", ["00110", "01001", "01000", "11100", "01000", "01000", "01000"])
-    set("g", ["00000", "00000", "01111", "10001", "01111", "00001", "01110"])
-    set("h", ["10000", "10000", "11110", "10001", "10001", "10001", "10001"])
-    set("i", ["00100", "00000", "01100", "00100", "00100", "00100", "01110"])
-    set("j", ["00010", "00000", "00110", "00010", "00010", "10010", "01100"])
-    set("k", ["10000", "10000", "10010", "10100", "11000", "10100", "10010"])
-    set("l", ["01100", "00100", "00100", "00100", "00100", "00100", "01110"])
-    set("m", ["00000", "00000", "11010", "10101", "10101", "10101", "10101"])
-    set("n", ["00000", "00000", "11110", "10001", "10001", "10001", "10001"])
-    set("o", ["00000", "00000", "01110", "10001", "10001", "10001", "01110"])
-    set("p", ["00000", "00000", "11110", "10001", "11110", "10000", "10000"])
-    set("q", ["00000", "00000", "01111", "10001", "01111", "00001", "00001"])
-    set("r", ["00000", "00000", "10110", "11001", "10000", "10000", "10000"])
-    set("s", ["00000", "00000", "01111", "10000", "01110", "00001", "11110"])
-    set("t", ["01000", "01000", "11100", "01000", "01000", "01001", "00110"])
-    set("u", ["00000", "00000", "10001", "10001", "10001", "10001", "01111"])
-    set("v", ["00000", "00000", "10001", "10001", "10001", "01010", "00100"])
-    set("w", ["00000", "00000", "10001", "10001", "10101", "10101", "01010"])
-    set("x", ["00000", "00000", "10001", "01010", "00100", "01010", "10001"])
-    set("y", ["00000", "00000", "10001", "10001", "01111", "00001", "01110"])
-    set("z", ["00000", "00000", "11111", "00010", "00100", "01000", "11111"])
-    set("{", ["00110", "00100", "00100", "01100", "00100", "00100", "00110"])
-    set("|", ["00100", "00100", "00100", "00100", "00100", "00100", "00100"])
-    set("}", ["01100", "00100", "00100", "00110", "00100", "00100", "01100"])
-    set("~", ["01001", "10110", "00000", "00000", "00000", "00000", "00000"])
-
-    return font5x7
-  }
-
-  static func createFontAtlas() {
-    let font5x7 = initFont()
-    let pixelsCount = Int(atlasW * atlasH * 4)
-    let img = UnsafeMutablePointer<UInt8>.allocate(capacity: pixelsCount)
-    unsafe img.initialize(repeating: 0, count: pixelsCount)
-    defer { unsafe img.deallocate() }
-
-    for c in Int(firstChar)...Int(lastChar) {
-      let g = font5x7[c]
-      let xoff = Int(c - Int(firstChar)) * Int(glyphW + glyphSpacing)
-      if !g.rows[0].isEmpty {
-        for y in 0..<Int(glyphH) {
-          let row = Array(g.rows[y])
-          for x in 0..<Int(glyphW) {
-            let bit = row[x] == "1"
-            let idx = Int(y * atlasW + xoff + x) * 4
-            unsafe img[idx + 0] = 255
-            unsafe img[idx + 1] = 255
-            unsafe img[idx + 2] = 255
-            unsafe img[idx + 3] = bit ? 255 : 0
-          }
-        }
-      }
-    }
-
-    unsafe glGenTextures(1, &fontTex)
-    glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
-    glPixelStorei(GLenum(GL_UNPACK_ALIGNMENT), 1)
-    unsafe glTexImage2D(
-      GLenum(GL_TEXTURE_2D), 0, GLint(GL_RGBA8), GLsizei(atlasW), GLsizei(atlasH), 0, GLenum(GL_RGBA),
-      GLenum(GL_UNSIGNED_BYTE), img)
-    glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_MIN_FILTER), GL_NEAREST)
-    glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_MAG_FILTER), GL_NEAREST)
-    glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_WRAP_S), GL_CLAMP_TO_EDGE)
-    glTexParameteri(GLenum(GL_TEXTURE_2D), GLenum(GL_TEXTURE_WRAP_T), GL_CLAMP_TO_EDGE)
-  }
-
-  static func glyphUV(_ c: UInt8) -> (Float, Float, Float, Float) {
-    var ch = c
-    if ch < firstChar || ch > lastChar { ch = 32 }
-    let idx = Int(ch - firstChar)
-    let xoff = idx * (Int(glyphW) + Int(glyphSpacing))
-    let u0 = Float(xoff) / Float(atlasW)
-    let u1 = Float(xoff + Int(glyphW)) / Float(atlasW)
-    let v0 = Float(1.0) - Float(glyphH) / Float(atlasH)
-    let v1 = Float(1.0)
-    return (u0, v0, u1, v1)
-  }
-
-  static func drawQuad(_ quad: RenderableQuad) {
-    glBindTexture(GLenum(GL_TEXTURE_2D), whiteTex)
-    let rects: InlineArray<1, RenderableQuad> = [quad]
-    unsafe rects.span.withUnsafeBytes { buf in
-      glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-      unsafe glBufferSubData(GLenum(GL_ARRAY_BUFFER), 0, MemoryLayout<RenderableQuad>.stride, buf.baseAddress)
-    }
-    glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, 1)
-  }
-
-  static func drawText(_ text: RenderableText) {
-    var penX = text.pos.x
-    let penY = text.pos.y
-
-    var totalWidth: UInt = 0
-    for _ in text.text {
-      let w = glyphW * text.scale
-      totalWidth += w + glyphSpacing * text.scale
-    }
-    if !text.text.isEmpty {
-      totalWidth -= glyphSpacing * text.scale
-    }
-
-    let textHeight = glyphH * text.scale
-
-    drawQuad(
-      RenderableQuad(
-        dst_p0: (penX, penY),
-        dst_p1: (penX + totalWidth, penY + textHeight),
-        tex_tl: (0, 0),
-        tex_br: (1, 1),
-        color: text.background
-      )
-    )
-
-    // Draw text
-    glBindTexture(GLenum(GL_TEXTURE_2D), fontTex)
-    var symbols = ContiguousArray<RenderableQuad>(
-      repeating:
-        RenderableQuad(
-          dst_p0: (0, 0),
-          dst_p1: (0, 0),
-          tex_tl: (0, 0),
-          tex_br: (0, 0),
-          color: text.foreground
-        ), count: text.text.length)
-
-    penX = text.pos.x
-
-    for (i, c) in text.text.utf8.enumerated() {
-      let (u0, v0, u1, v1) = glyphUV(c)
-      let w = glyphW * text.scale
-      let h = glyphH * text.scale
-      symbols[i] = RenderableQuad(
-        dst_p0: (penX, penY),
-        dst_p1: (penX + w, penY + h),
-        tex_tl: (u0, v0),
-        tex_br: (u1, v1),
-        color: text.foreground
-      )
-      penX += w + glyphSpacing * text.scale
-    }
-
-    guard !symbols.isEmpty else { return }
-
-    unsafe symbols.withUnsafeBytes { buf in
-      glBindBuffer(GLenum(GL_ARRAY_BUFFER), instanceVBO)
-      unsafe glBufferSubData(
-        GLenum(GL_ARRAY_BUFFER), 0, symbols.count * MemoryLayout<RenderableQuad>.stride, buf.baseAddress)
-    }
-    glDrawArraysInstanced(GLenum(GL_TRIANGLE_STRIP), 0, 4, GLsizei(symbols.count))
-  }
+  // MARK: - Frame Lifecycle
 
   public static func preDraw() {
     start = ContinuousClock.now
@@ -566,6 +172,8 @@ public enum Wayland: Renderer {
     end = ContinuousClock.now
     elapsed = end - start
   }
+
+  // MARK: - Wayland Listeners
 
   static var frameListener = unsafe wl_callback_listener(
     done: { _, callback, _time in
@@ -606,6 +214,8 @@ public enum Wayland: Renderer {
   static var _zwlr_layer_shell_v1_interface: wl_interface = unsafe zwlr_layer_shell_v1_interface
   #endif
   static var registryListener = unsafe wl_registry_listener(global: onGlobal, global_remove: { _, _, _ in })
+
+  // MARK: - Setup
 
   public static func setup(_ refresh_rate: Duration = refresh_rate) {
     self.refresh_rate = refresh_rate
@@ -676,6 +286,8 @@ public enum Wayland: Renderer {
       send(.frame(height: UInt(windowHeight), width: UInt(windowWidth)))
     }
   }
+
+  // MARK: - Protocol Callbacks
 
   static var wmBaseListener = unsafe xdg_wm_base_listener(
     ping: { _, base, serial in
@@ -787,7 +399,9 @@ public enum Wayland: Renderer {
       #endif
     }
 
-  /// I am using this event loop so that I can have async suspenion points in "user space"
+  // MARK: - Event Loop
+
+  /// I am using this event loop so that I can have async suspension points in "user space"
   /// This is more of a hack to get around how the wayland-client library works. Because
   /// C doesn't have a notion of async dispatch queues are used which is why we need to call
   /// `wl_display_dispatch` on a background thread. I don't love this but this hack seems to
@@ -800,7 +414,7 @@ public enum Wayland: Renderer {
     guard calledOnce else {
       fatalError("Only call events once.")
     }
-    calledOnce = true
+    calledOnce = false
     Task {
       // Render loop
       while Wayland.state.isRunning {
@@ -808,7 +422,7 @@ public enum Wayland: Renderer {
 
         // Calculate FPS
         let now = ContinuousClock.now
-        _ = now - lastFrameTime
+        let frameDelta = now - lastFrameTime
         lastFrameTime = now
 
         frameCount += 1
