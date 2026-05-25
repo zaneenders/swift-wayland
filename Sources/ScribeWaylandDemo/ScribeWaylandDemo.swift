@@ -29,6 +29,34 @@ private func keyCodeToChar(_ code: UInt) -> Character? {
     }
 }
 
+// MARK: - Text wrapping
+
+/// Wraps text to fit within `maxChars` per line. Splits on word boundaries.
+private func wrapText(_ text: String, maxChars: Int) -> [String] {
+    guard maxChars > 0 else { return [text] }
+    var lines: [String] = []
+    var current = ""
+    for word in text.split(separator: " ", omittingEmptySubsequences: false) {
+        let wordStr = String(word)
+        if current.isEmpty {
+            current = wordStr
+        } else if current.count + 1 + wordStr.count <= maxChars {
+            current += " " + wordStr
+        } else {
+            lines.append(current)
+            current = wordStr
+        }
+        // Handle words longer than maxChars by force-splitting
+        while current.count > maxChars {
+            let splitIdx = current.index(current.startIndex, offsetBy: maxChars)
+            lines.append(String(current[..<splitIdx]))
+            current = String(current[splitIdx...])
+        }
+    }
+    if !current.isEmpty { lines.append(current) }
+    return lines.isEmpty ? [""] : lines
+}
+
 // MARK: - Chat state actor (isolated from MainActor)
 
 private actor ChatState {
@@ -108,7 +136,11 @@ private struct MyScreen: Block {
     let busy: Bool
 
     var layer: some Block {
-        Direction(.vertical) {
+        // ~55 chars at scale(2) fits 800px window (glyph=10+2=12px each)
+        let maxChars = 55
+        let wrapped: [String] = lines.flatMap { wrapText($0, maxChars: maxChars) }
+
+        return Direction(.vertical) {
             // Banner
             Direction(.horizontal) {
                 Text("Scribe Wayland Chat")
@@ -121,7 +153,7 @@ private struct MyScreen: Block {
 
             // Transcript
             Direction(.vertical) {
-                for line in lines.suffix(20) {
+                for line in wrapped.suffix(20) {
                     Text(line)
                         .foreground(.green).padding(2).scale(2)
                 }
