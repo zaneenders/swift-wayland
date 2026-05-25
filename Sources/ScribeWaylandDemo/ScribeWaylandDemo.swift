@@ -94,26 +94,26 @@ private actor ChatState {
                         reply += t
                         let display = "  \(reply)"  // assistant prefix
                         if !hasReply {
-                            await self.appendLine(display)
+                            self.appendLine(display)
                             hasReply = true
                         } else {
-                            await self.updateLastLine(display)
+                            self.updateLastLine(display)
                         }
                     }
                 case .tool(let t):
                     if case .invocation(let n, _, let o) = t {
-                        await self.appendLine("  [\(n)] \(o)")
+                        self.appendLine("  [\(n)] \(o)")
                     }
                 case .lifecycle(let lc):
                     if case .error(let e) = lc {
-                        await self.appendLine("  Error: \(e.errorDescription ?? "?")")
+                        self.appendLine("  Error: \(e.errorDescription ?? "?")")
                     }
                 }
             }
             if !hasReply {
-                await self.appendLine("  (no response)")
+                self.appendLine("  (no response)")
             }
-            await self.setBusy(false)
+            self.setBusy(false)
         }
         return text
     }
@@ -137,14 +137,13 @@ private struct MyScreen: Block {
     let busy: Bool
 
     var layer: some Block {
-        // ~55 chars at scale(2) fits 800px window
-        let maxChars = 55
+        let maxChars = 55  // safe default for 800px window at scale(2)
         let wrapped: [String] = lines.flatMap { wrapText($0, maxChars: maxChars) }
 
         return Direction(.vertical) {
             // Banner
             Direction(.horizontal) {
-                Text("Scribe Wayland Chat")
+                Text("Scribe")
                     .foreground(.white).padding(4).scale(2)
                 Rect().width(.grow)
                 Text(busy ? "thinking..." : "ready")
@@ -152,27 +151,26 @@ private struct MyScreen: Block {
             }
             .background(.blue).width(.grow)
 
-            // Transcript — show all lines, fill remaining space
+            // Transcript
             Direction(.vertical) {
-                for line in wrapped {
+                for line in wrapped.suffix(30) {
                     let color: Color = line.hasPrefix("> ") ? .cyan : .white
                     Text(line)
-                        .foreground(color).padding(1).scale(2)
+                        .foreground(color).scale(2)
                 }
             }
             .width(.grow).height(.grow)
             .background(.black)
 
-            // Input line
+            // Input
             Direction(.horizontal) {
                 Text("> " + input + (busy ? "" : "_"))
-                    .foreground(.cyan).padding(4).scale(2)
+                    .foreground(.cyan).scale(2)
                 Rect().width(.grow)
             }
             .background(.black).width(.grow)
         }
         .height(.grow).width(.grow)
-        .background(.black)
     }
 }
 

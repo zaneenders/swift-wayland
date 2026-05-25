@@ -411,7 +411,7 @@ public enum Wayland: Renderer {
 
         // Calculate FPS
         let now = ContinuousClock.now
-        let frameDelta = now - lastFrameTime
+        _ = now - lastFrameTime
         lastFrameTime = now
 
         frameCount += 1
