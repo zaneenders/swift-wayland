@@ -92,11 +92,12 @@ private actor ChatState {
                 case .output(let out):
                     if case .text(_, let t) = out {
                         reply += t
+                        let display = "  \(reply)"  // assistant prefix
                         if !hasReply {
-                            await self.appendLine("  \(reply)")
+                            await self.appendLine(display)
                             hasReply = true
                         } else {
-                            await self.updateLastLine("  \(reply)")
+                            await self.updateLastLine(display)
                         }
                     }
                 case .tool(let t):
@@ -136,7 +137,7 @@ private struct MyScreen: Block {
     let busy: Bool
 
     var layer: some Block {
-        // ~55 chars at scale(2) fits 800px window (glyph=10+2=12px each)
+        // ~55 chars at scale(2) fits 800px window
         let maxChars = 55
         let wrapped: [String] = lines.flatMap { wrapText($0, maxChars: maxChars) }
 
@@ -151,14 +152,16 @@ private struct MyScreen: Block {
             }
             .background(.blue).width(.grow)
 
-            // Transcript
+            // Transcript — show all lines, fill remaining space
             Direction(.vertical) {
-                for line in wrapped.suffix(20) {
+                for line in wrapped {
+                    let color: Color = line.hasPrefix("> ") ? .cyan : .white
                     Text(line)
-                        .foreground(.green).padding(2).scale(2)
+                        .foreground(color).padding(1).scale(2)
                 }
             }
             .width(.grow).height(.grow)
+            .background(.black)
 
             // Input line
             Direction(.horizontal) {
@@ -169,6 +172,7 @@ private struct MyScreen: Block {
             .background(.black).width(.grow)
         }
         .height(.grow).width(.grow)
+        .background(.black)
     }
 }
 
