@@ -38,6 +38,42 @@ To run the toolbar example, pass the `--toolbar` flag:
 swift run SwiftWayland --toolbar
 ```
 
+## Release Build
+
+Build a standalone binary with `--static-swift-stdlib` to statically link the
+Swift runtime and all package dependencies. The binary depends only on system
+graphics libraries (Wayland, EGL, GLES3) which are present on any Linux desktop
+running a Wayland compositor — no Swift toolchain required on the target system.
+
+```console
+swift build -c release --static-swift-stdlib
+# Optional: strip debug info for distribution (~122 MB → ~67 MB)
+strip .build/aarch64-unknown-linux-gnu/release/SwiftWayland
+```
+
+The resulting binary (~67 MB stripped) can be copied to any aarch64 machine
+with Wayland and Mesa installed.
+
+### Runtime dependencies
+
+All remaining dynamic dependencies are guaranteed present on a Wayland desktop:
+
+| Library | Provided by |
+|---|---|
+| `libwayland-client.so.0` | wayland |
+| `libwayland-egl.so.1` | wayland |
+| `libGLESv2.so.2` | mesa-libGLES |
+| `libEGL.so.1` | mesa-libEGL |
+| `libGLdispatch.so.0` | mesa |
+| `libffi.so.8` | libffi (wayland dependency) |
+| `libc`, `libm`, `libstdc++`, `libgcc_s` | system |
+
+### Cross-compilation
+
+The `aarch64-swift-linux-musl` SDK is not suitable for this project because
+Wayland, EGL, and GLES3 talk to the kernel's GPU driver (DRM/DRI) at runtime and
+cannot be statically linked in a portable way. Use `--static-swift-stdlib` instead.
+
 -----
 
 ## Design
