@@ -112,10 +112,10 @@ private struct MyScreen: Block {
             // Banner
             Direction(.horizontal) {
                 Text("Scribe Wayland Chat")
-                    .foreground(.white).padding(4)
+                    .foreground(.white).padding(4).scale(2)
                 Rect().width(.grow)
                 Text(busy ? "thinking..." : "ready")
-                    .foreground(.gray).padding(4)
+                    .foreground(.gray).padding(4).scale(2)
             }
             .background(.blue).width(.grow)
 
@@ -123,7 +123,7 @@ private struct MyScreen: Block {
             Direction(.vertical) {
                 for line in lines.suffix(20) {
                     Text(line)
-                        .foreground(.green).padding(2)
+                        .foreground(.green).padding(2).scale(2)
                 }
             }
             .width(.grow).height(.grow)
@@ -131,7 +131,7 @@ private struct MyScreen: Block {
             // Input line
             Direction(.horizontal) {
                 Text("> " + input + (busy ? "" : "_"))
-                    .foreground(.cyan).padding(4)
+                    .foreground(.cyan).padding(4).scale(2)
                 Rect().width(.grow)
             }
             .background(.black).width(.grow)
