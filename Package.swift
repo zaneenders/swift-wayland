@@ -13,6 +13,7 @@ let package = Package(
     .package(url: "https://github.com/swift-cloud/swift-xxh3", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-log.git", from: "1.8.0"),
     .package(url: "https://github.com/apple/swift-nio.git", from: "2.86.0"),
+    .package(url: "https://github.com/zaneenders/scribe.git", branch: "main"),
   ],
   targets: [
     .executableTarget(
@@ -26,6 +27,14 @@ let package = Package(
       ],
       swiftSettings: swiftSettings
     ),
+    .executableTarget(
+      name: "ScribeWaylandDemo",
+      dependencies: [
+        "Wayland",
+        "ShapeTree",
+        .product(name: "ScribeCore", package: "scribe"),
+        .product(name: "Logging", package: "swift-log"),
+      ]),
     .target(
       name: "ShapeTree",
       dependencies: [
