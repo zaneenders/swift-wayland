@@ -90,6 +90,35 @@ public final class MetalDisplayListRenderer {
   private let poolBufferCount = 3
   private var shapeInstances: [ShapeInstance] = []
   private var textInstances: [TextInstance] = []
+  public private(set) var lastDrawCallCount = 0
+  public private(set) var lastInstanceCount = 0
+  private struct TextKey: Hashable {
+    let text: String
+    let face: UInt8
+  }
+  private var glyphRuns: [TextKey: [SIMD4<Float>]] = [:]
+  private var glyphRunOrder: [TextKey] = []
+  private var cachedGlyphCount = 0
+
+  private func glyphRun(_ text: String, face: FontFace) -> [SIMD4<Float>] {
+    let key = TextKey(text: text, face: face.rawValue)
+    if let cached = glyphRuns[key] { return cached }
+    let run = text.map { character in
+      let (u0, v0, u1, v1) = fontAtlas.glyphUV(character, readable: face == .readable)
+      return SIMD4<Float>(u0, v0, u1, v1)
+    }
+    // Bound both entry overhead and glyph storage. Oversized runs are transient.
+    if run.count <= 65_536, text.utf8.count <= 65_536 {
+      while !glyphRunOrder.isEmpty && (glyphRunOrder.count >= 1024 || cachedGlyphCount + run.count > 65_536) {
+        let oldest = glyphRunOrder.removeFirst()
+        cachedGlyphCount -= glyphRuns.removeValue(forKey: oldest)!.count
+      }
+      glyphRuns[key] = run
+      glyphRunOrder.append(key)
+      cachedGlyphCount += run.count
+    }
+    return run
+  }
 
   private struct CachedImageTexture {
     var generation: UInt64
@@ -119,6 +148,8 @@ public final class MetalDisplayListRenderer {
     rasterScale: Point,
     into enc: MTLRenderCommandEncoder
   ) {
+    lastDrawCallCount = 0
+    lastInstanceCount = 0
     let metrics = FontMetrics()
     let pxToNDC = SIMD2<Float>(2 / viewport.width, 2 / viewport.height)
     func ndc(_ x: Float, _ y: Float) -> SIMD2<Float> {
@@ -172,7 +203,7 @@ public final class MetalDisplayListRenderer {
     }
 
     var clipStack: [Rect] = []
-    for command in drawList.commands {
+    for command in drawList.culled(to: viewport).commands {
       switch command {
       case .fillRect(let rect, let color):
         closeText()
@@ -196,19 +227,18 @@ public final class MetalDisplayListRenderer {
         let advance =
           (face == .readable ? metrics.cellAdvance : metrics.displayCellAdvance) * scale
         var pen = SIMD2<Float>(position.x, position.y)
-        for character in text {
+        for uv in glyphRun(text, face: face) {
           if textFace != nil, textFace != face { closeText() }
           if textStart == nil {
             textStart = textInstances.count
             textFace = face
           }
-          let (u0, v0, u1, v1) = fontAtlas.glyphUV(character, readable: face == .readable)
           textInstances.append(
             TextInstance(
               dst_p0: ndc(pen.x, pen.y),
               dst_p1: ndc(pen.x + glyphSize.x, pen.y + glyphSize.y),
-              tex_tl: [u0, v0],
-              tex_br: [u1, v1],
+              tex_tl: [uv.x, uv.y],
+              tex_br: [uv.z, uv.w],
               color: [color.r, color.g, color.b, color.a]))
           pen.x += advance
         }
@@ -241,6 +271,7 @@ public final class MetalDisplayListRenderer {
     closeText()
     evictImageTexturesIfNeeded()
 
+    lastInstanceCount = shapeInstances.count + textInstances.count
     guard !batches.isEmpty else { return }
     let shapeBuffer = pooledBuffer(
       pool: &shapePool,
@@ -269,6 +300,7 @@ public final class MetalDisplayListRenderer {
           shapeBuffer,
           offset: instanceOffset * MemoryLayout<ShapeInstance>.stride,
           index: 0)
+        lastDrawCallCount += 1
         enc.drawPrimitives(
           type: .triangleStrip,
           vertexStart: 0,
@@ -282,6 +314,7 @@ public final class MetalDisplayListRenderer {
           textBuffer,
           offset: instanceOffset * MemoryLayout<TextInstance>.stride,
           index: 0)
+        lastDrawCallCount += 1
         enc.drawPrimitives(
           type: .triangleStrip,
           vertexStart: 0,
@@ -296,6 +329,7 @@ public final class MetalDisplayListRenderer {
         enc.setRenderPipelineState(imagePipeline)
         enc.setFragmentTexture(texture, index: 0)
         enc.setVertexBytes(&instance, length: MemoryLayout<TextInstance>.stride, index: 0)
+        lastDrawCallCount += 1
         enc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         enc.setScissorRect((scissorStack.last ?? viewportRect).asMtlScissor(scale: rasterScale))
       case .pushClip(let rect):

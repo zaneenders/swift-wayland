@@ -28,6 +28,16 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   private var statisticsCommands = 0
   private var statisticsDecodeTime: TimeInterval = 0
   private var statisticsRenderTime: TimeInterval = 0
+  private var statisticsDraws = 0
+  private var statisticsDrawCalls = 0
+  private var statisticsInstances = 0
+  private var statisticsGPUTime: TimeInterval = 0
+  private var statisticsGPUFrames = 0
+  private var statisticsRequestTime: TimeInterval = 0
+  private var statisticsReplies = 0
+  private var requestStartedAt: TimeInterval = 0
+  // Protect the renderer's three shared instance-buffer slots from GPU reuse.
+  private let inFlight = DispatchSemaphore(value: 3)
   private var frameRequestTimer: Timer?
   private var frameRequestOutstanding = false
   private var requestedFramesPerSecond: Double = 30
@@ -81,7 +91,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   public func connect(
     host: String = "127.0.0.1", port: Int = 9328, framesPerSecond: Double = 30
   ) throws {
-    requestedFramesPerSecond = framesPerSecond.isFinite ? max(1, framesPerSecond) : 30
+    requestedFramesPerSecond = framesPerSecond.isFinite ? min(240, max(1, framesPerSecond)) : 30
     let channel = try ClientBootstrap(group: group)
       .channelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
       .channelInitializer { [weak self] channel in
@@ -100,6 +110,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     self.channel = channel
     // Write directly here. Scheduling through eventLoop.execute allowed the
     // application run loop to start before the initial viewport was enqueued.
+    channel.write(try RemoteWire.encode(.frameRate(Float(requestedFramesPerSecond))), promise: nil)
     let write = channel.writeAndFlush(try RemoteWire.encode(.viewport(currentViewport)))
     write.whenFailure { error in print("Initial viewport write failed: \(error)") }
     startFrameRequests()
@@ -118,6 +129,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   private func requestFrameIfNeeded() {
     guard !frameRequestOutstanding else { return }
     frameRequestOutstanding = true
+    requestStartedAt = ProcessInfo.processInfo.systemUptime
     send(.requestFrame)
   }
 
@@ -167,6 +179,12 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
   public func draw(in view: MTKView) {
+    guard inFlight.wait(timeout: .now()) == .success else {
+      view.needsDisplay = true
+      return
+    }
+    var submitted = false
+    defer { if !submitted { inFlight.signal() } }
     guard
       let frame = latestFrame,
       let drawable = view.currentDrawable,
@@ -183,7 +201,22 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
       into: encoder)
     encoder.endEncoding()
     command.present(drawable)
+    let semaphore = inFlight
+    command.addCompletedHandler { [weak self] command in
+      semaphore.signal()
+      let duration = command.gpuEndTime - command.gpuStartTime
+      let valid = command.status == .completed && command.gpuStartTime > 0 && duration >= 0
+      DispatchQueue.main.async {
+        guard let self, valid else { return }
+        self.statisticsGPUTime += duration
+        self.statisticsGPUFrames += 1
+      }
+    }
+    submitted = true
     command.commit()
+    statisticsDraws += 1
+    statisticsDrawCalls += displayRenderer.lastDrawCallCount
+    statisticsInstances += displayRenderer.lastInstanceCount
     displayRenderer.finishFrame()
     statisticsRenderTime += ProcessInfo.processInfo.systemUptime - renderStarted
   }
@@ -224,6 +257,20 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
 
   private func receive(_ message: RemoteMessage, byteCount: Int, decodeDuration: TimeInterval) {
     guard !isShuttingDown else { return }
+    switch message {
+    case .frame, .frameUnchanged:
+      if frameRequestOutstanding {
+        statisticsRequestTime += ProcessInfo.processInfo.systemUptime - requestStartedAt
+        statisticsReplies += 1
+      }
+      frameRequestOutstanding = false
+    default: break
+    }
+    if case .frameUnchanged = message {
+      statisticsBytes += byteCount
+      printStatisticsIfNeeded()
+      return
+    }
     if case .clipboard(let request) = message {
       guard !request.isReply else { return }
       guard let generation = clipboardGenerations.consume(sequence: request.id) else {
@@ -280,11 +327,17 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     let frames = max(1, statisticsFrames)
     print(
       String(
-        format: "client %.1f fps | %.2f Mbit/s | %.0f commands/frame | decode %.2f ms | encode GPU %.2f ms",
-        Double(statisticsFrames) / elapsed, Double(statisticsBytes) * 8 / elapsed / 1_000_000,
+        format:
+          "client %.1f received fps | %.1f rendered fps | %.2f Mbit/s | %.0f commands/frame | decode %.2f ms | CPU encode %.2f ms | GPU %.2f ms | request %.2f ms | %.0f draws/frame | %.0f instances/frame",
+        Double(statisticsFrames) / elapsed, Double(statisticsDraws) / elapsed,
+        Double(statisticsBytes) * 8 / elapsed / 1_000_000,
         Double(statisticsCommands) / Double(frames),
         statisticsDecodeTime * 1_000 / Double(frames),
-        statisticsRenderTime * 1_000 / Double(frames)))
+        statisticsRenderTime * 1_000 / Double(max(1, statisticsDraws)),
+        statisticsGPUTime * 1_000 / Double(max(1, statisticsGPUFrames)),
+        statisticsRequestTime * 1_000 / Double(max(1, statisticsReplies)),
+        Double(statisticsDrawCalls) / Double(max(1, statisticsDraws)),
+        Double(statisticsInstances) / Double(max(1, statisticsDraws))))
     fflush(stdout)
     statisticsStartedAt = now
     statisticsFrames = 0
@@ -292,12 +345,20 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     statisticsCommands = 0
     statisticsDecodeTime = 0
     statisticsRenderTime = 0
+    statisticsDraws = 0
+    statisticsDrawCalls = 0
+    statisticsInstances = 0
+    statisticsGPUTime = 0
+    statisticsGPUFrames = 0
+    statisticsRequestTime = 0
+    statisticsReplies = 0
   }
 }
 
 private final class RemoteClientHandler: ChannelInboundHandler, @unchecked Sendable {
   typealias InboundIn = ByteBuffer
   private var buffer = ByteBuffer()
+  private let images = RemoteImageCache()
   private let onMessage: @Sendable (RemoteMessage, Int, TimeInterval) -> Void
   private let onInactive: @Sendable () -> Void
 
@@ -316,7 +377,7 @@ private final class RemoteClientHandler: ChannelInboundHandler, @unchecked Senda
       while true {
         let bytesBeforeDecode = buffer.readableBytes
         let started = ProcessInfo.processInfo.systemUptime
-        guard let message = try RemoteWire.decode(from: &buffer) else { break }
+        guard let message = try RemoteWire.decode(from: &buffer, images: images) else { break }
         let duration = ProcessInfo.processInfo.systemUptime - started
         onMessage(message, bytesBeforeDecode - buffer.readableBytes, duration)
       }

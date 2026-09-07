@@ -7,6 +7,9 @@ import RemoteMetalClient
 struct RemoteDemoClient {
   @MainActor
   static func main() throws {
+    #if DEBUG
+    print("Performance warning: debug build; use -c release on both client and daemon.")
+    #endif
     let arguments = Array(CommandLine.arguments.dropFirst())
     if arguments.contains("--help") || arguments.contains("-h") {
       print("usage: RemoteDemoClient [host] [port] [fps]")

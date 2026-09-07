@@ -21,17 +21,21 @@ public enum RemoteMessage: Equatable, Sendable {
   /// Requests one fresh server-side display-list snapshot. The client uses this
   /// to pace production to its own display loop and avoids queuing stale frames.
   case requestFrame
+  case frameRate(Float)
+  case frameUnchanged
   case frame(id: UInt64, inputSequence: UInt64, viewport: Size, commands: [DrawCommand])
 }
 
 public enum RemoteWire {
   public static let magic: UInt32 = 0x4348_524D  // CHRM
-  public static let version: UInt16 = 2
+  public static let version: UInt16 = 3
   public static let maximumClipboardBytes = 1024 * 1024
   public static let maximumPayloadBytes = 64 * 1024 * 1024
   public static let maximumCommandsPerFrame = 1_000_000
 
   private enum MessageType: UInt16 {
+    case frameRate = 7
+    case frameUnchanged = 8
     case key = 5
     case clipboard = 6
     case viewport = 1
@@ -41,8 +45,9 @@ public enum RemoteWire {
   }
 
   public static func encode(
-    _ message: RemoteMessage, allocator: ByteBufferAllocator = .init()
+    _ message: RemoteMessage, allocator: ByteBufferAllocator = .init(), images: RemoteImageCache? = nil
   ) throws -> ByteBuffer {
+    let workingImages = images?.copy()
     var payload = allocator.buffer(capacity: 1024)
     let type: MessageType
     switch message {
@@ -62,6 +67,12 @@ public enum RemoteWire {
       type = .input
       payload.writeInteger(sequence, endianness: .little)
       try payload.writeInput(state)
+    case .frameRate(let fps):
+      guard fps.isFinite, fps >= 1, fps <= 240 else { throw RemoteProtocolError.malformedMessage }
+      type = .frameRate
+      payload.writeFloat(fps)
+    case .frameUnchanged:
+      type = .frameUnchanged
     case .requestFrame:
       type = .requestFrame
     case .frame(let id, let inputSequence, let viewport, let commands):
@@ -73,7 +84,7 @@ public enum RemoteWire {
         throw RemoteProtocolError.messageTooLarge(commands.count)
       }
       payload.writeInteger(UInt32(commands.count), endianness: .little)
-      for command in commands { try payload.writeCommand(command) }
+      for command in commands { try payload.writeCommand(command, images: workingImages) }
     }
     guard payload.readableBytes <= maximumPayloadBytes else {
       throw RemoteProtocolError.messageTooLarge(payload.readableBytes)
@@ -84,11 +95,12 @@ public enum RemoteWire {
     result.writeInteger(type.rawValue, endianness: .little)
     result.writeInteger(UInt32(payload.readableBytes), endianness: .little)
     result.writeBuffer(&payload)
+    if let workingImages { images?.replace(with: workingImages) }
     return result
   }
 
   /// Decodes one complete message, returning nil until the buffer contains it all.
-  public static func decode(from buffer: inout ByteBuffer) throws -> RemoteMessage? {
+  public static func decode(from buffer: inout ByteBuffer, images: RemoteImageCache? = nil) throws -> RemoteMessage? {
     guard buffer.readableBytes >= 12 else { return nil }
     guard
       let magic: UInt32 = buffer.getInteger(at: buffer.readerIndex, endianness: .little),
@@ -109,6 +121,7 @@ public enum RemoteWire {
     guard let type = MessageType(rawValue: rawType) else {
       throw RemoteProtocolError.unknownMessage(rawType)
     }
+    let workingImages = images?.copy()
     let message: RemoteMessage
     switch type {
     case .key:
@@ -127,6 +140,12 @@ public enum RemoteWire {
       message = .viewport(try payload.readSize())
     case .input:
       message = .input(sequence: try payload.read(UInt64.self), state: try payload.readInput())
+    case .frameRate:
+      let fps = try payload.readFloat()
+      guard fps.isFinite, fps >= 1, fps <= 240 else { throw RemoteProtocolError.malformedMessage }
+      message = .frameRate(fps)
+    case .frameUnchanged:
+      message = .frameUnchanged
     case .requestFrame:
       message = .requestFrame
     case .frame:
@@ -142,10 +161,11 @@ public enum RemoteWire {
       }
       var commands: [DrawCommand] = []
       commands.reserveCapacity(count)
-      for _ in 0..<count { commands.append(try payload.readDrawCommand()) }
+      for _ in 0..<count { commands.append(try payload.readDrawCommand(images: workingImages)) }
       message = .frame(id: id, inputSequence: sequence, viewport: viewport, commands: commands)
     }
     guard payload.readableBytes == 0 else { throw RemoteProtocolError.malformedMessage }
+    if let workingImages { images?.replace(with: workingImages) }
     return message
   }
 }
@@ -179,7 +199,7 @@ extension ByteBuffer {
     writeFloat(value.bottomLeft)
   }
   fileprivate mutating func writeStringValue(_ value: String) throws {
-    let bytes = Array(value.utf8)
+    let bytes = value.utf8
     guard bytes.count <= Int(UInt32.max) else {
       throw RemoteProtocolError.stringTooLarge(bytes.count)
     }
@@ -202,7 +222,7 @@ extension ByteBuffer {
     for event in input.textEvents { try writeTextEvent(event) }
   }
 
-  fileprivate mutating func writeCommand(_ command: DrawCommand) throws {
+  fileprivate mutating func writeCommand(_ command: DrawCommand, images: RemoteImageCache?) throws {
     switch command {
     case .fillRect(let rect, let color):
       writeInteger(UInt8(1))
@@ -232,6 +252,18 @@ extension ByteBuffer {
       writeFloat(scale)
       writeInteger(face.rawValue)
     case .image(let rect, let image, let scaling, let alignment):
+      if let cached = images?.image(id: image.id), cached.generation == image.generation,
+        cached.width == image.width, cached.height == image.height
+      {
+        writeInteger(UInt8(9))
+        writeRect(rect)
+        try writeStringValue(image.id.rawValue)
+        writeInteger(image.generation, endianness: .little)
+        writeInteger(scaling.wireValue)
+        writeFloat(alignment.x)
+        writeFloat(alignment.y)
+        return
+      }
       writeInteger(UInt8(6))
       writeRect(rect)
       try writeStringValue(image.id.rawValue)
@@ -243,6 +275,7 @@ extension ByteBuffer {
       }
       writeInteger(UInt32(image.rgba8.count), endianness: .little)
       writeBytes(image.rgba8)
+      images?.insert(image)
       writeInteger(scaling.wireValue)
       writeFloat(alignment.x)
       writeFloat(alignment.y)
@@ -297,7 +330,7 @@ extension ByteBuffer {
       scrollDelta: scroll, commands: commands, textEvents: text)
   }
 
-  fileprivate mutating func readDrawCommand() throws -> DrawCommand {
+  fileprivate mutating func readDrawCommand(images: RemoteImageCache?) throws -> DrawCommand {
     switch try read(UInt8.self) {
     case 1: return .fillRect(rect: try readRect(), color: try readColor())
     case 2: return .strokeRect(rect: try readRect(), width: try readFloat(), color: try readColor())
@@ -314,6 +347,17 @@ extension ByteBuffer {
         throw RemoteProtocolError.malformedMessage
       }
       return .text(position: point, text: text, color: color, scale: scale, face: face)
+    case 9:
+      let rect = try readRect()
+      let id = ImageID(try readStringValue())
+      let generation = try read(UInt64.self)
+      guard let image = images?.image(id: id), image.generation == generation,
+        let scaling = ImageScaling(wireValue: try read(UInt8.self))
+      else {
+        throw RemoteProtocolError.malformedMessage
+      }
+      let alignment = ImageAlignment(x: try readFloat(), y: try readFloat())
+      return .image(rect: rect, image: image, scaling: scaling, alignment: alignment)
     case 6:
       let rect = try readRect()
       let id = try readStringValue()
@@ -332,6 +376,7 @@ extension ByteBuffer {
       let alignment = ImageAlignment(x: try readFloat(), y: try readFloat())
       let image = try ImageResource(
         id: ImageID(id), generation: generation, width: width, height: height, rgba8: bytes)
+      images?.insert(image)
       return .image(rect: rect, image: image, scaling: scaling, alignment: alignment)
     case 7: return .pushClip(try readRect())
     case 8: return .popClip

@@ -23,19 +23,19 @@ swift run --package-path Example ChromaDemo
 On macOS, run the block graph daemon and Metal display client in separate terminals:
 
 ```sh
-swift run --package-path Example RemoteDemoDaemon
+swift run --package-path Example -c release RemoteDemoDaemon
 ```
 
 ```sh
-swift run --package-path Example RemoteDemoClient
+swift run --package-path Example -c release RemoteDemoClient
 ```
 
 To connect across a LAN, bind the daemon to all interfaces and pass its IP or
 hostname to the client:
 
 ```sh
-swift run --package-path Example RemoteDemoDaemon 0.0.0.0 9328
-swift run --package-path Example RemoteDemoClient 192.168.1.42 9328
+swift run --package-path Example -c release RemoteDemoDaemon 0.0.0.0 9328
+swift run --package-path Example -c release RemoteDemoClient 192.168.1.42 9328
 ```
 
 The remote demo includes a scrollable sidebar of 10,000 UUIDs beside the animated
@@ -46,7 +46,12 @@ The same Mandelbrot bitmap used in the native demo appears above the shapes, dem
 Chroma's `Image` block. Both demos use the shared `DemoImages` generator.
 The daemon generates the 640×400 RGBA image once, with no
 external assets or downloads, and the client displays it with its aspect ratio
-preserved. The current protocol embeds its 1,000 KiB of pixels in every frame.
+preserved. Wire protocol v3 sends its 1,000 KiB of pixels once per connection or
+image revision; subsequent frames reference the image ID and generation. Both
+peers must be rebuilt together (older protocol versions are rejected). Wire
+resources use deterministic FIFO eviction at 128 IDs / 64 MiB; evicted images
+are automatically redefined on their next use. Encoding must remain ordered
+and encoded frames must not be dropped after resource-cache updates.
 
 ### Virtualized lists
 
@@ -99,8 +104,8 @@ require HarfBuzz, FreeType, Fontconfig, or an installed system font.
 
 The UUID sidebar uses `LazyVStack` directly (it owns its scroll viewport), so
 only visible rows emit drawing commands. A normal `VStack` inside `ScrollView`
-still measures and draws every row; clipping alone does not reduce server work
-or the remote command stream. The current lazy stack caches row measurements,
+still measures and draws every row. Conservative display-list culling now
+removes invisible primitives before transmission, but does not avoid layout work. The current lazy stack caches row measurements,
 but still constructs row descriptions and scans the cache each frame.
 
 Measure the demo without networking or a GPU, using the same 1100×720 viewport:
@@ -109,8 +114,9 @@ Measure the demo without networking or a GPU, using the same 1100×720 viewport:
 swift run --package-path Example -c release RemoteDemoDaemon --benchmark
 ```
 
-This reports cold-frame draw time, mean draw time over 60 subsequent frames,
-and command count. It does not include wire encoding or client rendering.
+This reports cold-frame draw/cull time, mean draw/cull time over 60 subsequent
+frames, command count, cached wire encode/decode time, and steady-state bytes
+per frame. It does not include networking or client Metal rendering.
 
 ### Remote clipboard and app-owned input
 
@@ -143,3 +149,41 @@ This remains a plain-text prototype: use a trusted connection or protected
 tunnel, not an exposed unauthenticated TCP port. Full IME composition, rich
 clipboard formats, and native Edit-menu integration are not implemented.
 Protocol v1 peers must be rebuilt together with the client and daemon.
+
+### Remote performance diagnostics
+
+Use **release builds on both machines**; debug Swift per-field decoding and
+instance construction are not representative performance measurements:
+
+```sh
+swift run --package-path Example -c release RemoteDemoDaemon 0.0.0.0 9328
+swift run --package-path Example -c release RemoteDemoClient 192.168.1.177 9328 30
+```
+
+The final client argument negotiates 1–240 fps. Each request grants one response;
+input and invalidations cannot independently send extra frames. Input is still
+processed in order immediately (the current interaction engine evaluates the
+graph to process it); visual snapshots are coalesced until the presentation
+credit/cadence permits sending. An unchanged scene receives a tiny unchanged
+reply rather than another display list. Polling still evaluates the graph so
+clock-driven demo animations continue to advance.
+
+Client counters separate received and rendered fps, decode CPU time, CPU Metal
+encoding time per actual draw, completed-command-buffer GPU time, request/reply
+latency, draw calls, and instances. GPU completion samples may fall in a later
+reporting interval. Server counters include draw/cull and encode time plus image
+pixel versus remaining protocol bandwidth. Text glyph runs are cached with
+bounded storage; clipping preserves painter order and antialiasing margins.
+The client limits in-flight GPU work to protect its three shared buffer slots.
+
+For repeatable comparisons, keep viewport, scene/shape count, and fps identical;
+record both server and client statistics after warmup. Actual LAN/GPU speedups
+need measurement on the target machines, not inference from debug logs.
+
+A headless live-transport smoke test checks pacing, unchanged replies, and image
+reuse across a viewport change:
+
+```sh
+swift build --package-path Example -c release --product RemoteDemoDaemon
+python3 IntegrationTests/Remote/pacing.py
+```
