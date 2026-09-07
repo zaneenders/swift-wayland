@@ -8,6 +8,7 @@ import RemoteProtocol
 
 @MainActor
 public final class RemoteServer {
+  nonisolated private static let connectionLogger = Logger(label: "chroma.remote.server.connection")
   private var logger = Logger(label: "chroma.remote.server")
   private let group: MultiThreadedEventLoopGroup
   private var serverChannel: Channel?
@@ -41,20 +42,21 @@ public final class RemoteServer {
       .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
       .childChannelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
       .childChannelInitializer { [weak self] channel in
-        guard let self else { return channel.eventLoop.makeSucceededVoidFuture() }
-        self.logger.debug("Accepted remote TCP connection")
+        Self.connectionLogger.debug("Accepted remote TCP connection")
+        let server = self
         return channel.pipeline.addHandler(
           RemoteServerHandler(
             onMessage: { channel, message in
-              Task { @MainActor [weak self] in self?.receive(message, from: channel) }
+              Task { @MainActor in server?.receive(message, from: channel) }
             },
             onInactive: { channel in
-              Task { @MainActor [weak self] in
-                if self?.clientChannel === channel { self?.clientChannel = nil }
+              Task { @MainActor in
+                if server?.clientChannel === channel { server?.clientChannel = nil }
               }
             },
-            onError: { [logger = self.logger] error in
-              logger.error("Remote channel failed", metadata: ["error": "\(error)"])
+            onError: { error in
+              Self.connectionLogger.error(
+                "Remote channel failed", metadata: ["error": "\(error)"])
             }))
       }
       .bind(host: host, port: port).wait()
