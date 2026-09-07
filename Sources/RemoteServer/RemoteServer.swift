@@ -8,6 +8,13 @@ import RemoteProtocol
 
 @MainActor
 public final class RemoteServer {
+  public var keyBindings = KeyBindings()
+  public var editingKeyBindings = KeyBindings()
+  private var pointerPosition = Point.zero
+  private var clipboardEpoch: UInt64 = 0
+  private var clipboardSnapshot: (text: String?, selection: Range<Int>?, leaf: WidgetID?)?
+  private var pendingClipboard: (id: UInt64, cut: Bool, paste: Bool)?
+  private var deferredInput: [RemoteMessage] = []
   private var logger = Logger(label: "chroma.remote.server")
   private let group: MultiThreadedEventLoopGroup
   private let connectionFactory: RemoteServerConnectionFactory
@@ -72,12 +79,63 @@ public final class RemoteServer {
     if clientChannel == nil {
       logger.info("Remote client connected")
     }
+    // The prototype has one interaction graph: reject competing clients rather
+    // than allowing one connection to mutate another's pending clipboard edit.
+    if let active = clientChannel, active !== channel {
+      channel.close(promise: nil)
+      return
+    }
     clientChannel = channel
+    if case .clipboard(let reply) = message {
+      guard reply.isReply, let pending = pendingClipboard, pending.id == reply.id else { return }
+      if reply.success {
+        if pending.paste, let text = reply.text, let snapshot = clipboardSnapshot,
+          snapshot.leaf == interaction.editingLeaf,
+          snapshot.text == interaction.editingText,
+          snapshot.selection == interaction.textSelectionRange
+        {
+          render(input: InputState(textEvents: [.insert(text)]))
+        }
+        if pending.cut, let snapshot = clipboardSnapshot,
+          snapshot.text == interaction.editingText,
+          snapshot.selection == interaction.textSelectionRange,
+          snapshot.leaf == interaction.editingLeaf
+        {
+          render(input: InputState(textEvents: [.deleteForward]))
+        }
+      }
+      finishClipboard()
+      return
+    }
+    if pendingClipboard != nil {
+      switch message {
+      case .input, .key:
+        guard deferredInput.count < 4096 else {
+          channel.close(promise: nil)
+          return
+        }
+        deferredInput.append(message)
+        return
+      default: break
+      }
+    }
     switch message {
+    case .clipboard: break
+    case .key(let sequence, let event):
+      guard sequence > inputSequence else { return }
+      inputSequence = sequence
+      let map = interaction.isTextEditing ? keyBindings.overlay(editingKeyBindings) : keyBindings
+      if let chord = event.chord, let resolution = map.command(for: chord) {
+        if let command = resolution { execute(command) }
+      } else if interaction.isTextEditing, let text = event.text {
+        render(input: InputState(textEvents: [.insert(text)]))
+      }
     case .viewport(let size):
       viewport = size
       render()
     case .input(let sequence, let state):
+      guard sequence > inputSequence else { return }
+      pointerPosition = state.pointerPosition
       inputSequence = sequence
       render(input: state)
     case .requestFrame:
@@ -85,6 +143,64 @@ public final class RemoteServer {
     case .frame:
       break
     }
+  }
+
+  private func execute(_ command: Command) {
+    guard case .editing(let event) = command else {
+      render(input: InputState(commands: [command]))
+      return
+    }
+    switch event {
+    case .copy, .cut, .paste:
+      let text: String?
+      if event == .paste {
+        guard interaction.isTextEditing else { return }
+        text = nil
+      } else {
+        text = event == .cut ? interaction.editableSelectionText() : interaction.copyText()
+        guard let text, !text.isEmpty, text.utf8.count < RemoteWire.maximumClipboardBytes / 6 else { return }
+      }
+      let id = inputSequence
+      clipboardEpoch &+= 1
+      let epoch = clipboardEpoch
+      clipboardSnapshot = (interaction.editingText, interaction.textSelectionRange, interaction.editingLeaf)
+      pendingClipboard = (id, event == .cut, event == .paste)
+      do {
+        let bytes = try RemoteWire.encode(.clipboard(ClipboardTransfer(id: id, text: text)))
+        clientChannel?.writeAndFlush(bytes, promise: nil)
+      } catch {
+        finishClipboard()
+        return
+      }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+        guard let self, self.pendingClipboard?.id == id, self.clipboardEpoch == epoch else { return }
+        self.finishClipboard()
+      }
+    case .selectAll where !interaction.isTextEditing:
+      interaction.selectAll(at: pointerPosition)
+      render()
+    default:
+      render(input: InputState(textEvents: [event]))
+    }
+  }
+
+  private func finishClipboard() {
+    pendingClipboard = nil
+    clipboardSnapshot = nil
+    while pendingClipboard == nil, !deferredInput.isEmpty, let channel = clientChannel {
+      let next = deferredInput.removeFirst()
+      receive(next, from: channel)
+    }
+  }
+
+  fileprivate func disconnected(_ channel: Channel) {
+    guard clientChannel === channel else { return }
+    clientChannel = nil
+    pendingClipboard = nil
+    clipboardEpoch &+= 1
+    clipboardSnapshot = nil
+    deferredInput.removeAll()
+    inputSequence = 0
   }
 
   private func scheduleRedraw() {
@@ -168,11 +284,11 @@ private final class RemoteServerConnectionFactory: @unchecked Sendable {
     return channel.pipeline.addHandler(
       RemoteServerHandler(
         onMessage: { [weak self] channel, message in
-          Task { @MainActor in self?.server?.receive(message, from: channel) }
+          DispatchQueue.main.async { self?.server?.receive(message, from: channel) }
         },
         onInactive: { [weak self] channel in
-          Task { @MainActor in
-            if self?.server?.clientChannel === channel { self?.server?.clientChannel = nil }
+          DispatchQueue.main.async {
+            self?.server?.disconnected(channel)
           }
         },
         onError: { error in

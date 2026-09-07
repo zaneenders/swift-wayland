@@ -14,6 +14,8 @@ public enum RemoteProtocolError: Error, Equatable, Sendable {
 }
 
 public enum RemoteMessage: Equatable, Sendable {
+  case key(sequence: UInt64, event: RemoteKeyEvent)
+  case clipboard(ClipboardTransfer)
   case viewport(Size)
   case input(sequence: UInt64, state: InputState)
   /// Requests one fresh server-side display-list snapshot. The client uses this
@@ -24,11 +26,14 @@ public enum RemoteMessage: Equatable, Sendable {
 
 public enum RemoteWire {
   public static let magic: UInt32 = 0x4348_524D  // CHRM
-  public static let version: UInt16 = 1
+  public static let version: UInt16 = 2
+  public static let maximumClipboardBytes = 1024 * 1024
   public static let maximumPayloadBytes = 64 * 1024 * 1024
   public static let maximumCommandsPerFrame = 1_000_000
 
   private enum MessageType: UInt16 {
+    case key = 5
+    case clipboard = 6
     case viewport = 1
     case input = 2
     case frame = 3
@@ -41,6 +46,15 @@ public enum RemoteWire {
     var payload = allocator.buffer(capacity: 1024)
     let type: MessageType
     switch message {
+    case .key(let sequence, let event):
+      type = .key
+      payload.writeInteger(sequence, endianness: .little)
+      payload.writeBytes(try JSONEncoder().encode(event))
+    case .clipboard(let transfer):
+      type = .clipboard
+      let data = try JSONEncoder().encode(transfer)
+      guard data.count <= Self.maximumClipboardBytes else { throw RemoteProtocolError.messageTooLarge(data.count) }
+      payload.writeBytes(data)
     case .viewport(let size):
       type = .viewport
       payload.writeSize(size)
@@ -97,6 +111,18 @@ public enum RemoteWire {
     }
     let message: RemoteMessage
     switch type {
+    case .key:
+      let sequence = try payload.read(UInt64.self)
+      message = .key(
+        sequence: sequence,
+        event: try JSONDecoder().decode(
+          RemoteKeyEvent.self, from: Data(payload.readBytes(length: payload.readableBytes)!)))
+    case .clipboard:
+      guard payload.readableBytes <= Self.maximumClipboardBytes else {
+        throw RemoteProtocolError.messageTooLarge(payload.readableBytes)
+      }
+      message = .clipboard(
+        try JSONDecoder().decode(ClipboardTransfer.self, from: Data(payload.readBytes(length: payload.readableBytes)!)))
     case .viewport:
       message = .viewport(try payload.readSize())
     case .input:
@@ -128,15 +154,29 @@ extension ByteBuffer {
   fileprivate mutating func writeFloat(_ value: Float) {
     writeInteger(value.bitPattern, endianness: .little)
   }
-  fileprivate mutating func writePoint(_ value: Point) { writeFloat(value.x); writeFloat(value.y) }
-  fileprivate mutating func writeSize(_ value: Size) { writeFloat(value.width); writeFloat(value.height) }
-  fileprivate mutating func writeRect(_ value: Rect) { writePoint(value.origin); writeSize(value.size) }
+  fileprivate mutating func writePoint(_ value: Point) {
+    writeFloat(value.x)
+    writeFloat(value.y)
+  }
+  fileprivate mutating func writeSize(_ value: Size) {
+    writeFloat(value.width)
+    writeFloat(value.height)
+  }
+  fileprivate mutating func writeRect(_ value: Rect) {
+    writePoint(value.origin)
+    writeSize(value.size)
+  }
   fileprivate mutating func writeColor(_ value: Color) {
-    writeFloat(value.r); writeFloat(value.g); writeFloat(value.b); writeFloat(value.a)
+    writeFloat(value.r)
+    writeFloat(value.g)
+    writeFloat(value.b)
+    writeFloat(value.a)
   }
   fileprivate mutating func writeRadii(_ value: CornerRadii) {
-    writeFloat(value.topLeft); writeFloat(value.topRight)
-    writeFloat(value.bottomRight); writeFloat(value.bottomLeft)
+    writeFloat(value.topLeft)
+    writeFloat(value.topRight)
+    writeFloat(value.bottomRight)
+    writeFloat(value.bottomLeft)
   }
   fileprivate mutating func writeStringValue(_ value: String) throws {
     let bytes = Array(value.utf8)
@@ -165,18 +205,36 @@ extension ByteBuffer {
   fileprivate mutating func writeCommand(_ command: DrawCommand) throws {
     switch command {
     case .fillRect(let rect, let color):
-      writeInteger(UInt8(1)); writeRect(rect); writeColor(color)
+      writeInteger(UInt8(1))
+      writeRect(rect)
+      writeColor(color)
     case .strokeRect(let rect, let width, let color):
-      writeInteger(UInt8(2)); writeRect(rect); writeFloat(width); writeColor(color)
+      writeInteger(UInt8(2))
+      writeRect(rect)
+      writeFloat(width)
+      writeColor(color)
     case .fillRoundedRect(let rect, let radii, let color):
-      writeInteger(UInt8(3)); writeRect(rect); writeRadii(radii); writeColor(color)
+      writeInteger(UInt8(3))
+      writeRect(rect)
+      writeRadii(radii)
+      writeColor(color)
     case .strokeRoundedRect(let rect, let radii, let width, let color):
-      writeInteger(UInt8(4)); writeRect(rect); writeRadii(radii); writeFloat(width); writeColor(color)
+      writeInteger(UInt8(4))
+      writeRect(rect)
+      writeRadii(radii)
+      writeFloat(width)
+      writeColor(color)
     case .text(let position, let text, let color, let scale, let face):
-      writeInteger(UInt8(5)); writePoint(position); try writeStringValue(text)
-      writeColor(color); writeFloat(scale); writeInteger(face.rawValue)
+      writeInteger(UInt8(5))
+      writePoint(position)
+      try writeStringValue(text)
+      writeColor(color)
+      writeFloat(scale)
+      writeInteger(face.rawValue)
     case .image(let rect, let image, let scaling, let alignment):
-      writeInteger(UInt8(6)); writeRect(rect); try writeStringValue(image.id.rawValue)
+      writeInteger(UInt8(6))
+      writeRect(rect)
+      try writeStringValue(image.id.rawValue)
       writeInteger(image.generation, endianness: .little)
       writeInteger(UInt32(image.width), endianness: .little)
       writeInteger(UInt32(image.height), endianness: .little)
@@ -185,9 +243,12 @@ extension ByteBuffer {
       }
       writeInteger(UInt32(image.rgba8.count), endianness: .little)
       writeBytes(image.rgba8)
-      writeInteger(scaling.wireValue); writeFloat(alignment.x); writeFloat(alignment.y)
+      writeInteger(scaling.wireValue)
+      writeFloat(alignment.x)
+      writeFloat(alignment.y)
     case .pushClip(let rect):
-      writeInteger(UInt8(7)); writeRect(rect)
+      writeInteger(UInt8(7))
+      writeRect(rect)
     case .popClip:
       writeInteger(UInt8(8))
     }
@@ -245,15 +306,20 @@ extension ByteBuffer {
       return .strokeRoundedRect(
         rect: try readRect(), radii: try readRadii(), width: try readFloat(), color: try readColor())
     case 5:
-      let point = try readPoint(), text = try readStringValue()
-      let color = try readColor(), scale = try readFloat()
+      let point = try readPoint()
+      let text = try readStringValue()
+      let color = try readColor()
+      let scale = try readFloat()
       guard let face = FontFace(rawValue: try read(UInt8.self)) else {
         throw RemoteProtocolError.malformedMessage
       }
       return .text(position: point, text: text, color: color, scale: scale, face: face)
     case 6:
-      let rect = try readRect(), id = try readStringValue(), generation = try read(UInt64.self)
-      let width = Int(try read(UInt32.self)), height = Int(try read(UInt32.self))
+      let rect = try readRect()
+      let id = try readStringValue()
+      let generation = try read(UInt64.self)
+      let width = Int(try read(UInt32.self))
+      let height = Int(try read(UInt32.self))
       let count = Int(try read(UInt32.self))
       guard count <= RemoteWire.maximumPayloadBytes, let rawBytes = readBytes(length: count) else {
         throw RemoteProtocolError.malformedMessage
@@ -276,7 +342,11 @@ extension ByteBuffer {
 
 extension ImageScaling {
   fileprivate var wireValue: UInt8 {
-    switch self { case .stretch: 0; case .contain: 1; case .cover: 2 }
+    switch self {
+    case .stretch: 0
+    case .contain: 1
+    case .cover: 2
+    }
   }
   fileprivate init?(wireValue: UInt8) {
     switch wireValue {
@@ -285,5 +355,30 @@ extension ImageScaling {
     case 2: self = .cover
     default: return nil
     }
+  }
+}
+
+/// Text is a platform-produced insertion candidate, separate from key identity.
+public struct RemoteKeyEvent: Codable, Equatable, Sendable {
+  public var chord: KeyChord?
+  public var text: String?
+  public init(chord: KeyChord?, text: String? = nil) {
+    self.chord = chord
+    self.text = text
+  }
+}
+
+/// A nil text in a request means read; a non-nil text means write.
+/// Replies acknowledge writes or supply text for reads. IDs refer to input sequences.
+public struct ClipboardTransfer: Codable, Equatable, Sendable {
+  public var id: UInt64
+  public var isReply: Bool
+  public var text: String?
+  public var success: Bool
+  public init(id: UInt64, isReply: Bool = false, text: String? = nil, success: Bool = true) {
+    self.id = id
+    self.isReply = isReply
+    self.text = text
+    self.success = success
   }
 }

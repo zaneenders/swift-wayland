@@ -44,6 +44,31 @@ struct RemoteDemoDaemon {
     let server = RemoteServer(
       content: PerformanceDemo(state: state).chromaTheme(.dark),
       size: Size(width: 1100, height: 720))
+    // The application owns bindings, including the remote client's physical modifiers.
+    server.keyBindings = KeyBindings {
+      bind("c", modifiers: .command, to: .editing(.copy))
+      bind("x", modifiers: .command, to: .editing(.cut))
+      bind("v", modifiers: .command, to: .editing(.paste))
+      bind("a", modifiers: .command, to: .editing(.selectAll))
+      bind(.leftArrow, to: .navigation(.left))
+      bind(.rightArrow, to: .navigation(.right))
+      bind(.upArrow, to: .navigation(.up))
+      bind(.downArrow, to: .navigation(.down))
+      bind(.pageUp, to: .navigation(.pageUp))
+      bind(.pageDown, to: .navigation(.pageDown))
+      bind(.enter, to: .action(.activate))
+      bind(.tab, to: .navigation(.next))
+    }
+    server.editingKeyBindings = KeyBindings {
+      bind(.leftArrow, to: .editing(.moveCaretLeft))
+      bind(.rightArrow, to: .editing(.moveCaretRight))
+      bind(.backspace, to: .editing(.backspace))
+      bind(.delete, to: .editing(.deleteForward))
+      bind(.home, to: .editing(.moveCaretToStart))
+      bind(.end, to: .editing(.moveCaretToEnd))
+      bind(.enter, to: .editing(.submit))
+      bind(.escape, to: .editing(.endEditing))
+    }
     try server.start(host: host, port: port)
     print("Interactive performance scene: \(state.itemCount) animated shapes")
     print("Click the controls in the remote window or use the arrow keys and Enter")
@@ -65,6 +90,9 @@ private final class PerformanceDemoState {
     case outline = "OUTLINE"
   }
 
+  var clipboardPage = false
+  var pastedText = ""
+  var sourceText = "Copy this remote text — hello from the daemon!"
   let image: ImageResource
   var itemCount: Int
   var speed: Float = 1
@@ -140,7 +168,7 @@ private final class PerformanceDemoState {
 private let remoteSmallText: Float = 0.52
 private let remoteTitleText: Float = 0.82
 
-private struct PerformanceDemo: Block {
+private struct PerformanceScene: Block {
   let state: PerformanceDemoState
 
   var body: some Block {
@@ -365,5 +393,38 @@ private struct ShapeCanvas: PrimitiveBlock {
         g: 0.38 + 0.52 * abs(sin(phase + 2.0)),
         b: 0.62 + 0.36 * abs(sin(phase)), a: 0.92)
     }
+  }
+}
+
+private struct PerformanceDemo: Block {
+  let state: PerformanceDemoState
+  var body: some Block {
+    VStack(spacing: 12) {
+      HStack(spacing: 12) {
+        Button(state.clipboardPage ? "Scene" : "[Scene]", id: WidgetID("tab.scene")) { state.clipboardPage = false }
+        Button(state.clipboardPage ? "[Clipboard]" : "Clipboard", id: WidgetID("tab.clipboard")) {
+          state.clipboardPage = true
+        }
+        Spacer()
+      }
+      if state.clipboardPage {
+        VStack(spacing: 16) {
+          Text("REMOTE CLIPBOARD")
+          Text("Drag to select this text, then copy it to another app.")
+            .fontScale(0.65).selectable(WidgetID("clipboard.label"))
+          TextField(
+            "Copy source", id: WidgetID("clipboard.source"), fontScale: 0.7,
+            text: { state.sourceText }, onChange: { state.sourceText = $0 })
+          Text("Paste target — click, then paste from your local clipboard.").fontScale(0.65)
+          TextField(
+            "Paste here…", id: WidgetID("clipboard.target"), fontScale: 0.7,
+            text: { state.pastedText }, onChange: { state.pastedText = $0 })
+          Text("Demo bindings: Command+C / X / V / A. Escape ends editing.").fontScale(0.55)
+          Spacer()
+        }.padding(20)
+      } else {
+        PerformanceScene(state: state)
+      }
+    }.padding(12)
   }
 }

@@ -111,3 +111,29 @@ swift run --package-path Example -c release RemoteDemoDaemon --benchmark
 
 This reports cold-frame draw time, mean draw time over 60 subsequent frames,
 and command count. It does not include wire encoding or client rendering.
+
+### Remote clipboard and app-owned input
+
+The remote demo has **Scene** and **Clipboard** tabs. In Clipboard, drag across
+selectable text or edit the copy-source field, then paste into the target field
+or another local application. The demo application chooses Command+C/X/V/A;
+the remote client does not hardcode these shortcuts. Escape ends editing.
+
+`RemoteServer.keyBindings` supplies the app's movement-mode bindings;
+`editingKeyBindings` overlays them while editing. Both default to empty, and
+bindings may be overridden or explicitly disabled. Configure modifiers for the
+client platform, not the daemon's host OS.
+
+Protocol v2 transports normalized keys and platform-produced text candidates.
+Pointer events and keys are sent immediately in order; NIO deliveries enter the
+main queue in FIFO order. Clipboard operations use sequence-correlated requests
+and replies. The client alone accesses `NSPasteboard`. Subsequent input waits
+for clipboard completion (or a five-second timeout), while frames continue.
+Cut deletes only after a successful clipboard write and an unchanged editor
+selection. Clipboard payloads are limited to 1 MiB of encoded data. The current
+server supports one active client, and rejects competing connections.
+
+This remains a plain-text prototype: use a trusted connection or protected
+tunnel, not an exposed unauthenticated TCP port. Full IME composition, rich
+clipboard formats, and native Edit-menu integration are not implemented.
+Protocol v1 peers must be rebuilt together with the client and daemon.

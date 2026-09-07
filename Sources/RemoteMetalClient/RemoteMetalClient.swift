@@ -18,6 +18,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   private let view: ChromaInputView
   private let window: NSWindow
   private var latestFrame: (viewport: Size, commands: [DrawCommand])?
+  private var clipboardGenerations: [UInt64: Int] = [:]
   private var inputSequence: UInt64 = 0
   private var isShuttingDown = false
   private var statisticsStartedAt = ProcessInfo.processInfo.systemUptime
@@ -45,7 +46,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     view.isPaused = true
     view.enableSetNeedsDisplay = true
     self.view = view
-    view.keyBindings = Self.remoteKeyBindings
+
     self.displayRenderer = try MetalDisplayListRenderer(device: device, pixelFormat: view.colorPixelFormat)
     self.window = NSWindow(
       contentRect: frame, styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -57,6 +58,14 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     window.center()
     view.delegate = self
     view.onInputAvailable = { [weak self] in self?.sendPendingInput() }
+    view.onRemoteKey = { [weak self] chord, text in
+      guard let self else { return }
+      self.inputSequence &+= 1
+      self.clipboardGenerations[self.inputSequence] = NSPasteboard.general.changeCount
+      // Bound retained gesture metadata even when the app never uses clipboard commands.
+      self.clipboardGenerations = self.clipboardGenerations.filter { $0.key + 1024 > self.inputSequence }
+      self.send(.key(sequence: self.inputSequence, event: RemoteKeyEvent(chord: chord, text: text)))
+    }
   }
 
   public func connect(
@@ -69,12 +78,12 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
         channel.pipeline.addHandler(
           RemoteClientHandler(
             onMessage: { [weak self] message, byteCount, decodeDuration in
-              Task { @MainActor in
+              DispatchQueue.main.async {
                 self?.receive(message, byteCount: byteCount, decodeDuration: decodeDuration)
               }
             },
             onInactive: { [weak self] in
-              Task { @MainActor in self?.connectionClosed() }
+              DispatchQueue.main.async { self?.connectionClosed() }
             }))
       }
       .connect(host: host, port: port).wait()
@@ -131,6 +140,8 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     frameRequestTimer?.invalidate()
     frameRequestTimer = nil
     view.onInputAvailable = nil
+    view.onRemoteKey = nil
+    clipboardGenerations.removeAll()
     view.delegate = nil
     window.delegate = nil
 
@@ -171,24 +182,6 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     Size(width: Float(view.bounds.width), height: Float(view.bounds.height))
   }
 
-  private static var remoteKeyBindings: KeyBindings {
-    KeyBindings {
-      Chroma.bind(.leftArrow, to: .navigation(.left))
-      Chroma.bind(.rightArrow, to: .navigation(.right))
-      Chroma.bind(.upArrow, to: .navigation(.up))
-      Chroma.bind(.downArrow, to: .navigation(.down))
-      Chroma.bind(.pageUp, to: .navigation(.pageUp))
-      Chroma.bind(.pageDown, to: .navigation(.pageDown))
-      Chroma.bind(.enter, to: .action(.activate))
-      Chroma.bind(.space, to: .action(.activate))
-      Chroma.bind(.backspace, to: .editing(.backspace))
-      Chroma.bind(.delete, to: .editing(.deleteForward))
-      Chroma.bind(.home, to: .editing(.moveCaretToStart))
-      Chroma.bind(.end, to: .editing(.moveCaretToEnd))
-      Chroma.bind(.escape, to: .editing(.endEditing))
-    }
-  }
-
   private func sendPendingInput() {
     guard !isShuttingDown else { return }
     inputSequence &+= 1
@@ -213,12 +206,31 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     frameRequestTimer?.invalidate()
     frameRequestTimer = nil
     channel = nil
+    clipboardGenerations.removeAll()
     window.title = "Chroma Remote Client — disconnected"
     print("Remote daemon disconnected")
   }
 
   private func receive(_ message: RemoteMessage, byteCount: Int, decodeDuration: TimeInterval) {
     guard !isShuttingDown else { return }
+    if case .clipboard(let request) = message {
+      guard !request.isReply,
+        let generation = clipboardGenerations.removeValue(forKey: request.id)
+      else { return }
+      let pasteboard = NSPasteboard.general
+      var reply = ClipboardTransfer(id: request.id, isReply: true, success: false)
+      if let text = request.text {
+        if pasteboard.changeCount == generation {
+          pasteboard.clearContents()
+          reply.success = pasteboard.setString(text, forType: .string)
+        }
+      } else if pasteboard.changeCount == generation {
+        reply.text = pasteboard.string(forType: .string)
+        reply.success = true
+      }
+      send(.clipboard(reply))
+      return
+    }
     guard case .frame(let id, _, let viewport, let commands) = message else { return }
     if latestFrame == nil {
       print("Received remote frame \(id) with \(commands.count) draw commands")

@@ -6,6 +6,7 @@ import MetalKit
 
 public final class ChromaInputView: MTKView {
   var interaction: Interaction?
+  public var onRemoteKey: ((KeyChord?, String?) -> Void)?
   public var onInputAvailable: (() -> Void)?
   public var keyBindings = KeyBindings()
   private var pointerPosition = Point(x: -1, y: -1)
@@ -43,7 +44,11 @@ public final class ChromaInputView: MTKView {
     // that ordering for remote consumers so keyDown can finish enqueueing its
     // command before frameInput() drains the accumulator.
     if onInputAvailable != nil {
-      DispatchQueue.main.async { [weak self] in self?.onInputAvailable?() }
+      if onRemoteKey != nil {
+        onInputAvailable?()
+      } else {
+        DispatchQueue.main.async { [weak self] in self?.onInputAvailable?() }
+      }
     }
   }
 
@@ -100,6 +105,12 @@ public final class ChromaInputView: MTKView {
   public override var acceptsFirstResponder: Bool { true }
 
   public override func keyDown(with event: NSEvent) {
+    if let onRemoteKey {
+      let text: String?
+      if case .insert(let value) = Self.textInsertionEvent(for: event) { text = value } else { text = nil }
+      onRemoteKey(Self.keyChord(for: event), text)
+      return
+    }
     scheduleRedraw()
     guard let chord = Self.keyChord(for: event) else {
       if interaction == nil {
