@@ -37,7 +37,7 @@ public final class RemoteServer {
       .childChannelInitializer { channel in channel.pipeline.addHandler(handler) }
       .bind(host: host, port: port).wait()
     print("Chroma remote daemon listening on \(host):\(port)")
-    fflush(stdout)
+    FileHandle.standardOutput.synchronizeFile()
   }
 
   /// Runs the main event loop used to evaluate the `@MainActor` block graph.
@@ -56,7 +56,7 @@ public final class RemoteServer {
   private func receive(_ message: RemoteMessage, from channel: Channel) {
     if clientChannel == nil {
       print("Remote client connected")
-      fflush(stdout)
+      FileHandle.standardOutput.synchronizeFile()
     }
     clientChannel = channel
     switch message {
