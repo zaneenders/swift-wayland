@@ -1,12 +1,14 @@
 import Chroma
 import Dispatch
 import Foundation
+import Logging
 import NIOCore
 import NIOPosix
 import RemoteProtocol
 
 @MainActor
 public final class RemoteServer {
+  private var logger = Logger(label: "chroma.remote.server")
   private let group: MultiThreadedEventLoopGroup
   private var serverChannel: Channel?
   private var clientChannel: Channel?
@@ -57,8 +59,7 @@ public final class RemoteServer {
       .childChannelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
       .childChannelInitializer { channel in channel.pipeline.addHandler(handler) }
       .bind(host: host, port: port).wait()
-    print("Chroma remote daemon listening on \(host):\(port)")
-    fflush(stdout)
+    logger.info("Chroma remote daemon listening", metadata: ["host": "\(host)", "port": "\(port)"])
   }
 
   /// Runs the executor used to evaluate the `@MainActor` block graph.
@@ -82,8 +83,7 @@ public final class RemoteServer {
 
   private func receive(_ message: RemoteMessage, from channel: Channel) {
     if clientChannel == nil {
-      print("Remote client connected")
-      fflush(stdout)
+      logger.info("Remote client connected")
     }
     clientChannel = channel
     switch message {
@@ -142,7 +142,7 @@ public final class RemoteServer {
         drawDuration: drawDuration, encodeDuration: encodeDuration)
       channel.writeAndFlush(bytes, promise: nil)
     } catch {
-      print("Remote frame encoding failed: \(error)")
+      logger.error("Remote frame encoding failed", metadata: ["error": "\(error)"])
     }
   }
 
@@ -159,14 +159,15 @@ public final class RemoteServer {
     guard elapsed >= 1 else { return }
     let frames = max(1, statisticsFrames)
     let megabitsPerSecond = Double(statisticsBytes) * 8 / elapsed / 1_000_000
-    print(
-      String(
-        format: "server %.1f fps | %.2f Mbit/s | %.0f commands/frame | draw %.2f ms | encode %.2f ms",
-        Double(statisticsFrames) / elapsed, megabitsPerSecond,
-        Double(statisticsCommands) / Double(frames),
-        statisticsDrawTime * 1_000 / Double(frames),
-        statisticsEncodeTime * 1_000 / Double(frames)))
-    fflush(stdout)
+    logger.info(
+      "Remote rendering statistics",
+      metadata: [
+        "fps": "\(String(format: "%.1f", Double(statisticsFrames) / elapsed))",
+        "megabits_per_second": "\(String(format: "%.2f", megabitsPerSecond))",
+        "commands_per_frame": "\(String(format: "%.0f", Double(statisticsCommands) / Double(frames)))",
+        "draw_ms": "\(String(format: "%.2f", statisticsDrawTime * 1_000 / Double(frames)))",
+        "encode_ms": "\(String(format: "%.2f", statisticsEncodeTime * 1_000 / Double(frames)))",
+      ])
     statisticsStartedAt = now
     statisticsFrames = 0
     statisticsBytes = 0
