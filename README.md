@@ -43,6 +43,34 @@ shapes. Hover over the list and use the mouse wheel or trackpad, use Page Up/Dow
 or click Top/Bottom. Generate replaces the UUIDs without resetting the scroll
 position; the sidebar header and scene controls remain outside the scroll area.
 
+### Virtualized lists
+
+For uniform-height rows, use the data-driven `LazyVStack` initializer:
+
+```swift
+LazyVStack(
+  id: WidgetID("items"),
+  data: items,
+  rowHeight: 48,
+  spacing: 5,
+  controller: scrollController
+) { item in
+  Text(item.title).padding(8)
+}
+```
+
+It accepts a random-access collection and constructs only rows intersecting the
+viewport—no application-owned row cache or full-list measurement is needed.
+`rowHeight` is the complete row height in logical points, including padding, not
+an estimate. Visible content is rebuilt from current data each frame. Give
+interactive widgets stable IDs derived from their items. The stack owns scrolling;
+constrain its viewport rather than nesting it in `ScrollView`.
+
+The existing `rows:` initializer supports measured, variable-height rows, but is
+only draw-culled: callers construct all rows, and uncached rows are measured even
+when offscreen. It is not the same virtualization guarantee. Dynamic-height
+measurement invalidation and scroll anchoring remain future work.
+
 By default the daemon listens on `127.0.0.1:9328`. It evaluates the Chroma block graph and
 sends complete binary `DrawList` frames over SwiftNIO. The client owns the
 AppKit window and GPU, sends pointer input and resize events to the daemon, and

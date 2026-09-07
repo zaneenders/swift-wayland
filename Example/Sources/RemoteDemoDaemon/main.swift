@@ -243,23 +243,22 @@ private struct UUIDList: Block {
         // LazyVStack owns its scroll viewport; wrapping it in ScrollView would
         // give it the full content height and defeat visible-row culling.
         LazyVStack(
-          id: WidgetID("remote.uuid.scroll"), spacing: 5,
-          controller: state.uuidScrollController,
-          rows: state.identifiers.indices.map { index in
-            LazyVStack.Row(
-              id: WidgetID(state.identifiers[index]),
-              content: VStack(spacing: 3) {
-                Text("UUID \(index + 1)")
-                  .fontScale(remoteSmallText)
-                  .foregroundColor(theme.secondaryForeground)
-                Text(state.identifiers[index])
-                  .fontScale(remoteSmallText)
-                  .foregroundColor(theme.foreground)
-              }
-              .padding(8)
-              .sizing(x: .grow)
-              .roundedBackground(theme.elevatedSurface, radius: 4))
-          })
+          id: WidgetID("remote.uuid.scroll"),
+          data: state.identifiers.indices, rowHeight: 48, spacing: 5,
+          controller: state.uuidScrollController
+        ) { index in
+          VStack(spacing: 3) {
+            Text("UUID \(index + 1)")
+              .fontScale(remoteSmallText)
+              .foregroundColor(theme.secondaryForeground)
+            Text(state.identifiers[index])
+              .fontScale(remoteSmallText)
+              .foregroundColor(theme.foreground)
+          }
+          .padding(8)
+          .sizing(x: .grow)
+          .roundedBackground(theme.elevatedSurface, radius: 4)
+        }
         .padding(8)
         .sizing(x: .grow, y: .grow)
         .border(theme.border)
