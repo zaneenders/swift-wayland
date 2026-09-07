@@ -8,21 +8,19 @@ struct RemoteDemoDaemon {
   static func main() throws {
     let arguments = Array(CommandLine.arguments.dropFirst())
     if arguments.contains("--help") || arguments.contains("-h") {
-      print("usage: RemoteDemoDaemon [bind-host] [port] [fps] [items]")
-      print("example: RemoteDemoDaemon 0.0.0.0 9328 30 2000")
+      print("usage: RemoteDemoDaemon [bind-host] [port] [items]")
+      print("example: RemoteDemoDaemon 0.0.0.0 9328 2000")
       return
     }
     let host = arguments.first ?? "127.0.0.1"
     let port = arguments.dropFirst().first.flatMap(Int.init) ?? 9328
-    let fps = arguments.dropFirst(2).first.flatMap(Double.init) ?? 30
-    let itemCount = arguments.dropFirst(3).first.flatMap(Int.init) ?? 2_000
+    let itemCount = arguments.dropFirst(2).first.flatMap(Int.init) ?? 2_000
 
     let server = RemoteServer(
       content: PerformanceDemo(itemCount: max(1, itemCount)),
       size: Size(width: 1100, height: 720))
-    server.setRefreshRate(fps)
     try server.start(host: host, port: port)
-    print("Performance scene: \(itemCount) animated shapes at \(fps) requested fps")
+    print("Performance scene: \(itemCount) animated shapes; client paces frame requests")
     server.run()
   }
 }

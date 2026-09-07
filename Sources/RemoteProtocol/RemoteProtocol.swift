@@ -16,6 +16,9 @@ public enum RemoteProtocolError: Error, Equatable, Sendable {
 public enum RemoteMessage: Equatable, Sendable {
   case viewport(Size)
   case input(sequence: UInt64, state: InputState)
+  /// Requests one fresh server-side display-list snapshot. The client uses this
+  /// to pace production to its own display loop and avoids queuing stale frames.
+  case requestFrame
   case frame(id: UInt64, inputSequence: UInt64, viewport: Size, commands: [DrawCommand])
 }
 
@@ -28,6 +31,7 @@ public enum RemoteWire {
     case viewport = 1
     case input = 2
     case frame = 3
+    case requestFrame = 4
   }
 
   public static func encode(
@@ -43,6 +47,8 @@ public enum RemoteWire {
       type = .input
       payload.writeInteger(sequence, endianness: .little)
       try payload.writeInput(state)
+    case .requestFrame:
+      type = .requestFrame
     case .frame(let id, let inputSequence, let viewport, let commands):
       type = .frame
       payload.writeInteger(id, endianness: .little)
@@ -94,6 +100,8 @@ public enum RemoteWire {
       message = .viewport(try payload.readSize())
     case .input:
       message = .input(sequence: try payload.read(UInt64.self), state: try payload.readInput())
+    case .requestFrame:
+      message = .requestFrame
     case .frame:
       let id = try payload.read(UInt64.self)
       let sequence = try payload.read(UInt64.self)

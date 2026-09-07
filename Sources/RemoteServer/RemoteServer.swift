@@ -18,8 +18,6 @@ public final class RemoteServer {
   private var frameID: UInt64 = 0
   private var inputSequence: UInt64 = 0
   private var redrawScheduled = false
-  private var refreshInterval: TimeInterval?
-  private var refreshScheduled = false
   private var statisticsStartedAt = ProcessInfo.processInfo.systemUptime
   private var statisticsFrames = 0
   private var statisticsBytes = 0
@@ -32,17 +30,6 @@ public final class RemoteServer {
     self.viewport = size
     self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     interaction.onRedrawRequested = { [weak self] in self?.scheduleRedraw() }
-  }
-
-  /// Continuously produces complete frames for animations and performance tests.
-  /// Pass `0` to return to input/redraw-driven rendering.
-  public func setRefreshRate(_ framesPerSecond: Double) {
-    guard framesPerSecond.isFinite, framesPerSecond > 0 else {
-      refreshInterval = nil
-      return
-    }
-    refreshInterval = 1 / framesPerSecond
-    scheduleRefresh()
   }
 
   public func start(host: String = "127.0.0.1", port: Int = 9328) throws {
@@ -93,6 +80,8 @@ public final class RemoteServer {
     case .input(let sequence, let state):
       inputSequence = sequence
       render(input: state)
+    case .requestFrame:
+      render()
     case .frame:
       break
     }
@@ -105,17 +94,6 @@ public final class RemoteServer {
       guard let self else { return }
       self.redrawScheduled = false
       self.render()
-    }
-  }
-
-  private func scheduleRefresh() {
-    guard !refreshScheduled, let refreshInterval else { return }
-    refreshScheduled = true
-    DispatchQueue.main.asyncAfter(deadline: .now() + refreshInterval) { [weak self] in
-      guard let self else { return }
-      self.refreshScheduled = false
-      self.render()
-      self.scheduleRefresh()
     }
   }
 

@@ -106,17 +106,20 @@ The daemon demo continuously animates a configurable number of shapes. Its
 arguments include target frames per second and shape count:
 
 ```text
-RemoteDemoDaemon [bind-host] [port] [fps] [items]
-RemoteDemoClient [host] [port]
+RemoteDemoDaemon [bind-host] [port] [items]
+RemoteDemoClient [host] [port] [fps]
 ```
 
 For example, test 2,000 animated shapes at 30 requested frames per second:
 
 ```sh
-swift run RemoteDemoDaemon 0.0.0.0 9328 30 2000
+swift run RemoteDemoDaemon 0.0.0.0 9328 2000
 ```
 
-Try progressively heavier runs such as `5000`, `10000`, and `20000` items. Both
+The client requests frames at 30 FPS by default. Override it with, for example,
+`swift run RemoteDemoClient 192.168.1.177 9328 60`. Only one frame request
+is allowed in flight, so a slow network or server does not accumulate stale frames.
+Try progressively heavier daemon runs such as `5000`, `10000`, and `20000` items. Both
 processes print statistics approximately once per second. The daemon reports:
 
 - generated frames per second;

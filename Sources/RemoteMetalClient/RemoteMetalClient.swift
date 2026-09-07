@@ -26,6 +26,9 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   private var statisticsCommands = 0
   private var statisticsDecodeTime: TimeInterval = 0
   private var statisticsRenderTime: TimeInterval = 0
+  private var frameRequestTimer: Timer?
+  private var frameRequestOutstanding = false
+  private var requestedFramesPerSecond: Double = 30
 
   public init(size: Size = Size(width: 800, height: 600), title: String = "Chroma Remote") throws {
     guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
@@ -52,7 +55,10 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     view.onInputAvailable = { [weak self] in self?.sendPendingInput() }
   }
 
-  public func connect(host: String = "127.0.0.1", port: Int = 9328) throws {
+  public func connect(
+    host: String = "127.0.0.1", port: Int = 9328, framesPerSecond: Double = 30
+  ) throws {
+    requestedFramesPerSecond = framesPerSecond.isFinite ? max(1, framesPerSecond) : 30
     let channel = try ClientBootstrap(group: group)
       .channelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
       .channelInitializer { [weak self] channel in
@@ -69,6 +75,23 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     // application run loop to start before the initial viewport was enqueued.
     let write = channel.writeAndFlush(try RemoteWire.encode(.viewport(currentViewport)))
     write.whenFailure { error in print("Initial viewport write failed: \(error)") }
+    startFrameRequests()
+  }
+
+  private func startFrameRequests() {
+    frameRequestTimer?.invalidate()
+    let timer = Timer(timeInterval: 1 / requestedFramesPerSecond, repeats: true) { [weak self] _ in
+      MainActor.assumeIsolated { self?.requestFrameIfNeeded() }
+    }
+    RunLoop.main.add(timer, forMode: .common)
+    frameRequestTimer = timer
+    requestFrameIfNeeded()
+  }
+
+  private func requestFrameIfNeeded() {
+    guard !frameRequestOutstanding else { return }
+    frameRequestOutstanding = true
+    send(.requestFrame)
   }
 
   public func run() {
@@ -96,6 +119,8 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
 
     // Stop AppKit callbacks before closing NIO. Window teardown can otherwise
     // produce resize/input callbacks that try to schedule work on the stopped group.
+    frameRequestTimer?.invalidate()
+    frameRequestTimer = nil
     view.onInputAvailable = nil
     view.delegate = nil
     window.delegate = nil
@@ -177,6 +202,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     if latestFrame == nil {
       print("Received remote frame \(id) with \(commands.count) draw commands")
     }
+    frameRequestOutstanding = false
     latestFrame = (viewport, commands)
     statisticsFrames += 1
     statisticsBytes += byteCount
