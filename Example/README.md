@@ -102,8 +102,13 @@ If the connection fails:
 
 ### Performance scene and metrics
 
-The daemon demo continuously animates a configurable number of shapes. Its
-arguments include target frames per second and shape count:
+The daemon demo continuously animates a configurable number of shapes. The
+remote window is interactive: click (or use the arrow keys and Enter) to pause,
+change density or speed, switch palettes and shape styles, and trigger a phase
+burst. All of that UI state remains on the daemon, demonstrating round-trip
+remote input as well as remote rendering.
+
+Its arguments configure the bind address, port, and initial shape count:
 
 ```text
 RemoteDemoDaemon [bind-host] [port] [items]
