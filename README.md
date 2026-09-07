@@ -30,7 +30,15 @@ swift run --package-path Example RemoteDemoDaemon
 swift run --package-path Example RemoteDemoClient
 ```
 
-The daemon listens on `127.0.0.1:9328`, evaluates the Chroma block graph, and
+To connect across a LAN, bind the daemon to all interfaces and pass its IP or
+hostname to the client:
+
+```sh
+swift run --package-path Example RemoteDemoDaemon 0.0.0.0 9328
+swift run --package-path Example RemoteDemoClient 192.168.1.42 9328
+```
+
+By default the daemon listens on `127.0.0.1:9328`. It evaluates the Chroma block graph and
 sends complete binary `DrawList` frames over SwiftNIO. The client owns the
 AppKit window and GPU, sends pointer input and resize events to the daemon, and
 renders received frames with Metal. This initial prototype sends full frames

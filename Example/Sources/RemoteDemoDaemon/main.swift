@@ -1,13 +1,23 @@
 import Chroma
+import Foundation
 import RemoteServer
 
 @main
 struct RemoteDemoDaemon {
   @MainActor
   static func main() throws {
+    let arguments = Array(CommandLine.arguments.dropFirst())
+    if arguments.contains("--help") || arguments.contains("-h") {
+      print("usage: RemoteDemoDaemon [bind-host] [port]")
+      print("example: RemoteDemoDaemon 0.0.0.0 9328")
+      return
+    }
+    let host = arguments.first ?? "127.0.0.1"
+    let port = arguments.dropFirst().first.flatMap(Int.init) ?? 9328
+
     let state = DemoState()
     let server = RemoteServer(content: DemoView(state: state), size: Size(width: 800, height: 520))
-    try server.start()
+    try server.start(host: host, port: port)
     server.run()
   }
 }
