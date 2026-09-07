@@ -17,8 +17,6 @@ final class PerformanceDemoState {
   }
 
   var clipboardPage = false
-  var widgetsPage = false
-  let widgets = DemoState()
   var pastedText = ""
   var sourceText = "Copy this text — hello from Chroma!"
   let image: ImageResource
@@ -329,19 +327,15 @@ struct PerformanceDemo: Block {
   var body: some Block {
     VStack(spacing: 12) {
       HStack(spacing: 12) {
-        Button(!state.clipboardPage && !state.widgetsPage ? "[Scene]" : "Scene", id: WidgetID("tab.scene")) { state.clipboardPage = false; state.widgetsPage = false }
-        Button(state.clipboardPage && !state.widgetsPage ? "[Clipboard]" : "Clipboard", id: WidgetID("tab.clipboard")) {
-          state.widgetsPage = false
-          state.clipboardPage = true
+        Button(state.clipboardPage ? "Scene" : "[Scene]", id: WidgetID("tab.scene")) {
+          state.clipboardPage = false
         }
-        Button(state.widgetsPage ? "[Widgets]" : "Widgets", id: WidgetID("tab.widgets")) {
-          state.widgetsPage = true
+        Button(state.clipboardPage ? "[Clipboard]" : "Clipboard", id: WidgetID("tab.clipboard")) {
+          state.clipboardPage = true
         }
         Spacer()
       }
-      if state.widgetsPage {
-        DemoView(state: state.widgets)
-      } else if state.clipboardPage {
+      if state.clipboardPage {
         VStack(spacing: 16) {
           Text("CLIPBOARD")
           Text("Drag to select this text, then copy it to another app.")
