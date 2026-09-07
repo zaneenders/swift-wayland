@@ -18,6 +18,20 @@ Run the Wayland/EGL/OpenGL ES demo on Linux:
 swift run --package-path Example ChromaDemo
 ```
 
+Both modes run the same `DemoApplication` from `Example/Sources/DemoContent`.
+The **Scene** tab contains animated shapes and the virtualized UUID list;
+**Clipboard** exercises text editing and copy/paste; **Widgets** contains the
+navigation, text, scrolling, and image examples. `ChromaDemo` selects the local
+native backend at build time. `RemoteDemoDaemon` runs the same content remotely,
+and `RemoteDemoClient` is only a display/input client. There is no runtime
+local/remote switching.
+
+Shared demo smoke tests run without a window or GPU:
+
+```sh
+swift test --package-path Example
+```
+
 ## Remote rendering prototype
 
 On macOS, run the block graph daemon and Metal display client in separate terminals:
@@ -120,7 +134,7 @@ per frame. It does not include networking or client Metal rendering.
 
 ### Remote clipboard and app-owned input
 
-The remote demo has **Scene** and **Clipboard** tabs. In Clipboard, drag across
+The shared demo has **Scene**, **Clipboard**, and **Widgets** tabs. In Clipboard, drag across
 selectable text or edit the copy-source field, then paste into the target field
 or another local application. The demo application chooses Command+C/X/V/A;
 the remote client does not hardcode these shortcuts. Escape ends editing.

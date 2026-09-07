@@ -8,9 +8,12 @@ struct MetalSourceGenerator {
         """
         MetalSourceGenerator is an internal Chroma build tool and is not a demo.
 
-        Run the remote rendering prototype in two terminals:
-          swift run --package-path Example RemoteDemoDaemon
-          swift run --package-path Example RemoteDemoClient
+        Run the local demo:
+          swift run --package-path Example -c release ChromaDemo
+
+        Or run the same demo remotely in two terminals:
+          swift run --package-path Example -c release RemoteDemoDaemon
+          swift run --package-path Example -c release RemoteDemoClient
         """
       )
       return

@@ -2,12 +2,21 @@
 import PackageDescription
 
 var dependencies: [Target.Dependency] = [
-  "DemoImages",
+  "DemoContent",
   .product(name: "Chroma", package: "chroma")
 ]
 var swiftSettings: [SwiftSetting] = []
 var chromaTraits: Set<Package.Dependency.Trait> = []
 var targets: [Target] = [
+  .testTarget(
+    name: "DemoContentTests",
+    dependencies: ["DemoContent", .product(name: "HeadlessBackend", package: "chroma"),
+                   .product(name: "RemoteProtocol", package: "chroma")]
+  ),
+  .target(
+    name: "DemoContent",
+    dependencies: ["DemoImages", .product(name: "Chroma", package: "chroma")]
+  ),
   .target(
     name: "DemoImages",
     dependencies: [.product(name: "Chroma", package: "chroma")]
@@ -15,7 +24,7 @@ var targets: [Target] = [
   .executableTarget(
     name: "RemoteDemoDaemon",
     dependencies: [
-      "DemoImages",
+      "DemoContent",
       .product(name: "Chroma", package: "chroma"),
       .product(name: "RemoteServer", package: "chroma"),
       .product(name: "RemoteProtocol", package: "chroma"),
