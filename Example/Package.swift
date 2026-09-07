@@ -18,6 +18,7 @@ var targets: [Target] = [
       "DemoImages",
       .product(name: "Chroma", package: "chroma"),
       .product(name: "RemoteServer", package: "chroma"),
+      .product(name: "RemoteProtocol", package: "chroma"),
       .product(name: "HeadlessBackend", package: "chroma"),
     ]
   ),

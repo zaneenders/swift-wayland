@@ -26,6 +26,14 @@ public final class RemoteServer {
   private var frameID: UInt64 = 0
   private var inputSequence: UInt64 = 0
   private var redrawScheduled = false
+  private let frameQueue = LatestFrameQueue<FrameSnapshot>()
+  private let encodingQueue = DispatchQueue(label: "chroma.remote.frame-encoding")
+  private struct FrameSnapshot: Sendable {
+    let message: RemoteMessage
+    let channel: Channel
+    let drawDuration: TimeInterval
+    let commandCount: Int
+  }
   private var statisticsStartedAt = ProcessInfo.processInfo.systemUptime
   private var statisticsFrames = 0
   private var statisticsBytes = 0
@@ -70,7 +78,10 @@ public final class RemoteServer {
   }
 
   public func shutdown() throws {
-    try clientChannel?.close().wait()
+    frameQueue.discardPending()
+    let client = clientChannel
+    clientChannel = nil
+    try client?.close().wait()
     try serverChannel?.close().wait()
     try group.syncShutdownGracefully()
   }
@@ -198,6 +209,7 @@ public final class RemoteServer {
   fileprivate func disconnected(_ channel: Channel) {
     guard clientChannel === channel else { return }
     clientChannel = nil
+    frameQueue.discardPending()
     pendingClipboard = nil
     clipboardEpoch &+= 1
     clipboardSnapshot = nil
@@ -232,18 +244,56 @@ public final class RemoteServer {
     _ = interaction.consumeRedrawRequest()
     let drawDuration = ProcessInfo.processInfo.systemUptime - drawStarted
     frameID &+= 1
-    do {
-      let encodeStarted = ProcessInfo.processInfo.systemUptime
-      let bytes = try RemoteWire.encode(
-        .frame(id: frameID, inputSequence: inputSequence, viewport: viewport, commands: drawList.commands))
-      let encodeDuration = ProcessInfo.processInfo.systemUptime - encodeStarted
-      recordStatistics(
-        byteCount: bytes.readableBytes, commandCount: drawList.commands.count,
-        drawDuration: drawDuration, encodeDuration: encodeDuration)
-      channel.writeAndFlush(bytes, promise: nil)
-    } catch {
-      logger.error("Remote frame encoding failed", metadata: ["error": "\(error)"])
+    let snapshot = FrameSnapshot(
+      message: .frame(id: frameID, inputSequence: inputSequence, viewport: viewport, commands: drawList.commands),
+      channel: channel, drawDuration: drawDuration, commandCount: drawList.commands.count)
+    if let next = frameQueue.submit(snapshot) { encodeFrame(next) }
+  }
+
+  private func encodeFrame(_ snapshot: FrameSnapshot) {
+    // The graph and interaction remain main-actor isolated. Only its immutable,
+    // Sendable display list crosses to this worker; input never waits on encoding.
+    encodingQueue.async { [weak self] in
+      let started = ProcessInfo.processInfo.systemUptime
+      let result = Result { try RemoteWire.encode(snapshot.message) }
+      let duration = ProcessInfo.processInfo.systemUptime - started
+      DispatchQueue.main.async { [weak self] in
+        self?.encodedFrame(snapshot, result: result, duration: duration)
+      }
     }
+  }
+
+  private func encodedFrame(
+    _ snapshot: FrameSnapshot, result: Result<ByteBuffer, Error>, duration: TimeInterval
+  ) {
+    // Never deliver work from an old connection to a newly connected client.
+    guard clientChannel === snapshot.channel, snapshot.channel.isActive else {
+      completeFrame()
+      return
+    }
+    switch result {
+    case .success(let bytes):
+      recordStatistics(
+        byteCount: bytes.readableBytes, commandCount: snapshot.commandCount,
+        drawDuration: snapshot.drawDuration, encodeDuration: duration)
+      // Keep the slot occupied until NIO drains this write. Otherwise a slow
+      // connection would accumulate encoded frames even with bounded encoding.
+      snapshot.channel.writeAndFlush(bytes).whenComplete { [weak self] result in
+        DispatchQueue.main.async {
+          if case .failure(let error) = result {
+            self?.logger.error("Remote frame write failed", metadata: ["error": "\(error)"])
+          }
+          self?.completeFrame()
+        }
+      }
+    case .failure(let error):
+      logger.error("Remote frame encoding failed", metadata: ["error": "\(error)"])
+      completeFrame()
+    }
+  }
+
+  private func completeFrame() {
+    if let next = frameQueue.complete() { encodeFrame(next) }
   }
 
   private func recordStatistics(

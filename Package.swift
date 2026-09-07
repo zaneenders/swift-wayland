@@ -10,6 +10,7 @@ var products: [Product] = [
 ]
 
 var targets: [Target] = [
+  .testTarget(name: "RemoteServerTests", dependencies: ["RemoteServer"]),
   .testTarget(
     name: "ChromaTests",
     dependencies: ["Chroma", "ChromaFont", "HeadlessBackend"]
