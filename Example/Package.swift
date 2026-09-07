@@ -12,6 +12,7 @@ var targets: [Target] = [
     dependencies: [
       .product(name: "Chroma", package: "chroma"),
       .product(name: "RemoteServer", package: "chroma"),
+      .product(name: "HeadlessBackend", package: "chroma"),
     ]
   ),
 ]

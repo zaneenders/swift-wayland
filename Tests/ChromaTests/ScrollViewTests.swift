@@ -269,7 +269,7 @@ struct ScrollViewTests {
     let interaction = Interaction()
     let controller = ScrollViewController()
     let counter = DrawCounter()
-    let rows = (0..<10).map { index in
+    let rows = (0..<10_000).map { index in
       LazyVStack.Row(
         id: WidgetID("row-\(index)"),
         content: CountedRow(index: index, height: 10, counter: counter))
@@ -286,7 +286,7 @@ struct ScrollViewTests {
     }
 
     frame()
-    #expect(counter.measured == Array(0..<10))
+    #expect(counter.measured == Array(0..<10_000))
     #expect(counter.drawn == [0, 1, 2])
 
     counter.measured = []
@@ -295,6 +295,18 @@ struct ScrollViewTests {
     frame()
     #expect(counter.measured.isEmpty)
     #expect(counter.drawn == [4, 5, 6, 7])
+
+    counter.drawn = []
+    controller.scrollToBottom()
+    frame()
+    #expect(counter.measured.isEmpty)
+    #expect(counter.drawn == [9_997, 9_998, 9_999])
+
+    counter.drawn = []
+    controller.scrollToTop()
+    frame()
+    #expect(counter.measured.isEmpty)
+    #expect(counter.drawn == [0, 1, 2])
   }
 
   @Test func clippedLeafCannotBeHitOutsideViewport() {

@@ -1,14 +1,16 @@
 import Chroma
 import Foundation
+import HeadlessBackend
 import RemoteServer
 
 @main
 struct RemoteDemoDaemon {
   @MainActor
   static func main() throws {
-    let arguments = Array(CommandLine.arguments.dropFirst())
+    let benchmark = CommandLine.arguments.contains("--benchmark")
+    let arguments = Array(CommandLine.arguments.dropFirst()).filter { $0 != "--benchmark" }
     if arguments.contains("--help") || arguments.contains("-h") {
-      print("usage: RemoteDemoDaemon [bind-host] [port] [items]")
+      print("usage: RemoteDemoDaemon [bind-host] [port] [items] [--benchmark]")
       print("example: RemoteDemoDaemon 0.0.0.0 9328 2000")
       return
     }
@@ -16,6 +18,27 @@ struct RemoteDemoDaemon {
     let port = arguments.dropFirst().first.flatMap(Int.init) ?? 9328
     let itemCount = arguments.dropFirst(2).first.flatMap(Int.init) ?? 2_000
     let state = PerformanceDemoState(itemCount: itemCount)
+
+    if benchmark {
+      let renderer = HeadlessRenderer(size: Size(width: 1100, height: 720))
+      renderer.content = PerformanceDemo(state: state).chromaTheme(.dark)
+      // Report cold layout separately from steady-state frames with cached row sizes.
+      var total: TimeInterval = 0
+      var commandCount = 0
+      for frame in 0...60 {
+        let started = ProcessInfo.processInfo.systemUptime
+        let list = renderer.render()
+        let elapsed = ProcessInfo.processInfo.systemUptime - started
+        commandCount = list.commands.count
+        if frame == 0 {
+          print(String(format: "cold draw %.2f ms | %d commands", elapsed * 1000, commandCount))
+        } else {
+          total += elapsed
+        }
+      }
+      print(String(format: "mean draw %.2f ms | %d commands | 60 frames", total * 1000 / 60, commandCount))
+      return
+    }
 
     let server = RemoteServer(
       content: PerformanceDemo(state: state).chromaTheme(.dark),
@@ -217,10 +240,15 @@ private struct UUIDList: Block {
             state.uuidScrollController.scrollToBottom()
           }
         }
-        ScrollView(id: WidgetID("remote.uuid.scroll"), controller: state.uuidScrollController) {
-          VStack(spacing: 5) {
-            for index in state.identifiers.indices {
-              VStack(spacing: 3) {
+        // LazyVStack owns its scroll viewport; wrapping it in ScrollView would
+        // give it the full content height and defeat visible-row culling.
+        LazyVStack(
+          id: WidgetID("remote.uuid.scroll"), spacing: 5,
+          controller: state.uuidScrollController,
+          rows: state.identifiers.indices.map { index in
+            LazyVStack.Row(
+              id: WidgetID(state.identifiers[index]),
+              content: VStack(spacing: 3) {
                 Text("UUID \(index + 1)")
                   .fontScale(remoteSmallText)
                   .foregroundColor(theme.secondaryForeground)
@@ -230,11 +258,9 @@ private struct UUIDList: Block {
               }
               .padding(8)
               .sizing(x: .grow)
-              .roundedBackground(theme.elevatedSurface, radius: 4)
-            }
-          }
-          .padding(8)
-        }
+              .roundedBackground(theme.elevatedSurface, radius: 4))
+          })
+        .padding(8)
         .sizing(x: .grow, y: .grow)
         .border(theme.border)
       }

@@ -61,3 +61,20 @@ Chroma ships its authored monospaced bitmap display glyphs plus a pre-rasterized
 Bedstead readable face in `ChromaFont`. Bedstead is CC0/public-domain dedicated.
 Graphical backends build one shared atlas from that bundled data and do not
 require HarfBuzz, FreeType, Fontconfig, or an installed system font.
+
+### Remote list performance
+
+The UUID sidebar uses `LazyVStack` directly (it owns its scroll viewport), so
+only visible rows emit drawing commands. A normal `VStack` inside `ScrollView`
+still measures and draws every row; clipping alone does not reduce server work
+or the remote command stream. The current lazy stack caches row measurements,
+but still constructs row descriptions and scans the cache each frame.
+
+Measure the demo without networking or a GPU, using the same 1100×720 viewport:
+
+```sh
+swift run --package-path Example -c release RemoteDemoDaemon --benchmark
+```
+
+This reports cold-frame draw time, mean draw time over 60 subsequent frames,
+and command count. It does not include wire encoding or client rendering.
