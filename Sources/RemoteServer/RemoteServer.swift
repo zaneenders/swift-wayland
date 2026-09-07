@@ -158,7 +158,9 @@ public final class RemoteServer {
         text = nil
       } else {
         text = event == .cut ? interaction.editableSelectionText() : interaction.copyText()
-        guard let text, !text.isEmpty, text.utf8.count < RemoteWire.maximumClipboardBytes / 6 else { return }
+        // RemoteWire.encode below enforces the actual JSON payload size,
+        // including escaping and metadata, rather than a worst-case text limit.
+        guard let text, !text.isEmpty else { return }
       }
       let id = inputSequence
       clipboardEpoch &+= 1

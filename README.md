@@ -133,6 +133,12 @@ Cut deletes only after a successful clipboard write and an unchanged editor
 selection. Clipboard payloads are limited to 1 MiB of encoded data. The current
 server supports one active client, and rejects competing connections.
 
+The Metal client displays clipboard failures and disconnections in a dismissible
+banner at the top of its window, without taking keyboard focus. Oversized paste
+replies are replaced with a correlated failure reply immediately, so subsequent
+input does not wait for the clipboard timeout. The 1 MiB limit includes JSON
+metadata and escaping, not just the raw clipboard text.
+
 This remains a plain-text prototype: use a trusted connection or protected
 tunnel, not an exposed unauthenticated TCP port. Full IME composition, rich
 clipboard formats, and native Edit-menu integration are not implemented.

@@ -16,9 +16,10 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   private let queue: MTLCommandQueue
   private let displayRenderer: MetalDisplayListRenderer
   private let view: ChromaInputView
+  private let banner = NotificationBanner(frame: .zero)
   private let window: NSWindow
   private var latestFrame: (viewport: Size, commands: [DrawCommand])?
-  private var clipboardGenerations: [UInt64: Int] = [:]
+  private var clipboardGenerations = ClipboardGenerations()
   private var inputSequence: UInt64 = 0
   private var isShuttingDown = false
   private var statisticsStartedAt = ProcessInfo.processInfo.systemUptime
@@ -53,7 +54,18 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
       backing: .buffered, defer: false)
     super.init()
     window.title = title
-    window.contentView = view
+    let container = NSView(frame: frame)
+    view.frame = container.bounds
+    view.autoresizingMask = [.width, .height]
+    container.addSubview(view)
+    banner.translatesAutoresizingMaskIntoConstraints = false
+    container.addSubview(banner)
+    NSLayoutConstraint.activate([
+      banner.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
+      banner.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
+      banner.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
+    ])
+    window.contentView = container
     window.delegate = self
     window.center()
     view.delegate = self
@@ -61,9 +73,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     view.onRemoteKey = { [weak self] chord, text in
       guard let self else { return }
       self.inputSequence &+= 1
-      self.clipboardGenerations[self.inputSequence] = NSPasteboard.general.changeCount
-      // Bound retained gesture metadata even when the app never uses clipboard commands.
-      self.clipboardGenerations = self.clipboardGenerations.filter { $0.key + 1024 > self.inputSequence }
+      self.clipboardGenerations.record(sequence: self.inputSequence, generation: NSPasteboard.general.changeCount)
       self.send(.key(sequence: self.inputSequence, event: RemoteKeyEvent(chord: chord, text: text)))
     }
   }
@@ -208,27 +218,45 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     channel = nil
     clipboardGenerations.removeAll()
     window.title = "Chroma Remote Client — disconnected"
+    banner.show("Disconnected from the remote daemon. Close this window and reconnect to continue.")
     print("Remote daemon disconnected")
   }
 
   private func receive(_ message: RemoteMessage, byteCount: Int, decodeDuration: TimeInterval) {
     guard !isShuttingDown else { return }
     if case .clipboard(let request) = message {
-      guard !request.isReply,
-        let generation = clipboardGenerations.removeValue(forKey: request.id)
-      else { return }
+      guard !request.isReply else { return }
+      guard let generation = clipboardGenerations.consume(sequence: request.id) else {
+        banner.show("Clipboard operation failed: the input gesture has expired. Please try again.")
+        send(.clipboard(ClipboardTransfer(id: request.id, isReply: true, success: false)))
+        return
+      }
       let pasteboard = NSPasteboard.general
       var reply = ClipboardTransfer(id: request.id, isReply: true, success: false)
       if let text = request.text {
         if pasteboard.changeCount == generation {
           pasteboard.clearContents()
           reply.success = pasteboard.setString(text, forType: .string)
+          if reply.success {
+            clipboardGenerations.didWrite(
+              sequence: request.id, from: generation, to: pasteboard.changeCount)
+          }
         }
       } else if pasteboard.changeCount == generation {
         reply.text = pasteboard.string(forType: .string)
         reply.success = true
       }
-      send(.clipboard(reply))
+      if !reply.success {
+        banner.show("Clipboard operation failed: the clipboard changed or could not be written. Please try again.")
+      }
+      do {
+        let result = try ClipboardReplyEncoder.encode(reply)
+        if let notification = result.notification { banner.show(notification) }
+        channel?.writeAndFlush(result.bytes, promise: nil)
+      } catch {
+        banner.show("Clipboard operation failed: could not encode the reply. Please try again.")
+        send(.clipboard(ClipboardTransfer(id: request.id, isReply: true, success: false)))
+      }
       return
     }
     guard case .frame(let id, _, let viewport, let commands) = message else { return }
