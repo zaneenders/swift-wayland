@@ -33,18 +33,23 @@ public final class RemoteServer {
   }
 
   public func start(host: String = "127.0.0.1", port: Int = 9328) throws {
-    let handler = RemoteServerHandler { [weak self] channel, message in
-      Task { @MainActor in self?.receive(message, from: channel) }
-    } onInactive: { [weak self] channel in
-      Task { @MainActor in
-        if self?.clientChannel === channel { self?.clientChannel = nil }
-      }
-    }
+    // A ChannelHandler is stateful and may only belong to one channel. Construct
+    // a new handler for every accepted connection so reconnecting after a probe
+    // (`nc`) or a closed client does not cause NIO to reset the new connection.
     serverChannel = try ServerBootstrap(group: group)
       .serverChannelOption(ChannelOptions.backlog, value: 8)
       .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
       .childChannelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
-      .childChannelInitializer { channel in channel.pipeline.addHandler(handler) }
+      .childChannelInitializer { [weak self] channel in
+        channel.pipeline.addHandler(
+          RemoteServerHandler { [weak self] channel, message in
+            Task { @MainActor in self?.receive(message, from: channel) }
+          } onInactive: { [weak self] channel in
+            Task { @MainActor in
+              if self?.clientChannel === channel { self?.clientChannel = nil }
+            }
+          })
+      }
       .bind(host: host, port: port).wait()
     logger.info("Chroma remote daemon listening", metadata: ["host": "\(host)", "port": "\(port)"])
   }

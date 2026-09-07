@@ -63,11 +63,15 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
       .channelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
       .channelInitializer { [weak self] channel in
         channel.pipeline.addHandler(
-          RemoteClientHandler { [weak self] message, byteCount, decodeDuration in
-            Task { @MainActor in
-              self?.receive(message, byteCount: byteCount, decodeDuration: decodeDuration)
-            }
-          })
+          RemoteClientHandler(
+            onMessage: { [weak self] message, byteCount, decodeDuration in
+              Task { @MainActor in
+                self?.receive(message, byteCount: byteCount, decodeDuration: decodeDuration)
+              }
+            },
+            onInactive: { [weak self] in
+              Task { @MainActor in self?.connectionClosed() }
+            }))
       }
       .connect(host: host, port: port).wait()
     self.channel = channel
@@ -196,6 +200,15 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     }
   }
 
+  private func connectionClosed() {
+    guard !isShuttingDown else { return }
+    frameRequestTimer?.invalidate()
+    frameRequestTimer = nil
+    channel = nil
+    window.title = "Chroma Remote Client — disconnected"
+    print("Remote daemon disconnected")
+  }
+
   private func receive(_ message: RemoteMessage, byteCount: Int, decodeDuration: TimeInterval) {
     guard !isShuttingDown else { return }
     guard case .frame(let id, _, let viewport, let commands) = message else { return }
@@ -238,9 +251,14 @@ private final class RemoteClientHandler: ChannelInboundHandler, @unchecked Senda
   typealias InboundIn = ByteBuffer
   private var buffer = ByteBuffer()
   private let onMessage: @Sendable (RemoteMessage, Int, TimeInterval) -> Void
+  private let onInactive: @Sendable () -> Void
 
-  init(onMessage: @escaping @Sendable (RemoteMessage, Int, TimeInterval) -> Void) {
+  init(
+    onMessage: @escaping @Sendable (RemoteMessage, Int, TimeInterval) -> Void,
+    onInactive: @escaping @Sendable () -> Void
+  ) {
     self.onMessage = onMessage
+    self.onInactive = onInactive
   }
 
   func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -259,6 +277,11 @@ private final class RemoteClientHandler: ChannelInboundHandler, @unchecked Senda
       context.fireErrorCaught(error)
       context.close(promise: nil)
     }
+  }
+
+  func channelInactive(context: ChannelHandlerContext) {
+    onInactive()
+    context.fireChannelInactive()
   }
 
   func errorCaught(context: ChannelHandlerContext, error: Error) {
