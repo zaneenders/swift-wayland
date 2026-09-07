@@ -49,10 +49,17 @@ private final class PerformanceDemoState {
   var timeOffset: TimeInterval = 0
   var pauseStartedAt: TimeInterval?
   var burst = 0
+  let uuidScrollController = ScrollViewController()
+  var identifiers = (1...10_000).map { _ in UUID().uuidString }
   var lastAction = "Ready — choose a control"
 
   init(itemCount: Int) {
     self.itemCount = min(20_000, max(100, itemCount))
+  }
+
+  func regenerateIdentifiers() {
+    identifiers = (1...10_000).map { _ in UUID().uuidString }
+    lastAction = "Generated 10,000 new UUIDs"
   }
 
   func adjustItems(by amount: Int) {
@@ -159,9 +166,15 @@ private struct PerformanceDemo: Block {
         .background(theme.surface)
         .border(theme.border)
 
-        ShapeCanvas(state: state)
-          .sizing(x: .grow, y: .grow)
-          .clipped()
+        HStack(spacing: 10) {
+          ShapeCanvas(state: state)
+            .sizing(x: .grow, y: .grow)
+            .clipped()
+
+          UUIDList(state: state)
+            .sizing(x: .fixed(330), y: .grow)
+        }
+        .padding(10)
 
         HStack(spacing: 12) {
           Text(state.lastAction)
@@ -177,6 +190,57 @@ private struct PerformanceDemo: Block {
         .border(theme.border)
       }
       .background(theme.background)
+    }
+  }
+}
+
+private struct UUIDList: Block {
+  let state: PerformanceDemoState
+
+  var body: some Block {
+    ThemeReader { theme in
+      VStack(spacing: 8) {
+        Text("\(state.identifiers.count) UUIDs / SCROLL TEST")
+          .fontScale(remoteSmallText)
+          .foregroundColor(theme.accent)
+        Text("Scroll here with the wheel or trackpad.")
+          .fontScale(remoteSmallText)
+          .foregroundColor(theme.secondaryForeground)
+        HStack(spacing: 6) {
+          Button("Generate", id: WidgetID("remote.uuid.generate"), fontScale: remoteSmallText) {
+            state.regenerateIdentifiers()
+          }
+          Button("Top", id: WidgetID("remote.uuid.top"), fontScale: remoteSmallText) {
+            state.uuidScrollController.scrollToTop()
+          }
+          Button("Bottom", id: WidgetID("remote.uuid.bottom"), fontScale: remoteSmallText) {
+            state.uuidScrollController.scrollToBottom()
+          }
+        }
+        ScrollView(id: WidgetID("remote.uuid.scroll"), controller: state.uuidScrollController) {
+          VStack(spacing: 5) {
+            for index in state.identifiers.indices {
+              VStack(spacing: 3) {
+                Text("UUID \(index + 1)")
+                  .fontScale(remoteSmallText)
+                  .foregroundColor(theme.secondaryForeground)
+                Text(state.identifiers[index])
+                  .fontScale(remoteSmallText)
+                  .foregroundColor(theme.foreground)
+              }
+              .padding(8)
+              .sizing(x: .grow)
+              .roundedBackground(theme.elevatedSurface, radius: 4)
+            }
+          }
+          .padding(8)
+        }
+        .sizing(x: .grow, y: .grow)
+        .border(theme.border)
+      }
+      .padding(10)
+      .background(theme.surface)
+      .border(theme.border)
     }
   }
 }

@@ -38,6 +38,11 @@ swift run --package-path Example RemoteDemoDaemon 0.0.0.0 9328
 swift run --package-path Example RemoteDemoClient 192.168.1.42 9328
 ```
 
+The remote demo includes a scrollable sidebar of 10,000 UUIDs beside the animated
+shapes. Hover over the list and use the mouse wheel or trackpad, use Page Up/Down,
+or click Top/Bottom. Generate replaces the UUIDs without resetting the scroll
+position; the sidebar header and scene controls remain outside the scroll area.
+
 By default the daemon listens on `127.0.0.1:9328`. It evaluates the Chroma block graph and
 sends complete binary `DrawList` frames over SwiftNIO. The client owns the
 AppKit window and GPU, sends pointer input and resize events to the daemon, and

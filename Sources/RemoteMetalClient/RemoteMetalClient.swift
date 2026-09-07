@@ -177,6 +177,8 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
       Chroma.bind(.rightArrow, to: .navigation(.right))
       Chroma.bind(.upArrow, to: .navigation(.up))
       Chroma.bind(.downArrow, to: .navigation(.down))
+      Chroma.bind(.pageUp, to: .navigation(.pageUp))
+      Chroma.bind(.pageDown, to: .navigation(.pageDown))
       Chroma.bind(.enter, to: .action(.activate))
       Chroma.bind(.space, to: .action(.activate))
       Chroma.bind(.backspace, to: .editing(.backspace))
