@@ -42,14 +42,20 @@ public final class RemoteServer {
       .childChannelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
       .childChannelInitializer { [weak self] channel in
         guard let self else { return channel.eventLoop.makeSucceededVoidFuture() }
+        self.logger.debug("Accepted remote TCP connection")
         return channel.pipeline.addHandler(
-          RemoteServerHandler { channel, message in
-            Task { @MainActor [weak self] in self?.receive(message, from: channel) }
-          } onInactive: { channel in
-            Task { @MainActor [weak self] in
-              if self?.clientChannel === channel { self?.clientChannel = nil }
-            }
-          })
+          RemoteServerHandler(
+            onMessage: { channel, message in
+              Task { @MainActor [weak self] in self?.receive(message, from: channel) }
+            },
+            onInactive: { channel in
+              Task { @MainActor [weak self] in
+                if self?.clientChannel === channel { self?.clientChannel = nil }
+              }
+            },
+            onError: { [logger = self.logger] error in
+              logger.error("Remote channel failed", metadata: ["error": "\(error)"])
+            }))
       }
       .bind(host: host, port: port).wait()
     logger.info("Chroma remote daemon listening", metadata: ["host": "\(host)", "port": "\(port)"])
@@ -166,13 +172,16 @@ private final class RemoteServerHandler: ChannelInboundHandler, @unchecked Senda
   private var buffer = ByteBuffer()
   private let onMessage: @Sendable (Channel, RemoteMessage) -> Void
   private let onInactive: @Sendable (Channel) -> Void
+  private let onError: @Sendable (Error) -> Void
 
   init(
     onMessage: @escaping @Sendable (Channel, RemoteMessage) -> Void,
-    onInactive: @escaping @Sendable (Channel) -> Void
+    onInactive: @escaping @Sendable (Channel) -> Void,
+    onError: @escaping @Sendable (Error) -> Void
   ) {
     self.onMessage = onMessage
     self.onInactive = onInactive
+    self.onError = onError
   }
 
   func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -191,7 +200,7 @@ private final class RemoteServerHandler: ChannelInboundHandler, @unchecked Senda
 
   func channelInactive(context: ChannelHandlerContext) { onInactive(context.channel) }
   func errorCaught(context: ChannelHandlerContext, error: Error) {
-    print("Remote client error: \(error)")
+    onError(error)
     context.close(promise: nil)
   }
 }
