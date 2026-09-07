@@ -29,6 +29,10 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   private var frameRequestTimer: Timer?
   private var frameRequestOutstanding = false
   private var requestedFramesPerSecond: Double = 30
+  // AppKit window/delegate relationships are not owning. Keep the coordinator
+  // alive for the duration of NSApplication.run(), even when its caller's local
+  // variable is no longer considered live by the optimizer.
+  private var lifetimeRetain: RemoteMetalClient?
 
   public init(size: Size = Size(width: 800, height: 600), title: String = "Chroma Remote") throws {
     guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
@@ -99,6 +103,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   }
 
   public func run() {
+    lifetimeRetain = self
     let app = NSApplication.shared
     app.setActivationPolicy(.regular)
     window.makeKeyAndOrderFront(nil)
@@ -135,6 +140,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
       try? openChannel.close().wait()
     }
     try? group.syncShutdownGracefully()
+    lifetimeRetain = nil
   }
 
   public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}

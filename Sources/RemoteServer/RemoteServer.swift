@@ -41,11 +41,12 @@ public final class RemoteServer {
       .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
       .childChannelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
       .childChannelInitializer { [weak self] channel in
-        channel.pipeline.addHandler(
-          RemoteServerHandler { [weak self] channel, message in
-            Task { @MainActor in self?.receive(message, from: channel) }
-          } onInactive: { [weak self] channel in
-            Task { @MainActor in
+        guard let self else { return channel.eventLoop.makeSucceededVoidFuture() }
+        return channel.pipeline.addHandler(
+          RemoteServerHandler { channel, message in
+            Task { @MainActor [weak self] in self?.receive(message, from: channel) }
+          } onInactive: { channel in
+            Task { @MainActor [weak self] in
               if self?.clientChannel === channel { self?.clientChannel = nil }
             }
           })
