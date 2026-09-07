@@ -16,6 +16,7 @@ permissions:
 jobs:
   macos:
     name: macOS
+    needs: hygiene
     runs-on: macos-26
     timeout-minutes: 30
     steps:
@@ -33,6 +34,7 @@ jobs:
 
   arch:
     name: Arch Linux
+    needs: hygiene
     runs-on: ubuntu-24.04
     container: archlinux:base-devel
     timeout-minutes: 30
@@ -122,5 +124,5 @@ jobs:
         run: |
           git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$GITHUB_SHA" -- '*.swift' |
             while IFS= read -r swift_file; do
-              swift format lint --strict "$swift_file"
+              swift format lint --strict "$swift_file" || exit 1
             done
