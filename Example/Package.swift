@@ -28,6 +28,21 @@ let package = Package(
       name: "ChromaDemo",
       dependencies: dependencies,
       swiftSettings: swiftSettings
+    ),
+    .executableTarget(
+      name: "RemoteDemoDaemon",
+      dependencies: [
+        .product(name: "Chroma", package: "chroma"),
+        .product(name: "RemoteServer", package: "chroma"),
+      ]
+    ),
+    .executableTarget(
+      name: "RemoteDemoClient",
+      dependencies: [
+        .product(name: "Chroma", package: "chroma"),
+        .product(name: "RemoteMetalClient", package: "chroma"),
+      ],
+      swiftSettings: swiftSettings
     )
   ]
 )

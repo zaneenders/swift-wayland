@@ -1,5 +1,10 @@
 import Foundation
 
+/// Identifies a logical image and its backend texture-cache slot.
+///
+/// Reuse an ID when replacing the pixels of the same logical image. Use a
+/// different ID for an unrelated image. Backends may reuse an uploaded texture
+/// when the ID, generation, and dimensions are unchanged.
 public struct ImageID: Hashable, Sendable {
   public var rawValue: String
 
@@ -12,6 +17,7 @@ public enum ImageResourceError: Error, Equatable, Sendable {
   case invalidDimensions(width: Int, height: Int)
   case pixelCountOverflow
   case invalidByteCount(expected: Int, actual: Int)
+  case generationOverflow
 }
 
 /// A backend-independent, tightly packed RGBA8 image.
@@ -19,6 +25,11 @@ public enum ImageResourceError: Error, Equatable, Sendable {
 /// Pixels are stored top-to-bottom as straight-alpha red, green, blue, and
 /// alpha bytes. Image decoding and color-profile conversion are intentionally
 /// left to the application.
+///
+/// `id` is the stable identity of the logical image/cache slot. `generation`
+/// identifies its pixel revision: whenever the pixels or dimensions change,
+/// create a replacement with ``replacingPixels(width:height:rgba8:)``. Backends
+/// may reuse a texture while ID, generation, and dimensions are unchanged.
 public struct ImageResource: Equatable, Sendable {
   public let id: ImageID
   public let generation: UInt64
@@ -49,6 +60,29 @@ public struct ImageResource: Equatable, Sendable {
     self.width = width
     self.height = height
     self.rgba8 = rgba8
+  }
+
+  /// Returns this logical image with validated replacement pixels and the next
+  /// generation, preserving its stable ID.
+  ///
+  /// This method does not mutate the receiver. It throws `generationOverflow`
+  /// instead of wrapping, because wrapping could make a backend mistake new
+  /// pixels for an already cached generation.
+  public func replacingPixels(
+    width: Int,
+    height: Int,
+    rgba8: Data
+  ) throws -> ImageResource {
+    guard generation < .max else {
+      throw ImageResourceError.generationOverflow
+    }
+    return try ImageResource(
+      id: id,
+      generation: generation + 1,
+      width: width,
+      height: height,
+      rgba8: rgba8
+    )
   }
 
   public var size: Size {

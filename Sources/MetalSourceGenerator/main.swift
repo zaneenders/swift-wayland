@@ -4,7 +4,16 @@ import Foundation
 struct MetalSourceGenerator {
   static func main() throws {
     guard CommandLine.arguments.count == 3 else {
-      throw GeneratorError.usage
+      print(
+        """
+        MetalSourceGenerator is an internal Chroma build tool and is not a demo.
+
+        Run the remote rendering prototype in two terminals:
+          swift run --package-path Example RemoteDemoDaemon
+          swift run --package-path Example RemoteDemoClient
+        """
+      )
+      return
     }
 
     let inputURL = URL(fileURLWithPath: CommandLine.arguments[1])

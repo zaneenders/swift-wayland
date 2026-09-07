@@ -26,6 +26,42 @@ struct ImageRenderingTests {
     }
   }
 
+  @Test func replacingPixelsPreservesIdentityAndIncrementsGeneration() throws {
+    let original = try resource(generation: 41)
+    let pixels = Data(repeating: 7, count: 3 * 2 * 4)
+
+    let replacement = try original.replacingPixels(width: 3, height: 2, rgba8: pixels)
+
+    #expect(replacement.id == original.id)
+    #expect(replacement.generation == 42)
+    #expect(replacement.width == 3)
+    #expect(replacement.height == 2)
+    #expect(replacement.rgba8 == pixels)
+    #expect(original.generation == 41)
+    #expect(original.width == 2)
+    #expect(original.height == 1)
+  }
+
+  @Test func replacingPixelsValidatesBeforeReturningReplacement() throws {
+    let original = try resource()
+
+    #expect(throws: ImageResourceError.invalidDimensions(width: 0, height: 1)) {
+      try original.replacingPixels(width: 0, height: 1, rgba8: Data())
+    }
+    #expect(throws: ImageResourceError.invalidByteCount(expected: 8, actual: 7)) {
+      try original.replacingPixels(
+        width: 2, height: 1, rgba8: Data(repeating: 0, count: 7))
+    }
+  }
+
+  @Test func replacingPixelsRejectsGenerationOverflow() throws {
+    let image = try resource(generation: .max)
+
+    #expect(throws: ImageResourceError.generationOverflow) {
+      try image.replacingPixels(width: 2, height: 1, rgba8: image.rgba8)
+    }
+  }
+
   @Test func scalingModesResolveCenteredGeometry() {
     let destination = Rect(x: 10, y: 20, width: 100, height: 100)
     let source = Size(width: 200, height: 100)
@@ -73,10 +109,99 @@ struct ImageRenderingTests {
     #expect(ImageAlignment(x: .infinity, y: .nan) == .center)
   }
 
+  @Test func imageUsesIntrinsicSizeWithoutImplicitExpansion() throws {
+    let image = Image(try resource(width: 80, height: 40))
+    let proposal = Size(width: 300, height: 200)
+    let context = RenderContext()
+
+    #expect(BlockEngine.measure(image, proposal: proposal, context: context) == image.resource.size)
+    #expect(BlockEngine.measure(image.sizing(), proposal: proposal, context: context) == image.resource.size)
+    #expect(!BlockEngine.expandsHorizontally(image))
+    #expect(!BlockEngine.expandsVertically(image))
+  }
+
+  @Test func imageCanOptIntoExpansionIndependentlyOnEachAxis() throws {
+    let image = Image(try resource(width: 80, height: 40))
+    let proposal = Size(width: 300, height: 200)
+    let context = RenderContext()
+    let horizontal = image.sizing(x: .grow)
+    let vertical = image.sizing(y: .grow)
+
+    #expect(BlockEngine.measure(horizontal, proposal: proposal, context: context) == Size(width: 300, height: 40))
+    #expect(BlockEngine.expandsHorizontally(horizontal))
+    #expect(!BlockEngine.expandsVertically(horizontal))
+    #expect(BlockEngine.measure(vertical, proposal: proposal, context: context) == Size(width: 80, height: 200))
+    #expect(!BlockEngine.expandsHorizontally(vertical))
+    #expect(BlockEngine.expandsVertically(vertical))
+  }
+
+  @Test func imageInStackKeepsIntrinsicSize() throws {
+    let image = try resource(width: 80, height: 40)
+    let stack = HStack(spacing: 5) {
+      Image(image)
+      Image(image)
+    }
+    let context = RenderContext()
+
+    #expect(
+      BlockEngine.measure(
+        stack, proposal: Size(width: 300, height: 200), context: context)
+        == Size(width: 165, height: 40))
+  }
+
+  @Test func imageInFixedFrameUsesAssignedRectForEveryScalingMode() throws {
+    let resource = try resource(width: 80, height: 40)
+    let frame = Rect(x: 0, y: 0, width: 100, height: 100)
+    let context = RenderContext()
+
+    for scaling in [ImageScaling.contain, .cover, .stretch] {
+      let image = Image(resource, scaling: scaling).sizing(
+        x: .fixed(frame.size.width), y: .fixed(frame.size.height))
+      var list = DrawList()
+      BlockEngine.draw(image, into: &list, in: frame, context: context)
+
+      #expect(
+        list.commands == [
+          .image(rect: frame, image: resource, scaling: scaling, alignment: .center)
+        ])
+    }
+  }
+
+  @Test func imageInScrollViewUsesIntrinsicContentSize() throws {
+    let resource = try resource(width: 80, height: 40)
+    let interaction = Interaction()
+    let context = RenderContext(interaction: interaction)
+    let viewport = Rect(x: 0, y: 0, width: 100, height: 20)
+    interaction.beginFrame(input: InputState())
+    var list = DrawList()
+
+    BlockEngine.draw(
+      ScrollView(id: WidgetID("image-scroll"), showsIndicator: false) {
+        Image(resource)
+      },
+      into: &list,
+      in: viewport,
+      context: context
+    )
+    interaction.endFrame()
+
+    #expect(interaction.scrollLimit(for: WidgetID("image-scroll")) == 20)
+    #expect(interaction.horizontalScrollLimit(for: WidgetID("image-scroll")) == 0)
+    #expect(
+      list.commands == [
+        .pushClip(viewport),
+        .image(
+          rect: Rect(x: 0, y: 0, width: 80, height: 40), image: resource,
+          scaling: .contain, alignment: .center),
+        .popClip,
+      ])
+  }
+
   @Test func imageBlockEmitsDeterministicHeadlessCommand() throws {
     let image = try resource()
     let renderer = HeadlessRenderer(size: Size(width: 120, height: 80))
     renderer.content = Image(image, scaling: .cover, alignment: .top)
+      .sizing(x: .grow, y: .grow)
 
     let first = renderer.render()
     let second = renderer.render()
