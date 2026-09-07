@@ -8,11 +8,11 @@ import RemoteProtocol
 
 @MainActor
 public final class RemoteServer {
-  nonisolated private static let connectionLogger = Logger(label: "chroma.remote.server.connection")
   private var logger = Logger(label: "chroma.remote.server")
   private let group: MultiThreadedEventLoopGroup
+  private let connectionFactory: RemoteServerConnectionFactory
   private var serverChannel: Channel?
-  private var clientChannel: Channel?
+  fileprivate var clientChannel: Channel?
   private let interaction = Interaction()
   private var content: (any Block)?
   private var viewport: Size
@@ -30,6 +30,7 @@ public final class RemoteServer {
     self.content = content
     self.viewport = size
     self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+    self.connectionFactory = RemoteServerConnectionFactory()
     interaction.onRedrawRequested = { [weak self] in self?.scheduleRedraw() }
   }
 
@@ -37,28 +38,13 @@ public final class RemoteServer {
     // A ChannelHandler is stateful and may only belong to one channel. Construct
     // a new handler for every accepted connection so reconnecting after a probe
     // (`nc`) or a closed client does not cause NIO to reset the new connection.
+    // Keep NIO's initializer in a nonisolated object. A closure literal created
+    // here inherits @MainActor, while NIO invokes it on its event-loop thread.
+    connectionFactory.server = self
     serverChannel = try ServerBootstrap(group: group)
       .serverChannelOption(ChannelOptions.backlog, value: 8)
       .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
-      .childChannelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
-      .childChannelInitializer { [self] channel in
-        Self.connectionLogger.info("Accepted remote TCP connection")
-        let server: RemoteServer? = self
-        return channel.pipeline.addHandler(
-          RemoteServerHandler(
-            onMessage: { channel, message in
-              Task { @MainActor in server?.receive(message, from: channel) }
-            },
-            onInactive: { channel in
-              Task { @MainActor in
-                if server?.clientChannel === channel { server?.clientChannel = nil }
-              }
-            },
-            onError: { error in
-              Self.connectionLogger.error(
-                "Remote channel failed", metadata: ["error": "\(error)"])
-            }))
-      }
+      .childChannelInitializer(connectionFactory.initialize)
       .bind(host: host, port: port).wait()
     logger.info("Chroma remote daemon listening", metadata: ["host": "\(host)", "port": "\(port)"])
   }
@@ -82,7 +68,7 @@ public final class RemoteServer {
     try group.syncShutdownGracefully()
   }
 
-  private func receive(_ message: RemoteMessage, from channel: Channel) {
+  fileprivate func receive(_ message: RemoteMessage, from channel: Channel) {
     if clientChannel == nil {
       logger.info("Remote client connected")
     }
@@ -166,6 +152,28 @@ public final class RemoteServer {
     statisticsCommands = 0
     statisticsDrawTime = 0
     statisticsEncodeTime = 0
+  }
+}
+
+private final class RemoteServerConnectionFactory: @unchecked Sendable {
+  private static let logger = Logger(label: "chroma.remote.server.connection")
+  weak var server: RemoteServer?
+
+  func initialize(channel: Channel) -> EventLoopFuture<Void> {
+    Self.logger.info("Accepted remote TCP connection")
+    return channel.pipeline.addHandler(
+      RemoteServerHandler(
+        onMessage: { [weak self] channel, message in
+          Task { @MainActor in self?.server?.receive(message, from: channel) }
+        },
+        onInactive: { [weak self] channel in
+          Task { @MainActor in
+            if self?.server?.clientChannel === channel { self?.server?.clientChannel = nil }
+          }
+        },
+        onError: { error in
+          Self.logger.error("Remote channel failed", metadata: ["error": "\(error)"])
+        }))
   }
 }
 
