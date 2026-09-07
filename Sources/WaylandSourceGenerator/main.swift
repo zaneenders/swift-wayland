@@ -8,11 +8,11 @@ struct WaylandSourceGenerator {
         """
         WaylandSourceGenerator is an internal Chroma build tool and is not a demo.
 
-        Run the remote rendering prototype:
-          On Linux:
-            swift run --package-path Example RemoteDemoDaemon <linux-host-ip>
-          On macOS (the remote client requires Metal):
-            swift run --package-path Example RemoteDemoClient <linux-host-ip>
+        Run the remote rendering daemon on Linux:
+          swift run --package-path Example RemoteDemoDaemon
+
+        To accept connections from another machine, specify this host's IP:
+          swift run --package-path Example RemoteDemoDaemon <linux-host-ip>
 
         Or run a local graphical demo:
           swift run --package-path Example ChromaDemo
