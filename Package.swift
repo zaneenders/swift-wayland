@@ -14,6 +14,13 @@ var targets: [Target] = [
     name: "ChromaTests",
     dependencies: ["Chroma", "ChromaFont", "HeadlessBackend"]
   ),
+  .testTarget(
+    name: "RemoteProtocolTests",
+    dependencies: [
+      "Chroma", "RemoteProtocol",
+      .product(name: "NIOCore", package: "swift-nio"),
+    ]
+  ),
   .target(name: "Chroma"),
   .target(name: "ChromaFont"),
   .target(name: "HeadlessBackend", dependencies: ["Chroma"]),
