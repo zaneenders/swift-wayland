@@ -21,4 +21,32 @@ struct NotificationBannerTests {
     #expect(!banner.isHidden)
     #expect(label?.stringValue == "Disconnected")
   }
+
+  @Test func closeButtonStaysCompactAndMessageWraps() throws {
+    for width in [320.0, 560.0, 1400.0] {
+      let container = NSView(frame: NSRect(x: 0, y: 0, width: width, height: 300))
+      let banner = NotificationBanner(frame: .zero)
+      banner.translatesAutoresizingMaskIntoConstraints = false
+      container.addSubview(banner)
+      NSLayoutConstraint.activate([
+        banner.topAnchor.constraint(equalTo: container.topAnchor),
+        banner.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+        banner.widthAnchor.constraint(equalToConstant: width),
+      ])
+      banner.show("Disconnected from the remote daemon. Close this window and reconnect to continue.")
+      container.layoutSubtreeIfNeeded()
+      let button = try #require(banner.subviews.compactMap { $0 as? NSButton }.first)
+      let label = try #require(banner.subviews.compactMap { $0 as? NSTextField }.first)
+      #expect(button.frame.width == 28)
+      #expect(button.alignmentRect(forFrame: button.frame).height == 28)
+      #expect(button.image != nil)
+      #expect(button.accessibilityLabel() == "Dismiss notification")
+      #expect(label.frame.maxX < button.frame.minX)
+      #expect(banner.frame.height >= 56)
+      if width == 320 {
+        #expect(label.frame.height > 30)
+      }
+    }
+  }
+
 }

@@ -2,38 +2,69 @@ import AppKit
 
 /// Client-owned overlay: remains available even when the daemon cannot render.
 @MainActor
-final class NotificationBanner: NSView {
+final class NotificationBanner: NSVisualEffectView {
   private let label = NSTextField(wrappingLabelWithString: "")
-  private let dismissButton = NSButton(title: "Dismiss", target: nil, action: nil)
+  private let dismissButton = NSButton(title: "", target: nil, action: nil)
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
+    material = .popover
+    blendingMode = .withinWindow
+    state = .active
     wantsLayer = true
-    layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-    layer?.cornerRadius = 8
+    layer?.cornerRadius = 12
+    layer?.borderWidth = 1
+
+    let icon = NSImageView(image: NSImage(
+      systemSymbolName: "exclamationmark.circle.fill", accessibilityDescription: nil)!)
+    icon.contentTintColor = .systemOrange
+    icon.symbolConfiguration = .init(pointSize: 18, weight: .medium)
+    icon.setAccessibilityElement(false)
+
     label.font = .systemFont(ofSize: 13)
     label.textColor = .labelColor
+    label.maximumNumberOfLines = 0
+    label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+    dismissButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Dismiss notification")
+    dismissButton.symbolConfiguration = .init(pointSize: 11, weight: .semibold)
+    dismissButton.contentTintColor = .secondaryLabelColor
+    dismissButton.isBordered = false
+    dismissButton.setAccessibilityLabel("Dismiss notification")
+    dismissButton.toolTip = "Dismiss notification"
     dismissButton.target = self
     dismissButton.action = #selector(dismiss)
-    dismissButton.bezelStyle = .rounded
     dismissButton.refusesFirstResponder = true
-    for child in [label, dismissButton] {
+    for child in [icon, label, dismissButton] {
       child.translatesAutoresizingMaskIntoConstraints = false
       addSubview(child)
     }
     NSLayoutConstraint.activate([
-      label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-      label.topAnchor.constraint(equalTo: topAnchor, constant: 12),
-      label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12),
+      icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+      icon.topAnchor.constraint(equalTo: topAnchor, constant: 16),
+      icon.widthAnchor.constraint(equalToConstant: 20),
+      icon.heightAnchor.constraint(equalToConstant: 20),
+      label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 12),
+      label.topAnchor.constraint(equalTo: topAnchor, constant: 16),
+      label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
       dismissButton.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 12),
       dismissButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-      dismissButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+      dismissButton.topAnchor.constraint(equalTo: topAnchor, constant: 12),
+      dismissButton.widthAnchor.constraint(equalToConstant: 28),
+      dismissButton.heightAnchor.constraint(equalToConstant: 28),
+      heightAnchor.constraint(greaterThanOrEqualToConstant: 56),
     ])
-    dismissButton.setContentCompressionResistancePriority(.required, for: .horizontal)
     isHidden = true
   }
 
   required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    effectiveAppearance.performAsCurrentDrawingAppearance {
+      layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.35).cgColor
+    }
+  }
 
   func show(_ message: String) {
     label.stringValue = message

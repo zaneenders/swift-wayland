@@ -70,10 +70,14 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     container.addSubview(view)
     banner.translatesAutoresizingMaskIntoConstraints = false
     container.addSubview(banner)
+    let preferredBannerWidth = banner.widthAnchor.constraint(equalToConstant: 560)
+    preferredBannerWidth.priority = .defaultHigh
     NSLayoutConstraint.activate([
-      banner.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
-      banner.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
-      banner.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
+      banner.topAnchor.constraint(equalTo: container.topAnchor, constant: 16),
+      banner.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+      banner.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: 16),
+      banner.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -16),
+      preferredBannerWidth,
     ])
     window.contentView = container
     window.delegate = self
