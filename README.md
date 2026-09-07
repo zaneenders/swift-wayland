@@ -140,7 +140,16 @@ selection. Clipboard payloads are limited to 1 MiB of encoded data. The current
 server supports one active client, and rejects competing connections.
 
 The Metal client displays clipboard failures and disconnections in a dismissible
-banner at the top of its window, without taking keyboard focus. Oversized paste
+banner at the top of its window, without taking keyboard focus. After a connection
+is lost, it retries the same host and port in the background with delays of 1, 2,
+4, 8, then 10 seconds (capped), with a five-second connection timeout. The last
+frame stays visible while reconnecting. Once a fresh frame arrives, a green
+“Reconnected” notification appears for four seconds. Dismissing the banner does
+not stop retries; closing the window does. Initial connection failures still
+throw to the caller. Reconnecting starts a new server connection, not a restored
+application session.
+
+Oversized paste
 replies are replaced with a correlated failure reply immediately, so subsequent
 input does not wait for the clipboard timeout. The 1 MiB limit includes JSON
 metadata and escaping, not just the raw clipboard text.

@@ -3,6 +3,8 @@ import AppKit
 /// Client-owned overlay: remains available even when the daemon cannot render.
 @MainActor
 final class NotificationBanner: NSVisualEffectView {
+  private var dismissTimer: Timer?
+  private let icon = NSImageView()
   private let label = NSTextField(wrappingLabelWithString: "")
   private let dismissButton = NSButton(title: "", target: nil, action: nil)
 
@@ -15,8 +17,7 @@ final class NotificationBanner: NSVisualEffectView {
     layer?.cornerRadius = 12
     layer?.borderWidth = 1
 
-    let icon = NSImageView(image: NSImage(
-      systemSymbolName: "exclamationmark.circle.fill", accessibilityDescription: nil)!)
+    icon.image = NSImage(systemSymbolName: "exclamationmark.circle.fill", accessibilityDescription: nil)
     icon.contentTintColor = .systemOrange
     icon.symbolConfiguration = .init(pointSize: 18, weight: .medium)
     icon.setAccessibilityElement(false)
@@ -66,7 +67,20 @@ final class NotificationBanner: NSVisualEffectView {
     }
   }
 
-  func show(_ message: String) {
+  func show(_ message: String, success: Bool = false, dismissAfter: TimeInterval? = nil) {
+    dismissTimer?.invalidate()
+    dismissTimer = nil
+    icon.image = NSImage(
+      systemSymbolName: success ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
+      accessibilityDescription: nil)
+    icon.contentTintColor = success ? .systemGreen : .systemOrange
+    if let dismissAfter {
+      let timer = Timer(timeInterval: dismissAfter, repeats: false) { [weak self] _ in
+        MainActor.assumeIsolated { self?.dismiss() }
+      }
+      dismissTimer = timer
+      RunLoop.main.add(timer, forMode: .common)
+    }
     label.stringValue = message
     isHidden = false
     NSAccessibility.post(element: self, notification: .announcementRequested, userInfo: [
@@ -76,6 +90,8 @@ final class NotificationBanner: NSVisualEffectView {
   }
 
   @objc func dismiss() {
+    dismissTimer?.invalidate()
+    dismissTimer = nil
     isHidden = true
   }
 }

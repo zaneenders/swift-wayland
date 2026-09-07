@@ -13,6 +13,12 @@ import RemoteProtocol
 public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegate {
   private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
   private var channel: Channel?
+  private var endpoint: (host: String, port: Int)?
+  private var connectionGeneration = UUID()
+  private var reconnectTimer: Timer?
+  private var reconnectDelay: TimeInterval = 1
+  private var awaitingReconnectFrame = false
+  private let connectedTitle: String
   private let queue: MTLCommandQueue
   private let displayRenderer: MetalDisplayListRenderer
   private let view: ChromaInputView
@@ -50,6 +56,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
       throw BackendError.unavailable(backend: "Remote Metal", reason: "no compatible GPU was found")
     }
+    self.connectedTitle = title
     self.queue = queue
     let frame = CGRect(x: 0, y: 0, width: CGFloat(size.width), height: CGFloat(size.height))
     let view = ChromaInputView(frame: frame, device: device)
@@ -85,7 +92,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     view.delegate = self
     view.onInputAvailable = { [weak self] in self?.sendPendingInput() }
     view.onRemoteKey = { [weak self] chord, text in
-      guard let self else { return }
+      guard let self, !self.isShuttingDown, self.channel?.isActive == true else { return }
       self.inputSequence &+= 1
       self.clipboardGenerations.record(sequence: self.inputSequence, generation: NSPasteboard.general.changeCount)
       self.send(.key(sequence: self.inputSequence, event: RemoteKeyEvent(chord: chord, text: text)))
@@ -96,22 +103,41 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     host: String = "127.0.0.1", port: Int = 9328, framesPerSecond: Double = 30
   ) throws {
     requestedFramesPerSecond = framesPerSecond.isFinite ? min(240, max(1, framesPerSecond)) : 30
-    let channel = try ClientBootstrap(group: group)
+    endpoint = (host, port)
+    let generation = UUID()
+    connectionGeneration = generation
+    let channel = try openConnection(host: host, port: port, generation: generation).wait()
+    try activate(channel)
+  }
+
+  private func openConnection(host: String, port: Int, generation: UUID) -> EventLoopFuture<Channel> {
+    ClientBootstrap(group: group)
+      .connectTimeout(.seconds(5))
       .channelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
       .channelInitializer { [weak self] channel in
         channel.pipeline.addHandler(
           RemoteClientHandler(
             onMessage: { [weak self] message, byteCount, decodeDuration in
               DispatchQueue.main.async {
-                self?.receive(message, byteCount: byteCount, decodeDuration: decodeDuration)
+                guard let self, self.connectionGeneration == generation else { return }
+                self.receive(message, byteCount: byteCount, decodeDuration: decodeDuration)
               }
             },
             onInactive: { [weak self] in
-              DispatchQueue.main.async { self?.connectionClosed() }
+              DispatchQueue.main.async {
+                guard let self, self.connectionGeneration == generation else { return }
+                self.connectionClosed()
+              }
             }))
       }
-      .connect(host: host, port: port).wait()
+      .connect(host: host, port: port)
+  }
+
+  private func activate(_ channel: Channel) throws {
     self.channel = channel
+    frameRequestOutstanding = false
+    clipboardGenerations.removeAll()
+    _ = view.frameInput()
     // Write directly here. Scheduling through eventLoop.execute allowed the
     // application run loop to start before the initial viewport was enqueued.
     channel.write(try RemoteWire.encode(.frameRate(Float(requestedFramesPerSecond))), promise: nil)
@@ -131,7 +157,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   }
 
   private func requestFrameIfNeeded() {
-    guard !frameRequestOutstanding else { return }
+    guard !isShuttingDown, channel?.isActive == true, !frameRequestOutstanding else { return }
     frameRequestOutstanding = true
     requestStartedAt = ProcessInfo.processInfo.systemUptime
     send(.requestFrame)
@@ -160,6 +186,10 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   private func shutdown() {
     guard !isShuttingDown else { return }
     isShuttingDown = true
+    connectionGeneration = UUID()
+    reconnectTimer?.invalidate()
+    reconnectTimer = nil
+    banner.dismiss()
 
     // Stop AppKit callbacks before closing NIO. Window teardown can otherwise
     // produce resize/input callbacks that try to schedule work on the stopped group.
@@ -250,13 +280,62 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
 
   private func connectionClosed() {
     guard !isShuttingDown else { return }
+    // Invalidate already queued callbacks from the old channel or failed attempt.
+    connectionGeneration = UUID()
     frameRequestTimer?.invalidate()
     frameRequestTimer = nil
+    frameRequestOutstanding = false
     channel = nil
     clipboardGenerations.removeAll()
-    window.title = "Chroma Remote Client — disconnected"
-    banner.show("Disconnected from the remote daemon. Close this window and reconnect to continue.")
-    print("Remote daemon disconnected")
+    if !awaitingReconnectFrame {
+      awaitingReconnectFrame = true
+      window.title = "\(connectedTitle) — reconnecting"
+      banner.show("Connection lost. Reconnecting automatically…")
+    }
+    scheduleReconnect()
+  }
+
+  private func scheduleReconnect() {
+    guard !isShuttingDown, endpoint != nil, reconnectTimer == nil else { return }
+    let timer = Timer(timeInterval: reconnectDelay, repeats: false) { [weak self] _ in
+      MainActor.assumeIsolated {
+        self?.reconnectTimer = nil
+        self?.reconnect()
+      }
+    }
+    reconnectDelay = min(reconnectDelay * 2, 10)
+    reconnectTimer = timer
+    RunLoop.main.add(timer, forMode: .common)
+  }
+
+  private func reconnect() {
+    guard !isShuttingDown, let endpoint else { return }
+    let generation = UUID()
+    connectionGeneration = generation
+    openConnection(host: endpoint.host, port: endpoint.port, generation: generation)
+      .whenComplete { [weak self] result in
+        DispatchQueue.main.async {
+          guard let self, !self.isShuttingDown, self.connectionGeneration == generation else {
+            if case .success(let channel) = result { channel.close(promise: nil) }
+            return
+          }
+          switch result {
+          case .success(let channel):
+            guard channel.isActive else {
+              self.connectionClosed()
+              return
+            }
+            do {
+              try self.activate(channel)
+            } catch {
+              channel.close(promise: nil)
+              self.connectionClosed()
+            }
+          case .failure:
+            self.connectionClosed()
+          }
+        }
+      }
   }
 
   private func receive(_ message: RemoteMessage, byteCount: Int, decodeDuration: TimeInterval) {
@@ -315,6 +394,12 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
       print("Received remote frame \(id) with \(commands.count) draw commands")
     }
     frameRequestOutstanding = false
+    if awaitingReconnectFrame {
+      awaitingReconnectFrame = false
+      reconnectDelay = 1
+      window.title = connectedTitle
+      banner.show("Reconnected to the remote daemon.", success: true, dismissAfter: 4)
+    }
     latestFrame = (viewport, commands)
     statisticsFrames += 1
     statisticsBytes += byteCount

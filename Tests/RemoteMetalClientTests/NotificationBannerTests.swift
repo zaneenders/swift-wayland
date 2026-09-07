@@ -49,4 +49,25 @@ struct NotificationBannerTests {
     }
   }
 
+
+  @Test func successNotificationDismissesAutomatically() throws {
+    let banner = NotificationBanner(frame: .zero)
+    banner.show("Reconnected", success: true, dismissAfter: 0.01)
+    let icon = try #require(banner.subviews.compactMap { $0 as? NSImageView }.first)
+    #expect(icon.contentTintColor == .systemGreen)
+    #expect(!banner.isHidden)
+    RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    #expect(banner.isHidden)
+  }
+
+  @Test func newWarningCancelsPreviousAutoDismiss() throws {
+    let banner = NotificationBanner(frame: .zero)
+    banner.show("Reconnected", success: true, dismissAfter: 0.01)
+    banner.show("Connection lost. Reconnecting automatically…")
+    let icon = try #require(banner.subviews.compactMap { $0 as? NSImageView }.first)
+    #expect(icon.contentTintColor == .systemOrange)
+    RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    #expect(!banner.isHidden)
+  }
+
 }
