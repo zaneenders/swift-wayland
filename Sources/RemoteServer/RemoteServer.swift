@@ -12,8 +12,19 @@ public final class RemoteServer {
   public var editingKeyBindings = KeyBindings()
   private var pointerPosition = Point.zero
   private var clipboardEpoch: UInt64 = 0
-  private var clipboardSnapshot: (text: String?, selection: Range<Int>?, leaf: WidgetID?)?
-  private var pendingClipboard: (id: UInt64, cut: Bool, paste: Bool)?
+  private struct EditorSnapshot {
+    let text: String?
+    let selection: Range<Int>?
+    let leaf: WidgetID?
+  }
+  private struct PendingClipboard {
+    enum Operation { case copy, cut, paste }
+    let id: UInt64
+    let epoch: UInt64
+    let operation: Operation
+    let snapshot: EditorSnapshot
+  }
+  private var pendingClipboard: PendingClipboard?
   private var deferredInput: [RemoteMessage] = []
   private var logger = Logger(label: "chroma.remote.server")
   private let group: MultiThreadedEventLoopGroup
@@ -24,17 +35,18 @@ public final class RemoteServer {
   private var content: (any Block)?
   private var viewport: Size
   private var frameID: UInt64 = 0
+  private var statistics = ServerStatistics()
   private var inputSequence: UInt64 = 0
   private var redrawScheduled = false
   private var framesPerSecond: Double = 30
   private var lastProducedAt: TimeInterval = 0
   private var requestPending = false
-  private var pendingSnapshot: FrameSnapshot?
   private var lastSentCommands: [DrawCommand]?
   private var lastSentViewport: Size?
   private var connectionEpoch: UInt64 = 0
   private let wireEncoder = ConnectionFrameEncoder()
-  private let frameQueue = LatestFrameQueue<FrameSnapshot>()
+  // Remains occupied across disconnects until old encoding/writing completes.
+  private var frameInFlight = false
   private let encodingQueue = DispatchQueue(label: "chroma.remote.frame-encoding")
   private struct FrameSnapshot: Sendable {
     let message: RemoteMessage
@@ -42,13 +54,6 @@ public final class RemoteServer {
     let drawDuration: TimeInterval
     let commandCount: Int
   }
-  private var statisticsStartedAt = ProcessInfo.processInfo.systemUptime
-  private var statisticsFrames = 0
-  private var statisticsBytes = 0
-  private var statisticsImageBytes = 0
-  private var statisticsCommands = 0
-  private var statisticsDrawTime: TimeInterval = 0
-  private var statisticsEncodeTime: TimeInterval = 0
 
   public init(content: any Block, size: Size = Size(width: 800, height: 600)) {
     self.content = content
@@ -87,17 +92,15 @@ public final class RemoteServer {
   }
 
   public func shutdown() throws {
-    frameQueue.discardPending()
     let client = clientChannel
     clientChannel = nil
     connectionEpoch &+= 1
-    pendingSnapshot = nil
     try client?.close().wait()
     try serverChannel?.close().wait()
     try group.syncShutdownGracefully()
   }
 
-  fileprivate func receive(_ message: RemoteMessage, from channel: Channel) {
+  func receive(_ message: RemoteMessage, from channel: Channel) {
     if clientChannel == nil {
       logger.info("Remote client connected")
     }
@@ -111,17 +114,17 @@ public final class RemoteServer {
     if case .clipboard(let reply) = message {
       guard reply.isReply, let pending = pendingClipboard, pending.id == reply.id else { return }
       if reply.success {
-        if pending.paste, let text = reply.text, let snapshot = clipboardSnapshot,
-          snapshot.leaf == interaction.editingLeaf,
-          snapshot.text == interaction.editingText,
-          snapshot.selection == interaction.textSelectionRange
+        if pending.operation == .paste, let text = reply.text,
+          pending.snapshot.leaf == interaction.editingLeaf,
+          pending.snapshot.text == interaction.editingText,
+          pending.snapshot.selection == interaction.textSelectionRange
         {
           render(input: InputState(textEvents: [.insert(text)]))
         }
-        if pending.cut, let snapshot = clipboardSnapshot,
-          snapshot.text == interaction.editingText,
-          snapshot.selection == interaction.textSelectionRange,
-          snapshot.leaf == interaction.editingLeaf
+        if pending.operation == .cut,
+          pending.snapshot.text == interaction.editingText,
+          pending.snapshot.selection == interaction.textSelectionRange,
+          pending.snapshot.leaf == interaction.editingLeaf
         {
           render(input: InputState(textEvents: [.deleteForward]))
         }
@@ -190,8 +193,12 @@ public final class RemoteServer {
       let id = inputSequence
       clipboardEpoch &+= 1
       let epoch = clipboardEpoch
-      clipboardSnapshot = (interaction.editingText, interaction.textSelectionRange, interaction.editingLeaf)
-      pendingClipboard = (id, event == .cut, event == .paste)
+      pendingClipboard = PendingClipboard(
+        id: id, epoch: epoch,
+        operation: event == .cut ? .cut : (event == .paste ? .paste : .copy),
+        snapshot: EditorSnapshot(
+          text: interaction.editingText,
+          selection: interaction.textSelectionRange, leaf: interaction.editingLeaf))
       do {
         let bytes = try RemoteWire.encode(.clipboard(ClipboardTransfer(id: id, text: text)))
         clientChannel?.writeAndFlush(bytes, promise: nil)
@@ -200,7 +207,7 @@ public final class RemoteServer {
         return
       }
       DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-        guard let self, self.pendingClipboard?.id == id, self.clipboardEpoch == epoch else { return }
+        guard let self, self.pendingClipboard?.id == id, self.pendingClipboard?.epoch == epoch else { return }
         self.finishClipboard()
       }
     case .selectAll where !interaction.isTextEditing:
@@ -213,26 +220,22 @@ public final class RemoteServer {
 
   private func finishClipboard() {
     pendingClipboard = nil
-    clipboardSnapshot = nil
     while pendingClipboard == nil, !deferredInput.isEmpty, let channel = clientChannel {
       let next = deferredInput.removeFirst()
       receive(next, from: channel)
     }
   }
 
-  fileprivate func disconnected(_ channel: Channel) {
+  func disconnected(_ channel: Channel) {
     guard clientChannel === channel else { return }
     clientChannel = nil
-    frameQueue.discardPending()
     pendingClipboard = nil
     clipboardEpoch &+= 1
-    clipboardSnapshot = nil
     deferredInput.removeAll()
     inputSequence = 0
     connectionEpoch &+= 1
     redrawScheduled = false
     requestPending = false
-    pendingSnapshot = nil
     lastSentCommands = nil
     lastSentViewport = nil
     lastProducedAt = 0
@@ -249,17 +252,14 @@ public final class RemoteServer {
       self.redrawScheduled = false
       // A request is a single presentation credit. Input can update the graph
       // immediately, but neither input nor animation can bypass this credit.
-      guard self.requestPending, !self.frameQueue.isBusy else { return }
+      guard self.requestPending, !self.frameInFlight else { return }
       self.lastProducedAt = ProcessInfo.processInfo.systemUptime
-      self.render()
-      self.publishPendingFrame()
+      if let snapshot = self.render() { self.publishFrame(snapshot) }
     }
   }
 
-  private func publishPendingFrame() {
-    guard requestPending, let snapshot = pendingSnapshot else { return }
+  private func publishFrame(_ snapshot: FrameSnapshot) {
     requestPending = false
-    pendingSnapshot = nil
     if case .frame(_, _, let viewport, let commands) = snapshot.message {
       if lastSentViewport == viewport, lastSentCommands == commands {
         if let bytes = try? RemoteWire.encode(.frameUnchanged) {
@@ -270,11 +270,13 @@ public final class RemoteServer {
       lastSentViewport = viewport
       lastSentCommands = commands
     }
-    if let next = frameQueue.submit(snapshot) { encodeFrame(next) }
+    frameInFlight = true
+    encodeFrame(snapshot)
   }
 
-  private func render(input: InputState = InputState()) {
-    guard let channel = clientChannel else { return }
+  @discardableResult
+  private func render(input: InputState = InputState()) -> FrameSnapshot? {
+    guard let channel = clientChannel else { return nil }
     let drawStarted = ProcessInfo.processInfo.systemUptime
     interaction.beginFrame(input: input)
     var drawList = DrawList()
@@ -294,7 +296,7 @@ public final class RemoteServer {
     let snapshot = FrameSnapshot(
       message: .frame(id: frameID, inputSequence: inputSequence, viewport: viewport, commands: drawList.commands),
       channel: channel, drawDuration: drawDuration, commandCount: drawList.commands.count)
-    pendingSnapshot = snapshot
+    return snapshot
   }
 
   private func encodeFrame(_ snapshot: FrameSnapshot) {
@@ -322,8 +324,8 @@ public final class RemoteServer {
     switch result {
     case .success(let encoded):
       let bytes = encoded.bytes
-      statisticsImageBytes += encoded.imageBytes
-      recordStatistics(
+      statistics.imageBytes += encoded.imageBytes
+      statistics.record(
         byteCount: bytes.readableBytes, commandCount: snapshot.commandCount,
         drawDuration: snapshot.drawDuration, encodeDuration: duration)
       // Keep the slot occupied until NIO drains this write. Otherwise a slow
@@ -345,42 +347,8 @@ public final class RemoteServer {
   }
 
   private func completeFrame() {
-    if let next = frameQueue.complete() { encodeFrame(next) }
+    frameInFlight = false
     if requestPending { scheduleRedraw() }
-  }
-
-  private func recordStatistics(
-    byteCount: Int, commandCount: Int, drawDuration: TimeInterval, encodeDuration: TimeInterval
-  ) {
-    statisticsFrames += 1
-    statisticsBytes += byteCount
-    statisticsCommands += commandCount
-    statisticsDrawTime += drawDuration
-    statisticsEncodeTime += encodeDuration
-    let now = ProcessInfo.processInfo.systemUptime
-    let elapsed = now - statisticsStartedAt
-    guard elapsed >= 1 else { return }
-    let frames = max(1, statisticsFrames)
-    let megabitsPerSecond = Double(statisticsBytes) * 8 / elapsed / 1_000_000
-    logger.info(
-      "Remote rendering statistics",
-      metadata: [
-        "fps": "\(String(format: "%.1f", Double(statisticsFrames) / elapsed))",
-        "megabits_per_second": "\(String(format: "%.2f", megabitsPerSecond))",
-        "commands_per_frame": "\(String(format: "%.0f", Double(statisticsCommands) / Double(frames)))",
-        "image_mbit_s": "\(String(format: "%.2f", Double(statisticsImageBytes) * 8 / elapsed / 1_000_000))",
-        "command_mbit_s":
-          "\(String(format: "%.2f", Double(statisticsBytes - statisticsImageBytes) * 8 / elapsed / 1_000_000))",
-        "draw_ms": "\(String(format: "%.2f", statisticsDrawTime * 1_000 / Double(frames)))",
-        "encode_ms": "\(String(format: "%.2f", statisticsEncodeTime * 1_000 / Double(frames)))",
-      ])
-    statisticsStartedAt = now
-    statisticsFrames = 0
-    statisticsBytes = 0
-    statisticsImageBytes = 0
-    statisticsCommands = 0
-    statisticsDrawTime = 0
-    statisticsEncodeTime = 0
   }
 }
 
@@ -390,25 +358,27 @@ private final class RemoteServerConnectionFactory: @unchecked Sendable {
 
   func initialize(channel: Channel) -> EventLoopFuture<Void> {
     Self.logger.info("Accepted remote TCP connection")
-    return channel.pipeline.addHandler(
-      RemoteServerHandler(
-        onMessage: { [weak self] channel, message in
-          DispatchQueue.main.async { self?.server?.receive(message, from: channel) }
-        },
-        onInactive: { [weak self] channel in
-          DispatchQueue.main.async {
-            self?.server?.disconnected(channel)
-          }
-        },
-        onError: { error in
-          Self.logger.error("Remote channel failed", metadata: ["error": "\(error)"])
-        }))
+    return channel.eventLoop.makeCompletedFuture {
+      try channel.pipeline.syncOperations.addHandlers(
+        ByteToMessageHandler(RemoteMessageDecoder()),
+        RemoteServerHandler(
+          onMessage: { [weak self] channel, message in
+            DispatchQueue.main.async { self?.server?.receive(message, from: channel) }
+          },
+          onInactive: { [weak self] channel in
+            DispatchQueue.main.async {
+              self?.server?.disconnected(channel)
+            }
+          },
+          onError: { error in
+            Self.logger.error("Remote channel failed", metadata: ["error": "\(error)"])
+          }))
+    }
   }
 }
 
 private final class RemoteServerHandler: ChannelInboundHandler, @unchecked Sendable {
-  typealias InboundIn = ByteBuffer
-  private var buffer = ByteBuffer()
+  typealias InboundIn = DecodedRemoteMessage
   private let onMessage: @Sendable (Channel, RemoteMessage) -> Void
   private let onInactive: @Sendable (Channel) -> Void
   private let onError: @Sendable (Error) -> Void
@@ -424,17 +394,8 @@ private final class RemoteServerHandler: ChannelInboundHandler, @unchecked Senda
   }
 
   func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-    var incoming = unwrapInboundIn(data)
-    buffer.writeBuffer(&incoming)
-    do {
-      while let message = try RemoteWire.decode(from: &buffer) {
-        onMessage(context.channel, message)
-      }
-      buffer.discardReadBytes()
-    } catch {
-      context.fireErrorCaught(error)
-      context.close(promise: nil)
-    }
+    let decoded = unwrapInboundIn(data)
+    onMessage(context.channel, decoded.message)
   }
 
   func channelInactive(context: ChannelHandlerContext) { onInactive(context.channel) }
@@ -445,7 +406,7 @@ private final class RemoteServerHandler: ChannelInboundHandler, @unchecked Senda
 }
 
 // Only accessed by the serial encoding queue. Reset resources on reconnect;
-// encoding happens only after snapshot coalescing, never before it.
+// encoding happens only after a presentation credit is consumed.
 private final class ConnectionFrameEncoder: @unchecked Sendable {
   private var channel: Channel?
   private var images = RemoteImageCache()

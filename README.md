@@ -154,7 +154,7 @@ server supports one active client, and rejects competing connections.
 
 The Metal client displays clipboard failures and disconnections in a dismissible
 banner at the top of its window, without taking keyboard focus. After a connection
-is lost, it retries the same host and port in the background with delays of 1, 2,
+is lost, or a frame request receives no response for ten seconds, it retries the same host and port in the background with delays of 1, 2,
 4, 8, then 10 seconds (capped), with a five-second connection timeout. The last
 frame stays visible while reconnecting. Once a fresh frame arrives, a green
 “Reconnected” notification appears for four seconds. Dismissing the banner does

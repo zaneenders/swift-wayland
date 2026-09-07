@@ -26,21 +26,9 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   private let window: NSWindow
   private var latestFrame: (viewport: Size, commands: [DrawCommand])?
   private var clipboardGenerations = ClipboardGenerations()
+  private var statistics = ClientStatistics()
   private var inputSequence: UInt64 = 0
   private var isShuttingDown = false
-  private var statisticsStartedAt = ProcessInfo.processInfo.systemUptime
-  private var statisticsFrames = 0
-  private var statisticsBytes = 0
-  private var statisticsCommands = 0
-  private var statisticsDecodeTime: TimeInterval = 0
-  private var statisticsRenderTime: TimeInterval = 0
-  private var statisticsDraws = 0
-  private var statisticsDrawCalls = 0
-  private var statisticsInstances = 0
-  private var statisticsGPUTime: TimeInterval = 0
-  private var statisticsGPUFrames = 0
-  private var statisticsRequestTime: TimeInterval = 0
-  private var statisticsReplies = 0
   private var requestStartedAt: TimeInterval = 0
   // Protect the renderer's three shared instance-buffer slots from GPU reuse.
   private let inFlight = DispatchSemaphore(value: 3)
@@ -115,20 +103,23 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
       .connectTimeout(.seconds(5))
       .channelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
       .channelInitializer { [weak self] channel in
-        channel.pipeline.addHandler(
-          RemoteClientHandler(
-            onMessage: { [weak self] message, byteCount, decodeDuration in
-              DispatchQueue.main.async {
-                guard let self, self.connectionGeneration == generation else { return }
-                self.receive(message, byteCount: byteCount, decodeDuration: decodeDuration)
-              }
-            },
-            onInactive: { [weak self] in
-              DispatchQueue.main.async {
-                guard let self, self.connectionGeneration == generation else { return }
-                self.connectionClosed()
-              }
-            }))
+        channel.eventLoop.makeCompletedFuture {
+          try channel.pipeline.syncOperations.addHandlers(
+            ByteToMessageHandler(RemoteMessageDecoder()),
+            RemoteClientHandler(
+              onMessage: { [weak self] message, byteCount, decodeDuration in
+                DispatchQueue.main.async {
+                  guard let self, self.connectionGeneration == generation else { return }
+                  self.receive(message, byteCount: byteCount, decodeDuration: decodeDuration)
+                }
+              },
+              onInactive: { [weak self] in
+                DispatchQueue.main.async {
+                  guard let self, self.connectionGeneration == generation else { return }
+                  self.connectionClosed()
+                }
+              }))
+        }
       }
       .connect(host: host, port: port)
   }
@@ -157,7 +148,15 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   }
 
   private func requestFrameIfNeeded() {
-    guard !isShuttingDown, channel?.isActive == true, !frameRequestOutstanding else { return }
+    guard !isShuttingDown, let channel, channel.isActive else { return }
+    if frameRequestOutstanding {
+      if FrameResponseDeadline.hasExpired(since: requestStartedAt) {
+        // Invalidate callbacks and reuse the normal reconnect path immediately.
+        channel.close(promise: nil)
+        connectionClosed()
+      }
+      return
+    }
     frameRequestOutstanding = true
     requestStartedAt = ProcessInfo.processInfo.systemUptime
     send(.requestFrame)
@@ -242,17 +241,17 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
       let valid = command.status == .completed && command.gpuStartTime > 0 && duration >= 0
       DispatchQueue.main.async {
         guard let self, valid else { return }
-        self.statisticsGPUTime += duration
-        self.statisticsGPUFrames += 1
+        self.statistics.gpuTime += duration
+        self.statistics.gpuFrames += 1
       }
     }
     submitted = true
     command.commit()
-    statisticsDraws += 1
-    statisticsDrawCalls += displayRenderer.lastDrawCallCount
-    statisticsInstances += displayRenderer.lastInstanceCount
+    statistics.draws += 1
+    statistics.drawCalls += displayRenderer.lastDrawCallCount
+    statistics.instances += displayRenderer.lastInstanceCount
     displayRenderer.finishFrame()
-    statisticsRenderTime += ProcessInfo.processInfo.systemUptime - renderStarted
+    statistics.renderTime += ProcessInfo.processInfo.systemUptime - renderStarted
   }
 
   private var currentViewport: Size {
@@ -343,15 +342,15 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     switch message {
     case .frame, .frameUnchanged:
       if frameRequestOutstanding {
-        statisticsRequestTime += ProcessInfo.processInfo.systemUptime - requestStartedAt
-        statisticsReplies += 1
+        statistics.requestTime += ProcessInfo.processInfo.systemUptime - requestStartedAt
+        statistics.replies += 1
       }
       frameRequestOutstanding = false
     default: break
     }
     if case .frameUnchanged = message {
-      statisticsBytes += byteCount
-      printStatisticsIfNeeded()
+      statistics.bytes += byteCount
+      statistics.reportIfNeeded()
       return
     }
     if case .clipboard(let request) = message {
@@ -401,53 +400,17 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
       banner.show("Reconnected to the remote daemon.", success: true, dismissAfter: 4)
     }
     latestFrame = (viewport, commands)
-    statisticsFrames += 1
-    statisticsBytes += byteCount
-    statisticsCommands += commands.count
-    statisticsDecodeTime += decodeDuration
-    printStatisticsIfNeeded()
+    statistics.frames += 1
+    statistics.bytes += byteCount
+    statistics.commands += commands.count
+    statistics.decodeTime += decodeDuration
+    statistics.reportIfNeeded()
     view.needsDisplay = true
-  }
-
-  private func printStatisticsIfNeeded() {
-    let now = ProcessInfo.processInfo.systemUptime
-    let elapsed = now - statisticsStartedAt
-    guard elapsed >= 1 else { return }
-    let frames = max(1, statisticsFrames)
-    print(
-      String(
-        format:
-          "client %.1f received fps | %.1f rendered fps | %.2f Mbit/s | %.0f commands/frame | decode %.2f ms | CPU encode %.2f ms | GPU %.2f ms | request %.2f ms | %.0f draws/frame | %.0f instances/frame",
-        Double(statisticsFrames) / elapsed, Double(statisticsDraws) / elapsed,
-        Double(statisticsBytes) * 8 / elapsed / 1_000_000,
-        Double(statisticsCommands) / Double(frames),
-        statisticsDecodeTime * 1_000 / Double(frames),
-        statisticsRenderTime * 1_000 / Double(max(1, statisticsDraws)),
-        statisticsGPUTime * 1_000 / Double(max(1, statisticsGPUFrames)),
-        statisticsRequestTime * 1_000 / Double(max(1, statisticsReplies)),
-        Double(statisticsDrawCalls) / Double(max(1, statisticsDraws)),
-        Double(statisticsInstances) / Double(max(1, statisticsDraws))))
-    fflush(stdout)
-    statisticsStartedAt = now
-    statisticsFrames = 0
-    statisticsBytes = 0
-    statisticsCommands = 0
-    statisticsDecodeTime = 0
-    statisticsRenderTime = 0
-    statisticsDraws = 0
-    statisticsDrawCalls = 0
-    statisticsInstances = 0
-    statisticsGPUTime = 0
-    statisticsGPUFrames = 0
-    statisticsRequestTime = 0
-    statisticsReplies = 0
   }
 }
 
 private final class RemoteClientHandler: ChannelInboundHandler, @unchecked Sendable {
-  typealias InboundIn = ByteBuffer
-  private var buffer = ByteBuffer()
-  private let images = RemoteImageCache()
+  typealias InboundIn = DecodedRemoteMessage
   private let onMessage: @Sendable (RemoteMessage, Int, TimeInterval) -> Void
   private let onInactive: @Sendable () -> Void
 
@@ -460,21 +423,8 @@ private final class RemoteClientHandler: ChannelInboundHandler, @unchecked Senda
   }
 
   func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-    var incoming = unwrapInboundIn(data)
-    buffer.writeBuffer(&incoming)
-    do {
-      while true {
-        let bytesBeforeDecode = buffer.readableBytes
-        let started = ProcessInfo.processInfo.systemUptime
-        guard let message = try RemoteWire.decode(from: &buffer, images: images) else { break }
-        let duration = ProcessInfo.processInfo.systemUptime - started
-        onMessage(message, bytesBeforeDecode - buffer.readableBytes, duration)
-      }
-      buffer.discardReadBytes()
-    } catch {
-      context.fireErrorCaught(error)
-      context.close(promise: nil)
-    }
+    let decoded = unwrapInboundIn(data)
+    onMessage(decoded.message, decoded.byteCount, decoded.duration)
   }
 
   func channelInactive(context: ChannelHandlerContext) {

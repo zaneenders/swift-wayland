@@ -10,7 +10,12 @@ var products: [Product] = [
 ]
 
 var targets: [Target] = [
-  .testTarget(name: "RemoteServerTests", dependencies: ["RemoteServer"]),
+  .testTarget(
+    name: "RemoteServerTests",
+    dependencies: [
+      "RemoteServer", "RemoteProtocol", "Chroma",
+      .product(name: "NIOEmbedded", package: "swift-nio"),
+    ]),
   .testTarget(
     name: "ChromaTests",
     dependencies: ["Chroma", "ChromaFont", "HeadlessBackend"]
@@ -19,6 +24,7 @@ var targets: [Target] = [
     name: "RemoteProtocolTests",
     dependencies: [
       "Chroma", "RemoteProtocol",
+      .product(name: "NIOEmbedded", package: "swift-nio"),
       .product(name: "NIOCore", package: "swift-nio"),
     ]
   ),

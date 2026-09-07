@@ -198,7 +198,7 @@ extension ByteBuffer {
     writeFloat(value.bottomRight)
     writeFloat(value.bottomLeft)
   }
-  fileprivate mutating func writeStringValue(_ value: String) throws {
+  mutating func writeStringValue(_ value: String) throws {
     let bytes = value.utf8
     guard bytes.count <= Int(UInt32.max) else {
       throw RemoteProtocolError.stringTooLarge(bytes.count)
@@ -287,7 +287,7 @@ extension ByteBuffer {
     }
   }
 
-  fileprivate mutating func read<T: FixedWidthInteger>(_ type: T.Type) throws -> T {
+  mutating func read<T: FixedWidthInteger>(_ type: T.Type) throws -> T {
     guard let value: T = readInteger(endianness: .little) else {
       throw RemoteProtocolError.malformedMessage
     }
@@ -305,7 +305,7 @@ extension ByteBuffer {
       topLeft: try readFloat(), topRight: try readFloat(),
       bottomRight: try readFloat(), bottomLeft: try readFloat())
   }
-  fileprivate mutating func readStringValue() throws -> String {
+  mutating func readStringValue() throws -> String {
     let length = Int(try read(UInt32.self))
     guard length <= RemoteWire.maximumPayloadBytes, let value = readString(length: length) else {
       throw RemoteProtocolError.malformedMessage
