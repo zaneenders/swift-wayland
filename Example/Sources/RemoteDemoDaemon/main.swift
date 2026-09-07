@@ -1,4 +1,5 @@
 import Chroma
+import DemoImages
 import Foundation
 import HeadlessBackend
 import RemoteServer
@@ -64,6 +65,7 @@ private final class PerformanceDemoState {
     case outline = "OUTLINE"
   }
 
+  let image: ImageResource
   var itemCount: Int
   var speed: Float = 1
   var palette: Palette = .neon
@@ -77,6 +79,7 @@ private final class PerformanceDemoState {
   var lastAction = "Ready — choose a control"
 
   init(itemCount: Int) {
+    image = DemoImages.mandelbrot
     self.itemCount = min(20_000, max(100, itemCount))
   }
 
@@ -190,9 +193,24 @@ private struct PerformanceDemo: Block {
         .border(theme.border)
 
         HStack(spacing: 10) {
-          ShapeCanvas(state: state)
-            .sizing(x: .grow, y: .grow)
-            .clipped()
+          VStack(spacing: 10) {
+            VStack(spacing: 6) {
+              Text("MANDELBROT / 640 × 400 RGBA")
+                .fontScale(remoteSmallText)
+                .foregroundColor(theme.accent)
+              Image(state.image, scaling: .contain)
+                .sizing(x: .grow, y: .fixed(160))
+                .background(theme.background)
+            }
+            .padding(10)
+            .background(theme.surface)
+            .border(theme.border)
+
+            ShapeCanvas(state: state)
+              .sizing(x: .grow, y: .grow)
+              .clipped()
+          }
+          .sizing(x: .grow, y: .grow)
 
           UUIDList(state: state)
             .sizing(x: .fixed(330), y: .grow)

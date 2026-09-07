@@ -42,6 +42,11 @@ The remote demo includes a scrollable sidebar of 10,000 UUIDs beside the animate
 shapes. Hover over the list and use the mouse wheel or trackpad, use Page Up/Down,
 or click Top/Bottom. Generate replaces the UUIDs without resetting the scroll
 position; the sidebar header and scene controls remain outside the scroll area.
+The same Mandelbrot bitmap used in the native demo appears above the shapes, demonstrating remote image rendering through
+Chroma's `Image` block. Both demos use the shared `DemoImages` generator.
+The daemon generates the 640×400 RGBA image once, with no
+external assets or downloads, and the client displays it with its aspect ratio
+preserved. The current protocol embeds its 1,000 KiB of pixels in every frame.
 
 ### Virtualized lists
 
