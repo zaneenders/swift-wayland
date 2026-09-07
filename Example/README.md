@@ -100,12 +100,42 @@ If the connection fails:
 - allow the daemon through the macOS firewall if prompted;
 - verify TCP port `9328` is not blocked or already occupied.
 
-### Command-line syntax
+### Performance scene and metrics
+
+The daemon demo continuously animates a configurable number of shapes. Its
+arguments include target frames per second and shape count:
 
 ```text
-RemoteDemoDaemon [bind-host] [port]
+RemoteDemoDaemon [bind-host] [port] [fps] [items]
 RemoteDemoClient [host] [port]
 ```
+
+For example, test 2,000 animated shapes at 30 requested frames per second:
+
+```sh
+swift run RemoteDemoDaemon 0.0.0.0 9328 30 2000
+```
+
+Try progressively heavier runs such as `5000`, `10000`, and `20000` items. Both
+processes print statistics approximately once per second. The daemon reports:
+
+- generated frames per second;
+- transmitted Mbit/s;
+- commands per frame;
+- block drawing time;
+- binary encoding time.
+
+The client reports:
+
+- received frames per second;
+- received Mbit/s;
+- commands per frame;
+- binary decoding time;
+- CPU time used to encode commands into Metal (not GPU completion time).
+
+Compare localhost and LAN runs with the same FPS and item count. This helps
+separate server generation, wire bandwidth, client decoding, and Metal command
+encoding costs.
 
 The prototype currently sends complete frames and embeds image pixels. It does
 not yet provide authentication or encryption. Only expose it on a trusted local

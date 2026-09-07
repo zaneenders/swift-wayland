@@ -20,6 +20,12 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   private var latestFrame: (viewport: Size, commands: [DrawCommand])?
   private var inputSequence: UInt64 = 0
   private var isShuttingDown = false
+  private var statisticsStartedAt = ProcessInfo.processInfo.systemUptime
+  private var statisticsFrames = 0
+  private var statisticsBytes = 0
+  private var statisticsCommands = 0
+  private var statisticsDecodeTime: TimeInterval = 0
+  private var statisticsRenderTime: TimeInterval = 0
 
   public init(size: Size = Size(width: 800, height: 600), title: String = "Chroma Remote") throws {
     guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
@@ -48,10 +54,13 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
 
   public func connect(host: String = "127.0.0.1", port: Int = 9328) throws {
     let channel = try ClientBootstrap(group: group)
-      .channelInitializer { channel in
+      .channelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
+      .channelInitializer { [weak self] channel in
         channel.pipeline.addHandler(
-          RemoteClientHandler { [weak self] message in
-            Task { @MainActor in self?.receive(message) }
+          RemoteClientHandler { [weak self] message, byteCount, decodeDuration in
+            Task { @MainActor in
+              self?.receive(message, byteCount: byteCount, decodeDuration: decodeDuration)
+            }
           })
       }
       .connect(host: host, port: port).wait()
@@ -109,6 +118,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
       let command = queue.makeCommandBuffer(),
       let encoder = command.makeRenderCommandEncoder(descriptor: descriptor)
     else { return }
+    let renderStarted = ProcessInfo.processInfo.systemUptime
     displayRenderer.encode(
       DrawList(commands: frame.commands), viewport: frame.viewport,
       rasterScale: Point(
@@ -119,6 +129,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     command.present(drawable)
     command.commit()
     displayRenderer.finishFrame()
+    statisticsRenderTime += ProcessInfo.processInfo.systemUptime - renderStarted
   }
 
   private var currentViewport: Size {
@@ -160,29 +171,63 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     }
   }
 
-  private func receive(_ message: RemoteMessage) {
+  private func receive(_ message: RemoteMessage, byteCount: Int, decodeDuration: TimeInterval) {
     guard !isShuttingDown else { return }
     guard case .frame(let id, _, let viewport, let commands) = message else { return }
     if latestFrame == nil {
       print("Received remote frame \(id) with \(commands.count) draw commands")
     }
     latestFrame = (viewport, commands)
+    statisticsFrames += 1
+    statisticsBytes += byteCount
+    statisticsCommands += commands.count
+    statisticsDecodeTime += decodeDuration
+    printStatisticsIfNeeded()
     view.needsDisplay = true
+  }
+
+  private func printStatisticsIfNeeded() {
+    let now = ProcessInfo.processInfo.systemUptime
+    let elapsed = now - statisticsStartedAt
+    guard elapsed >= 1 else { return }
+    let frames = max(1, statisticsFrames)
+    print(
+      String(
+        format: "client %.1f fps | %.2f Mbit/s | %.0f commands/frame | decode %.2f ms | encode GPU %.2f ms",
+        Double(statisticsFrames) / elapsed, Double(statisticsBytes) * 8 / elapsed / 1_000_000,
+        Double(statisticsCommands) / Double(frames),
+        statisticsDecodeTime * 1_000 / Double(frames),
+        statisticsRenderTime * 1_000 / Double(frames)))
+    fflush(stdout)
+    statisticsStartedAt = now
+    statisticsFrames = 0
+    statisticsBytes = 0
+    statisticsCommands = 0
+    statisticsDecodeTime = 0
+    statisticsRenderTime = 0
   }
 }
 
 private final class RemoteClientHandler: ChannelInboundHandler, @unchecked Sendable {
   typealias InboundIn = ByteBuffer
   private var buffer = ByteBuffer()
-  private let onMessage: @Sendable (RemoteMessage) -> Void
+  private let onMessage: @Sendable (RemoteMessage, Int, TimeInterval) -> Void
 
-  init(onMessage: @escaping @Sendable (RemoteMessage) -> Void) { self.onMessage = onMessage }
+  init(onMessage: @escaping @Sendable (RemoteMessage, Int, TimeInterval) -> Void) {
+    self.onMessage = onMessage
+  }
 
   func channelRead(context: ChannelHandlerContext, data: NIOAny) {
     var incoming = unwrapInboundIn(data)
     buffer.writeBuffer(&incoming)
     do {
-      while let message = try RemoteWire.decode(from: &buffer) { onMessage(message) }
+      while true {
+        let bytesBeforeDecode = buffer.readableBytes
+        let started = ProcessInfo.processInfo.systemUptime
+        guard let message = try RemoteWire.decode(from: &buffer) else { break }
+        let duration = ProcessInfo.processInfo.systemUptime - started
+        onMessage(message, bytesBeforeDecode - buffer.readableBytes, duration)
+      }
       buffer.discardReadBytes()
     } catch {
       context.fireErrorCaught(error)

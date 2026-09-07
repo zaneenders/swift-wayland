@@ -16,12 +16,31 @@ public final class RemoteServer {
   private var frameID: UInt64 = 0
   private var inputSequence: UInt64 = 0
   private var redrawScheduled = false
+  private var refreshInterval: TimeInterval?
+  private var refreshScheduled = false
+  private var statisticsStartedAt = ProcessInfo.processInfo.systemUptime
+  private var statisticsFrames = 0
+  private var statisticsBytes = 0
+  private var statisticsCommands = 0
+  private var statisticsDrawTime: TimeInterval = 0
+  private var statisticsEncodeTime: TimeInterval = 0
 
   public init(content: any Block, size: Size = Size(width: 800, height: 600)) {
     self.content = content
     self.viewport = size
     self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     interaction.onRedrawRequested = { [weak self] in self?.scheduleRedraw() }
+  }
+
+  /// Continuously produces complete frames for animations and performance tests.
+  /// Pass `0` to return to input/redraw-driven rendering.
+  public func setRefreshRate(_ framesPerSecond: Double) {
+    guard framesPerSecond.isFinite, framesPerSecond > 0 else {
+      refreshInterval = nil
+      return
+    }
+    refreshInterval = 1 / framesPerSecond
+    scheduleRefresh()
   }
 
   public func start(host: String = "127.0.0.1", port: Int = 9328) throws {
@@ -35,10 +54,11 @@ public final class RemoteServer {
     serverChannel = try ServerBootstrap(group: group)
       .serverChannelOption(ChannelOptions.backlog, value: 8)
       .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+      .childChannelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
       .childChannelInitializer { channel in channel.pipeline.addHandler(handler) }
       .bind(host: host, port: port).wait()
     print("Chroma remote daemon listening on \(host):\(port)")
-    FileHandle.standardOutput.synchronizeFile()
+    fflush(stdout)
   }
 
   /// Runs the executor used to evaluate the `@MainActor` block graph.
@@ -63,7 +83,7 @@ public final class RemoteServer {
   private func receive(_ message: RemoteMessage, from channel: Channel) {
     if clientChannel == nil {
       print("Remote client connected")
-      FileHandle.standardOutput.synchronizeFile()
+      fflush(stdout)
     }
     clientChannel = channel
     switch message {
@@ -88,8 +108,20 @@ public final class RemoteServer {
     }
   }
 
+  private func scheduleRefresh() {
+    guard !refreshScheduled, let refreshInterval else { return }
+    refreshScheduled = true
+    DispatchQueue.main.asyncAfter(deadline: .now() + refreshInterval) { [weak self] in
+      guard let self else { return }
+      self.refreshScheduled = false
+      self.render()
+      self.scheduleRefresh()
+    }
+  }
+
   private func render(input: InputState = InputState()) {
     guard let channel = clientChannel else { return }
+    let drawStarted = ProcessInfo.processInfo.systemUptime
     interaction.beginFrame(input: input)
     var drawList = DrawList()
     if let content {
@@ -98,14 +130,49 @@ public final class RemoteServer {
         context: RenderContext(interaction: interaction))
     }
     interaction.endFrame()
+    let drawDuration = ProcessInfo.processInfo.systemUptime - drawStarted
     frameID &+= 1
     do {
+      let encodeStarted = ProcessInfo.processInfo.systemUptime
       let bytes = try RemoteWire.encode(
         .frame(id: frameID, inputSequence: inputSequence, viewport: viewport, commands: drawList.commands))
-      channel.eventLoop.execute { channel.writeAndFlush(bytes, promise: nil) }
+      let encodeDuration = ProcessInfo.processInfo.systemUptime - encodeStarted
+      recordStatistics(
+        byteCount: bytes.readableBytes, commandCount: drawList.commands.count,
+        drawDuration: drawDuration, encodeDuration: encodeDuration)
+      channel.writeAndFlush(bytes, promise: nil)
     } catch {
       print("Remote frame encoding failed: \(error)")
     }
+  }
+
+  private func recordStatistics(
+    byteCount: Int, commandCount: Int, drawDuration: TimeInterval, encodeDuration: TimeInterval
+  ) {
+    statisticsFrames += 1
+    statisticsBytes += byteCount
+    statisticsCommands += commandCount
+    statisticsDrawTime += drawDuration
+    statisticsEncodeTime += encodeDuration
+    let now = ProcessInfo.processInfo.systemUptime
+    let elapsed = now - statisticsStartedAt
+    guard elapsed >= 1 else { return }
+    let frames = max(1, statisticsFrames)
+    let megabitsPerSecond = Double(statisticsBytes) * 8 / elapsed / 1_000_000
+    print(
+      String(
+        format: "server %.1f fps | %.2f Mbit/s | %.0f commands/frame | draw %.2f ms | encode %.2f ms",
+        Double(statisticsFrames) / elapsed, megabitsPerSecond,
+        Double(statisticsCommands) / Double(frames),
+        statisticsDrawTime * 1_000 / Double(frames),
+        statisticsEncodeTime * 1_000 / Double(frames)))
+    fflush(stdout)
+    statisticsStartedAt = now
+    statisticsFrames = 0
+    statisticsBytes = 0
+    statisticsCommands = 0
+    statisticsDrawTime = 0
+    statisticsEncodeTime = 0
   }
 }
 
