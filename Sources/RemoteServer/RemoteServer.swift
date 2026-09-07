@@ -41,9 +41,9 @@ public final class RemoteServer {
       .serverChannelOption(ChannelOptions.backlog, value: 8)
       .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
       .childChannelOption(ChannelOptions.socketOption(.tcp_nodelay), value: 1)
-      .childChannelInitializer { [weak self] channel in
-        Self.connectionLogger.debug("Accepted remote TCP connection")
-        let server = self
+      .childChannelInitializer { [self] channel in
+        Self.connectionLogger.info("Accepted remote TCP connection")
+        let server: RemoteServer? = self
         return channel.pipeline.addHandler(
           RemoteServerHandler(
             onMessage: { channel, message in
