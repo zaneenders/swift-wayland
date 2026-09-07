@@ -26,6 +26,7 @@ public enum RemoteWire {
   public static let magic: UInt32 = 0x4348_524D  // CHRM
   public static let version: UInt16 = 1
   public static let maximumPayloadBytes = 64 * 1024 * 1024
+  public static let maximumCommandsPerFrame = 1_000_000
 
   private enum MessageType: UInt16 {
     case viewport = 1
@@ -54,7 +55,7 @@ public enum RemoteWire {
       payload.writeInteger(id, endianness: .little)
       payload.writeInteger(inputSequence, endianness: .little)
       payload.writeSize(viewport)
-      guard commands.count <= Int(UInt32.max) else {
+      guard commands.count <= min(Int(UInt32.max), maximumCommandsPerFrame) else {
         throw RemoteProtocolError.messageTooLarge(commands.count)
       }
       payload.writeInteger(UInt32(commands.count), endianness: .little)
@@ -107,6 +108,12 @@ public enum RemoteWire {
       let sequence = try payload.read(UInt64.self)
       let viewport = try payload.readSize()
       let count = Int(try payload.read(UInt32.self))
+      // Every command occupies at least its one-byte tag. Reject impossible
+      // counts before reserving so an untrusted peer cannot force a huge
+      // allocation with a tiny payload.
+      guard count <= maximumCommandsPerFrame, count <= payload.readableBytes else {
+        throw RemoteProtocolError.malformedMessage
+      }
       var commands: [DrawCommand] = []
       commands.reserveCapacity(count)
       for _ in 0..<count { commands.append(try payload.readDrawCommand()) }

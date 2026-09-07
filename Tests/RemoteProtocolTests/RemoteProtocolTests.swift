@@ -176,6 +176,20 @@ struct RemoteProtocolTests {
   }
 
   @Test func malformedPayloadsAndUnknownCommandsAreRejected() throws {
+    var impossibleCountPayload = ByteBuffer()
+    impossibleCountPayload.writeInteger(UInt64(1), endianness: .little)
+    impossibleCountPayload.writeInteger(UInt64(0), endianness: .little)
+    impossibleCountPayload.writeInteger(Float(10).bitPattern, endianness: .little)
+    impossibleCountPayload.writeInteger(Float(10).bitPattern, endianness: .little)
+    impossibleCountPayload.writeInteger(UInt32.max, endianness: .little)
+    var impossibleCountFrame = header(
+      magic: RemoteWire.magic, version: RemoteWire.version, type: 3,
+      length: UInt32(impossibleCountPayload.readableBytes))
+    impossibleCountFrame.writeBuffer(&impossibleCountPayload)
+    #expect(throws: RemoteProtocolError.malformedMessage) {
+      try RemoteWire.decode(from: &impossibleCountFrame)
+    }
+
     var requestWithPayload = header(magic: RemoteWire.magic, version: RemoteWire.version, type: 4, length: 1)
     requestWithPayload.writeInteger(UInt8(0))
     #expect(throws: RemoteProtocolError.malformedMessage) {
