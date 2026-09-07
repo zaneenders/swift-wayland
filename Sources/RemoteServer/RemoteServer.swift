@@ -1,4 +1,5 @@
 import Chroma
+import Dispatch
 import Foundation
 import NIOCore
 import NIOPosix
@@ -40,11 +41,17 @@ public final class RemoteServer {
     FileHandle.standardOutput.synchronizeFile()
   }
 
-  /// Runs the main event loop used to evaluate the `@MainActor` block graph.
-  /// Do not block the main thread on the NIO channel's close future: incoming
-  /// messages are deliberately handed from NIO to the main actor.
+  /// Runs the executor used to evaluate the `@MainActor` block graph.
+  /// Do not block on the NIO channel's close future: incoming messages are
+  /// deliberately handed from NIO to the main actor.
   public func run() {
+    #if os(macOS)
     RunLoop.main.run()
+    #else
+    // Foundation's main RunLoop is not a reliable process lifetime mechanism
+    // on all Linux deployments. Dispatch keeps the daemon and main queue alive.
+    dispatchMain()
+    #endif
   }
 
   public func shutdown() throws {
