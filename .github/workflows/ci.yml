@@ -42,7 +42,6 @@ jobs:
       SWIFTLY_HOME_DIR: /github/home/.local/share/swiftly
       SWIFTLY_BIN_DIR: /github/home/.local/bin
     steps:
-      - uses: actions/checkout@v6
       - name: Install Swift and native development libraries
         run: |
           pacman -Syu --noconfirm \
@@ -87,6 +86,8 @@ jobs:
           toolchain_path=$("$SWIFTLY_BIN_DIR/swiftly" use --print-location)
           "$toolchain_path/usr/bin/swift" --version
           echo "$toolchain_path/usr/bin" >> "$GITHUB_PATH"
+      # Install Git before checkout so it does not fall back to a source archive.
+      - uses: actions/checkout@v6
       - name: Show Swift version
         run: swift --version
       - name: Build native backend
@@ -113,7 +114,7 @@ jobs:
         run: python3 Benchmarks/Scripts/test_compare.py
       - name: Record wire benchmark timings (no timing threshold)
         run: Benchmarks/Scripts/run.sh Benchmarks/results/ci
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: rendering-wire-benchmarks-macos
           path: Benchmarks/results/ci
@@ -129,7 +130,6 @@ jobs:
       SWIFTLY_HOME_DIR: /github/home/.local/share/swiftly
       SWIFTLY_BIN_DIR: /github/home/.local/bin
     steps:
-      - uses: actions/checkout@v6
       - name: Install Swift and native development libraries
         run: |
           pacman -Syu --noconfirm \
@@ -174,6 +174,8 @@ jobs:
           toolchain_path=$("$SWIFTLY_BIN_DIR/swiftly" use --print-location)
           "$toolchain_path/usr/bin/swift" --version
           echo "$toolchain_path/usr/bin" >> "$GITHUB_PATH"
+      # Install Git before checkout so it does not fall back to a source archive.
+      - uses: actions/checkout@v6
       - name: Trust checkout ownership
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Show Swift version
@@ -184,7 +186,7 @@ jobs:
         run: python3 Benchmarks/Scripts/test_compare.py
       - name: Record wire benchmark timings (no timing threshold)
         run: Benchmarks/Scripts/run.sh Benchmarks/results/ci
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: rendering-wire-benchmarks-linux
           path: Benchmarks/results/ci
