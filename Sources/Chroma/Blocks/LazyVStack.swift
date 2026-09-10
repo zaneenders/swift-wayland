@@ -80,11 +80,13 @@ public struct LazyVStack: PrimitiveBlock {
     interaction.registerScrollViewport(rect)
     let contentHeight: Float
     if let uniformRows {
-      contentHeight = Float(uniformRows.count) * uniformRows.height
+      contentHeight =
+        Float(uniformRows.count) * uniformRows.height
         + spacing * Float(max(0, uniformRows.count - 1))
     } else {
       updateCache(width: rect.size.width, context: context)
-      contentHeight = controller.lazyStackCache.rowSizes.reduce(0) { $0 + $1.height }
+      contentHeight =
+        controller.lazyStackCache.rowSizes.reduce(0) { $0 + $1.height }
         + spacing * Float(max(0, rows.count - 1))
     }
     let maximumOffset = max(0, contentHeight - rect.size.height)
@@ -134,10 +136,18 @@ public struct LazyVStack: PrimitiveBlock {
     if let uniformRows {
       let stride = uniformRows.height + spacing
       // Clamp in floating point before converting to Int, including empty data.
-      let first = Int(min(Float(uniformRows.count), max(0,
-        ((visibleTop - uniformRows.height) / stride).rounded(.up))))
-      let end = Int(min(Float(uniformRows.count), max(0,
-        (visibleBottom / stride).rounded(.down) + 1)))
+      let first = Int(
+        min(
+          Float(uniformRows.count),
+          max(
+            0,
+            ((visibleTop - uniformRows.height) / stride).rounded(.up))))
+      let end = Int(
+        min(
+          Float(uniformRows.count),
+          max(
+            0,
+            (visibleBottom / stride).rounded(.down) + 1)))
       if rect.size.height > 0 && first < end {
         for index in first..<end {
           BlockEngine.draw(
@@ -184,7 +194,8 @@ public struct LazyVStack: PrimitiveBlock {
     // Stable rows already have measured sizes. Avoid rebuilding a dictionary
     // and two arrays on every animation or input frame.
     if cache.width == width && cache.rowIDs.count == rows.count
-      && zip(cache.rowIDs, rows).allSatisfy({ $0.0 == $0.1.id }) {
+      && zip(cache.rowIDs, rows).allSatisfy({ $0.0 == $0.1.id })
+    {
       return
     }
     var oldSizes: [WidgetID: Size] = [:]

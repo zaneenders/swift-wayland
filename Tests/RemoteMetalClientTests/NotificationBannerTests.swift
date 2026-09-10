@@ -1,6 +1,7 @@
 import AppKit
-@testable import RemoteMetalClient
 import Testing
+
+@testable import RemoteMetalClient
 
 @Suite("Client notification banner")
 @MainActor
@@ -48,7 +49,6 @@ struct NotificationBannerTests {
       }
     }
   }
-
 
   @Test func successNotificationDismissesAutomatically() throws {
     let banner = NotificationBanner(frame: .zero)

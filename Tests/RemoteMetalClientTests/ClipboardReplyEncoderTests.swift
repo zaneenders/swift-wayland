@@ -1,7 +1,8 @@
 import Foundation
 import RemoteProtocol
-@testable import RemoteMetalClient
 import Testing
+
+@testable import RemoteMetalClient
 
 @Suite("Client clipboard failure replies")
 struct ClipboardReplyEncoderTests {
@@ -12,8 +13,10 @@ struct ClipboardReplyEncoderTests {
       text: String(repeating: "x", count: RemoteWire.maximumClipboardBytes + excess))
     var result = try ClipboardReplyEncoder.encode(reply)
     #expect(result.notification?.contains("1 MiB") == true)
-    #expect(try RemoteWire.decode(from: &result.bytes) == .clipboard(
-      ClipboardTransfer(id: 42, isReply: true, success: false)))
+    #expect(
+      try RemoteWire.decode(from: &result.bytes)
+        == .clipboard(
+          ClipboardTransfer(id: 42, isReply: true, success: false)))
     #expect(result.bytes.readableBytes == 0)
   }
 

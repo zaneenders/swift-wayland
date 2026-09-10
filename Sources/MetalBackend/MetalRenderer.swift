@@ -115,7 +115,6 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
     NSApplication.shared.terminate(nil)
   }
 
-
   private var lastFrameTime: Double = 0
   private var smoothedFrameRate: Double = 0
 
@@ -174,8 +173,6 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
     smoothedFrameRate = smoothedFrameRate == 0 ? instant : smoothedFrameRate * 0.9 + instant * 0.1
     interaction.frameRate = smoothedFrameRate
   }
-
-
 
 }
 

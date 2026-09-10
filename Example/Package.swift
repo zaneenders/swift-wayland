@@ -3,15 +3,17 @@ import PackageDescription
 
 var dependencies: [Target.Dependency] = [
   "DemoContent",
-  .product(name: "Chroma", package: "chroma")
+  .product(name: "Chroma", package: "chroma"),
 ]
 var swiftSettings: [SwiftSetting] = []
 var chromaTraits: Set<Package.Dependency.Trait> = []
 var targets: [Target] = [
   .testTarget(
     name: "DemoContentTests",
-    dependencies: ["DemoContent", .product(name: "HeadlessBackend", package: "chroma"),
-                   .product(name: "RemoteProtocol", package: "chroma")]
+    dependencies: [
+      "DemoContent", .product(name: "HeadlessBackend", package: "chroma"),
+      .product(name: "RemoteProtocol", package: "chroma"),
+    ]
   ),
   .target(
     name: "DemoContent",

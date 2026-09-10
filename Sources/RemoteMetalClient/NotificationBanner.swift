@@ -83,10 +83,12 @@ final class NotificationBanner: NSVisualEffectView {
     }
     label.stringValue = message
     isHidden = false
-    NSAccessibility.post(element: self, notification: .announcementRequested, userInfo: [
-      .announcement: message,
-      .priority: NSAccessibilityPriorityLevel.high.rawValue,
-    ])
+    NSAccessibility.post(
+      element: self, notification: .announcementRequested,
+      userInfo: [
+        .announcement: message,
+        .priority: NSAccessibilityPriorityLevel.high.rawValue,
+      ])
   }
 
   @objc func dismiss() {

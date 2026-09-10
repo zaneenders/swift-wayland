@@ -347,7 +347,8 @@ struct PerformanceDemo: Block {
           TextField(
             "Paste here…", id: WidgetID("clipboard.target"), fontScale: 0.7,
             text: { state.pastedText }, onChange: { state.pastedText = $0 })
-          Text("Copy / cut / paste / select all: platform shortcut modifier + C / X / V / A. Escape ends editing.").fontScale(0.55)
+          Text("Copy / cut / paste / select all: platform shortcut modifier + C / X / V / A. Escape ends editing.")
+            .fontScale(0.55)
           Spacer()
         }.padding(20)
       } else {
