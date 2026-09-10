@@ -1,5 +1,6 @@
 # Local rendering benchmark artifacts
 Benchmarks/results/
+Benchmarks/Scripts/__pycache__/
 
 # Build artifacts
 .build/

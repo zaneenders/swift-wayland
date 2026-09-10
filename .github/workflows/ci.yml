@@ -109,6 +109,8 @@ jobs:
         run: swift --version
       - name: Test deterministic rendering replay
         run: swift test --package-path Benchmarks -c release
+      - name: Test benchmark comparison tooling
+        run: python3 Benchmarks/Scripts/test_compare.py
       - name: Record wire benchmark timings (no timing threshold)
         run: Benchmarks/Scripts/run.sh Benchmarks/results/ci
       - uses: actions/upload-artifact@v4
@@ -178,6 +180,8 @@ jobs:
         run: swift --version
       - name: Test deterministic rendering replay
         run: swift test --package-path Benchmarks -c release
+      - name: Test benchmark comparison tooling
+        run: python3 Benchmarks/Scripts/test_compare.py
       - name: Record wire benchmark timings (no timing threshold)
         run: Benchmarks/Scripts/run.sh Benchmarks/results/ci
       - uses: actions/upload-artifact@v4

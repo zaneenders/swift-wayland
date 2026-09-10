@@ -3,13 +3,18 @@ import Foundation
 
 /// Versioned, deterministic display lists: no application state, clock, or randomness.
 public struct RenderFixture: Sendable {
-  public static let version = 1
-  public static let names = ["shapes", "text", "clipped", "images"]
+  public static let version = 2
+  public static let names = ["shapes", "text", "clipped", "images"] + TranscriptReplay.names
   public let viewport = Size(width: 1100, height: 720)
-  public let list: DrawList
+  public let sequence: [DrawList]
+  public var list: DrawList { sequence[0] }
 
   public init(name: String, count: Int) throws {
     precondition(Self.names.contains(name) && count > 0)
+    if TranscriptReplay.names.contains(name) {
+      sequence = TranscriptReplay.make(name: name, historyLines: count)
+      return
+    }
     var list = DrawList()
     var pixels = Data()
     for y in 0..<64 {
@@ -34,6 +39,6 @@ public struct RenderFixture: Sendable {
       }
     }
     if name == "clipped" { list.popClip() }
-    self.list = list
+    self.sequence = [list]
   }
 }

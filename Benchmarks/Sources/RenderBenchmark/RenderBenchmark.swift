@@ -23,6 +23,9 @@ struct Distribution: Codable {
 struct Report: Codable {
   let schemaVersion: Int
   let fixtureVersion: Int
+  let sequenceFrames: Int
+  let commandCountMin: Int
+  let commandCountMax: Int
   let protocolVersion: UInt16
   let os: String
   let processors: Int
@@ -48,7 +51,7 @@ struct RenderBenchmark {
     var arguments = Array(CommandLine.arguments.dropFirst())
     if arguments == ["--help"] {
       print(
-        "RenderBenchmark [--scene shapes|text|clipped|images] [--stage wire|metal|pipeline] [--count 2000] [--frames 300] [--warmup 30] [--seconds 0]"
+        "RenderBenchmark [--scene \(RenderFixture.names.joined(separator: "|"))] [--stage wire|metal|pipeline] [--count 2000] [--frames 300] [--warmup 30] [--seconds 0]"
       )
       return
     }
@@ -97,12 +100,15 @@ struct RenderBenchmark {
     var measurementStart = now()
     repeat {
       var durations: [String: Double] = [:]
-      var replay = fixture.list
+      // Restart at frame zero after warmup so all trials cover identical sequences.
+      let sequenceIndex = iteration > warmup ? measured : iteration
+      let source = fixture.sequence[sequenceIndex % fixture.sequence.count]
+      var replay = source
       var bytes = 0
       if stage != "metal" {
         let message = RemoteMessage.frame(
           id: UInt64(iteration), inputSequence: 0,
-          viewport: fixture.viewport, commands: fixture.list.commands)
+          viewport: fixture.viewport, commands: source.commands)
         let encodeStart = now()
         var wire = try RemoteWire.encode(message, images: sender)
         durations["wireEncode"] = now() - encodeStart
@@ -140,7 +146,10 @@ struct RenderBenchmark {
       await Task.yield()
     } while measured < frames || now() - measurementStart < seconds
     let report = Report(
-      schemaVersion: 1, fixtureVersion: RenderFixture.version,
+      schemaVersion: 2, fixtureVersion: RenderFixture.version,
+      sequenceFrames: fixture.sequence.count,
+      commandCountMin: fixture.sequence.map { $0.commands.count }.min()!,
+      commandCountMax: fixture.sequence.map { $0.commands.count }.max()!,
       protocolVersion: RemoteWire.version, os: ProcessInfo.processInfo.operatingSystemVersionString,
       processors: ProcessInfo.processInfo.activeProcessorCount, scene: scene, stage: stage,
       count: count, frames: measured, warmup: warmup, profilingEnabled: profiling,
