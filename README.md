@@ -1,5 +1,18 @@
 # Chroma
 
+## Automated rendering benchmarks
+
+The standalone [Benchmarks package](Benchmarks/README.md) provides deterministic
+wire/offscreen Metal replay, correctness tests, JSON timing reports, regression
+comparisons, and automated `swift-profile-recorder` captures.
+
+```sh
+swift test --package-path Benchmarks -c release
+METAL=1 Benchmarks/Scripts/run.sh
+Benchmarks/Scripts/profile.sh Benchmarks/results/profile text metal
+```
+
+
 UI library written in Swift
 
 ⚠️ Unstable: Heavy AI • Active API [dogfooding](https://github.com/zaneenders/scribe)
