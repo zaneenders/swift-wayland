@@ -24,7 +24,8 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   private let view: ChromaInputView
   private let banner = NotificationBanner(frame: .zero)
   private let window: NSWindow
-  private var latestFrame: (viewport: Size, commands: [DrawCommand])?
+  private var frameState = RemoteFrameState()
+  private var latestFrame: (viewport: Size, commands: [DrawCommand])? { frameState.latest }
   private var clipboardGenerations = ClipboardGenerations()
   private var statistics = ClientStatistics()
   private var inputSequence: UInt64 = 0
@@ -33,7 +34,10 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   // Protect the renderer's three shared instance-buffer slots from GPU reuse.
   private let inFlight = DispatchSemaphore(value: 3)
   private var frameRequestTimer: Timer?
-  private var frameRequestOutstanding = false
+  private var frameRequestOutstanding: Bool {
+    get { frameState.requestOutstanding }
+    set { frameState.requestOutstanding = newValue }
+  }
   private var requestedFramesPerSecond: Double = 30
   // AppKit window/delegate relationships are not owning. Keep the coordinator
   // alive for the duration of NSApplication.run(), even when its caller's local
@@ -388,8 +392,13 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
       }
       return
     }
-    guard case .frame(let id, _, let viewport, let commands) = message else { return }
-    if latestFrame == nil {
+    guard case .frame(let id, _, _, let commands) = message else { return }
+    // The wire decoder has already consumed image definitions. Drop only the
+    // presentation, retaining cache synchronization and the previous good frame.
+    // The request credit was released above, so polling continues normally.
+    let isFirstFrame = latestFrame == nil
+    guard frameState.receive(message) else { return }
+    if isFirstFrame {
       print("Received remote frame \(id) with \(commands.count) draw commands")
     }
     frameRequestOutstanding = false
@@ -399,7 +408,6 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
       window.title = connectedTitle
       banner.show("Reconnected to the remote daemon.", success: true, dismissAfter: 4)
     }
-    latestFrame = (viewport, commands)
     statistics.frames += 1
     statistics.bytes += byteCount
     statistics.commands += commands.count

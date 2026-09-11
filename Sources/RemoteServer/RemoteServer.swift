@@ -12,6 +12,7 @@ public final class RemoteServer {
   public var keyBindings = KeyBindings()
   public var editingKeyBindings = KeyBindings()
   private var pointerPosition = Point.zero
+  private var pointerState = InputState()
   private var clipboardEpoch: UInt64 = 0
   private struct EditorSnapshot {
     let text: String?
@@ -157,11 +158,15 @@ public final class RemoteServer {
         render(input: InputState(textEvents: [.insert(text)]))
       }
     case .viewport(let size):
+      guard RemoteFrameValidation.isValidViewport(size) else { return }
       viewport = size
       render()
     case .input(let sequence, let state):
       guard sequence > inputSequence else { return }
       pointerPosition = state.pointerPosition
+      pointerState = InputState(
+        pointerPosition: state.pointerPosition, pointerPressPosition: state.pointerPressPosition,
+        pointerDown: state.pointerDown)
       inputSequence = sequence
       render(input: state)
     case .frameRate(let fps):
@@ -234,6 +239,8 @@ public final class RemoteServer {
     clipboardEpoch &+= 1
     deferredInput.removeAll()
     inputSequence = 0
+    pointerPosition = .zero
+    pointerState = InputState()
     connectionEpoch &+= 1
     redrawScheduled = false
     requestPending = false
@@ -276,9 +283,14 @@ public final class RemoteServer {
   }
 
   @discardableResult
-  private func render(input: InputState = InputState()) -> FrameSnapshot? {
+  private func render(input: InputState? = nil) -> FrameSnapshot? {
     guard let channel = clientChannel else { return nil }
     let drawStarted = ProcessInfo.processInfo.systemUptime
+    var input = input ?? pointerState
+    // Keyboard/clipboard edits carry transient events but no new pointer sample.
+    input.pointerPosition = pointerState.pointerPosition
+    input.pointerPressPosition = pointerState.pointerPressPosition
+    input.pointerDown = pointerState.pointerDown
     interaction.beginFrame(input: input)
     var drawList = DrawList()
     if let content {

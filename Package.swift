@@ -63,7 +63,7 @@ defaultBackendTraits.insert("MetalBackend")
 products.append(.library(name: "MetalBackend", targets: ["MetalBackend"]))
 products.append(.library(name: "RemoteMetalClient", targets: ["RemoteMetalClient"]))
 targets.append(contentsOf: [
-  .testTarget(name: "RemoteMetalClientTests", dependencies: ["RemoteMetalClient"]),
+  .testTarget(name: "RemoteMetalClientTests", dependencies: ["RemoteMetalClient", "Chroma", "RemoteProtocol"]),
   .target(
     name: "MetalBackend",
     dependencies: ["Chroma", "ChromaFont"],
