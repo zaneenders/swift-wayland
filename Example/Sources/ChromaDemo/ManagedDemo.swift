@@ -19,7 +19,8 @@ struct ManagedDemo {
       print("Save a capture with Ctrl+Shift+G; the default destination is Example/.")
       return
     }
-    let capture = try DemoCaptureConfiguration.parse(arguments: &arguments)
+    let capture =
+      try DemoCaptureConfiguration.parse(arguments: &arguments)
       ?? DemoCaptureConfiguration.nativeDefault()
     guard arguments.isEmpty else {
       throw LaunchError.message("Unexpected arguments: \(arguments.joined(separator: " "))")
@@ -73,7 +74,11 @@ struct ManagedDemo {
 
 private enum LaunchError: Error, CustomStringConvertible {
   case message(String)
-  var description: String { switch self { case .message(let text): text } }
+  var description: String {
+    switch self {
+    case .message(let text): text
+    }
+  }
 }
 
 /// Only this launcher owns this process. External RemoteDemoClient sessions do not.
@@ -91,7 +96,9 @@ private final class OwnedBackend: @unchecked Sendable {
     guard _NSGetExecutablePath(&path, &size) == 0 else {
       throw LaunchError.message("Cannot locate the demo executable")
     }
-    process.executableURL = URL(fileURLWithPath: String(decoding: path.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)).resolvingSymlinksInPath()
+    process.executableURL = URL(
+      fileURLWithPath: String(decoding: path.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    ).resolvingSymlinksInPath()
     process.arguments = ["--backend", "--capture-directory", capture.directory.path]
     process.standardInput = control
     process.standardOutput = readiness

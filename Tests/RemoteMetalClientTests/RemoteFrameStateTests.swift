@@ -5,6 +5,26 @@ import Testing
 @testable import RemoteMetalClient
 
 struct RemoteFrameStateTests {
+  @Test func unchangedReplyReleasesCreditAndKeepsPresentation() {
+    var state = RemoteFrameState()
+    let viewport = Size(width: 800, height: 600)
+    state.receive(.frame(id: 1, inputSequence: 0, viewport: viewport, commands: []))
+    state.requestOutstanding = true
+    let accepted = state.receive(.frameUnchanged)
+    #expect(!accepted)
+    #expect(!state.requestOutstanding)
+    #expect(state.latest?.viewport == viewport)
+  }
+
+  @Test func unrelatedMessageDoesNotReleaseCredit() {
+    var state = RemoteFrameState()
+    state.requestOutstanding = true
+    let accepted = state.receive(.requestFrame)
+    #expect(!accepted)
+    #expect(state.requestOutstanding)
+    #expect(state.latest == nil)
+  }
+
   @Test func dropsBadFrameAndReleasesCredit() {
     var state = RemoteFrameState()
     let viewport = Size(width: 800, height: 600)

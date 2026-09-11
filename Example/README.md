@@ -1,8 +1,9 @@
 # Chroma Examples
 
-## Native demo
+## Local demo
 
-Run the native Metal demo on macOS or the Wayland/EGL/OpenGL ES demo on Linux:
+On macOS, the demo owns a backend subprocess and connects a Metal client over
+loopback. Closing the window stops the backend. Linux uses Wayland/EGL/OpenGL ES:
 
 ```sh
 swift run ChromaDemo

@@ -88,7 +88,7 @@ intentional GPU completion waits; inspect active encoding stacks separately.
 
 ```sh
 METAL=1 Benchmarks/Scripts/run.sh Benchmarks/results/candidate
-python3 Benchmarks/Scripts/compare.py \
+swift run --package-path Benchmarks -c release CompareBenchmarks \
   Benchmarks/results/baseline Benchmarks/results/candidate \
   --max-regression-percent 15
 ```
@@ -117,7 +117,7 @@ construction/draw/cull measurements, and live Scribe profiles for real workloads
 METAL=1 Benchmarks/Scripts/baseline.sh Benchmarks/results/baseline-v2 5
 # Make ONE optimization, then repeat with exactly the same settings.
 METAL=1 Benchmarks/Scripts/baseline.sh Benchmarks/results/candidate-v2 5
-python3 Benchmarks/Scripts/compare.py \
+swift run --package-path Benchmarks -c release CompareBenchmarks \
   Benchmarks/results/baseline-v2 Benchmarks/results/candidate-v2
 ```
 

@@ -26,9 +26,9 @@ public struct DemoCaptureConfiguration: Sendable {
   /// The source location is embedded at build time; moved binaries can use the CLI override.
   public static func nativeDefault() throws -> Self {
     let directory = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent() // DemoContent
-      .deletingLastPathComponent() // Sources
-      .deletingLastPathComponent() // Example
+      .deletingLastPathComponent()  // DemoContent
+      .deletingLastPathComponent()  // Sources
+      .deletingLastPathComponent()  // Example
     return try Self(directory: directory)
   }
 

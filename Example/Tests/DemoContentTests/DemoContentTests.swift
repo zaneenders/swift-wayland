@@ -137,6 +137,7 @@ private func captureTestDirectory() throws -> URL {
     .standardizedFileURL.resolvingSymlinksInPath()
   let configuration = try DemoCaptureConfiguration.nativeDefault()
   #expect(configuration.directory.path == expected.path)
-  #expect(FileManager.default.fileExists(
-    atPath: configuration.directory.appendingPathComponent("Package.swift").path))
+  #expect(
+    FileManager.default.fileExists(
+      atPath: configuration.directory.appendingPathComponent("Package.swift").path))
 }

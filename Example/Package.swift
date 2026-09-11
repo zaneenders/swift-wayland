@@ -8,10 +8,12 @@ var dependencies: [Target.Dependency] = [
 var swiftSettings: [SwiftSetting] = []
 var chromaTraits: Set<Package.Dependency.Trait> = []
 var targets: [Target] = [
-  .target(name: "DemoBackend", dependencies: [
-    "DemoContent", .product(name: "Chroma", package: "chroma"),
-    .product(name: "RemoteServer", package: "chroma"),
-  ]),
+  .target(
+    name: "DemoBackend",
+    dependencies: [
+      "DemoContent", .product(name: "Chroma", package: "chroma"),
+      .product(name: "RemoteServer", package: "chroma"),
+    ]),
   .testTarget(
     name: "DemoContentTests",
     dependencies: [

@@ -21,6 +21,8 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-log.git", from: "1.6.1"),
   ],
   targets: [
+    .executableTarget(name: "CompareBenchmarks"),
+    .testTarget(name: "CompareBenchmarksTests", dependencies: ["CompareBenchmarks"]),
     .target(name: "RenderFixtures", dependencies: [.product(name: "Chroma", package: "chroma")]),
     .executableTarget(
       name: "RenderBenchmark", dependencies: runnerDependencies,

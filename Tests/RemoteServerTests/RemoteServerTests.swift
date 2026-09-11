@@ -1,4 +1,5 @@
 import Chroma
+import Foundation
 import NIOCore
 import NIOEmbedded
 import RemoteProtocol
@@ -8,11 +9,13 @@ import Testing
 
 @MainActor
 struct RemoteServerTests {
-  private func reply(from channel: EmbeddedChannel) async throws -> RemoteMessage {
+  private func reply(from channel: EmbeddedChannel, images: RemoteImageCache = RemoteImageCache()) async throws
+    -> RemoteMessage
+  {
     for _ in 0..<500 {
       channel.embeddedEventLoop.run()
       if var bytes = try channel.readOutbound(as: ByteBuffer.self) {
-        return try #require(try RemoteWire.decode(from: &bytes))
+        return try #require(try RemoteWire.decode(from: &bytes, images: images))
       }
       try await Task.sleep(for: .milliseconds(2))
     }
@@ -110,5 +113,61 @@ extension RemoteServerTests {
     _ = try await reply(from: channel)
     #expect(recorder.inputs.last?.pointerDown == false)
     #expect(recorder.inputs.last?.pointerReleased == false)
+  }
+}
+
+extension RemoteServerTests {
+  @Test func presentationCreditsRespectFrameRate() async throws {
+    let server = RemoteServer(content: EmptyBlock())
+    let channel = EmbeddedChannel()
+    try await channel.connect(to: SocketAddress(ipAddress: "127.0.0.1", port: 9328)).get()
+    defer {
+      server.disconnected(channel)
+      _ = try? channel.finish()
+      try? server.shutdown()
+    }
+    server.receive(.frameRate(30), from: channel)
+    server.receive(.requestFrame, from: channel)
+    _ = try await reply(from: channel)
+    let clock = ContinuousClock()
+    let started = clock.now
+    for _ in 0..<30 {
+      server.receive(.requestFrame, from: channel)
+      #expect(try await reply(from: channel) == .frameUnchanged)
+    }
+    #expect(started.duration(to: clock.now) >= .seconds(30 / 30.5))
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(try channel.readOutbound(as: ByteBuffer.self) == nil)
+  }
+
+  @Test func viewportChangeReusesImagePixels() async throws {
+    let image = try ImageResource(
+      id: ImageID("test"), width: 2, height: 2,
+      rgba8: Data(repeating: 255, count: 16))
+    let server = RemoteServer(content: Image(image))
+    let channel = EmbeddedChannel()
+    let images = RemoteImageCache()
+    try await channel.connect(to: SocketAddress(ipAddress: "127.0.0.1", port: 9328)).get()
+    defer {
+      server.disconnected(channel)
+      _ = try? channel.finish()
+      try? server.shutdown()
+    }
+    server.receive(.requestFrame, from: channel)
+    guard case .frame = try await reply(from: channel, images: images) else {
+      Issue.record("First credit must produce a full frame")
+      return
+    }
+    #expect(images.transmittedPixelBytes == image.rgba8.count)
+    let resized = Size(width: 820, height: 520)
+    server.receive(.viewport(resized), from: channel)
+    server.receive(.requestFrame, from: channel)
+    guard case .frame(_, _, let viewport, let commands) = try await reply(from: channel, images: images) else {
+      Issue.record("Viewport change must produce a full frame")
+      return
+    }
+    #expect(viewport == resized)
+    #expect(!commands.isEmpty)
+    #expect(images.transmittedPixelBytes == image.rgba8.count)
   }
 }

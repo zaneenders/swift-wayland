@@ -349,9 +349,10 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
         statistics.requestTime += ProcessInfo.processInfo.systemUptime - requestStartedAt
         statistics.replies += 1
       }
-      frameRequestOutstanding = false
     default: break
     }
+    let isFirstFrame = latestFrame == nil
+    let acceptedFrame = frameState.receive(message)
     if case .frameUnchanged = message {
       statistics.bytes += byteCount
       statistics.reportIfNeeded()
@@ -395,13 +396,11 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
     guard case .frame(let id, _, _, let commands) = message else { return }
     // The wire decoder has already consumed image definitions. Drop only the
     // presentation, retaining cache synchronization and the previous good frame.
-    // The request credit was released above, so polling continues normally.
-    let isFirstFrame = latestFrame == nil
-    guard frameState.receive(message) else { return }
+    // Frame state releases the request credit even for a rejected presentation.
+    guard acceptedFrame else { return }
     if isFirstFrame {
       print("Received remote frame \(id) with \(commands.count) draw commands")
     }
-    frameRequestOutstanding = false
     if awaitingReconnectFrame {
       awaitingReconnectFrame = false
       reconnectDelay = 1
