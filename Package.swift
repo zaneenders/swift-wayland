@@ -14,6 +14,7 @@ var targets: [Target] = [
     name: "RemoteServerTests",
     dependencies: [
       "RemoteServer", "RemoteProtocol", "Chroma",
+      .product(name: "NIOPosix", package: "swift-nio"),
       .product(name: "NIOEmbedded", package: "swift-nio"),
     ]),
   .testTarget(

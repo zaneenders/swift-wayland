@@ -29,7 +29,7 @@ public final class RemoteServer {
   private let group: MultiThreadedEventLoopGroup
   private let connectionFactory: RemoteServerConnectionFactory
   private var serverChannel: Channel?
-  fileprivate var clientChannel: Channel?
+  private(set) var clientChannel: Channel?
   private let interaction = Interaction()
   private var content: (any Block)?
   private var viewport: Size
@@ -45,8 +45,8 @@ public final class RemoteServer {
   private var connectionEpoch: UInt64 = 0
   private let wireEncoder = ConnectionFrameEncoder()
   // Remains occupied across disconnects until old encoding/writing completes.
-  private var frameInFlight = false
-  private let encodingQueue = DispatchQueue(label: "chroma.remote.frame-encoding")
+  private(set) var frameInFlight = false
+  private let encodingQueue: DispatchQueue
   private struct FrameSnapshot: Sendable {
     let message: RemoteMessage
     let channel: Channel
@@ -54,7 +54,13 @@ public final class RemoteServer {
     let commandCount: Int
   }
 
-  public init(content: any Block, size: Size = Size(width: 800, height: 600)) {
+  public convenience init(content: any Block, size: Size = Size(width: 800, height: 600)) {
+    self.init(content: content, size: size, encodingQueue: DispatchQueue(label: "chroma.remote.frame-encoding"))
+  }
+
+  // Injectable serial queue lets lifecycle tests hold encoding across a disconnect.
+  init(content: any Block, size: Size = Size(width: 800, height: 600), encodingQueue: DispatchQueue) {
+    self.encodingQueue = encodingQueue
     self.content = content
     self.viewport = size
     self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
@@ -103,6 +109,7 @@ public final class RemoteServer {
   }
 
   func receive(_ message: RemoteMessage, from channel: Channel) {
+    guard channel.isActive else { return }
     if clientChannel == nil {
       logger.info("Remote client connected")
     }
@@ -374,12 +381,13 @@ private final class RemoteServerConnectionFactory: @unchecked Sendable {
   func initialize(channel: Channel) -> EventLoopFuture<Void> {
     Self.logger.info("Accepted remote TCP connection")
     return channel.eventLoop.makeCompletedFuture {
+      let mailbox = RemoteInputMailbox { [weak self] message in
+        self?.server?.receive(message, from: channel)
+      }
       try channel.pipeline.syncOperations.addHandlers(
         ByteToMessageHandler(RemoteMessageDecoder()),
         RemoteServerHandler(
-          onMessage: { [weak self] channel, message in
-            DispatchQueue.main.async { self?.server?.receive(message, from: channel) }
-          },
+          mailbox: mailbox,
           onInactive: { [weak self] channel in
             DispatchQueue.main.async {
               self?.server?.disconnected(channel)
@@ -394,26 +402,31 @@ private final class RemoteServerConnectionFactory: @unchecked Sendable {
 
 private final class RemoteServerHandler: ChannelInboundHandler, @unchecked Sendable {
   typealias InboundIn = DecodedRemoteMessage
-  private let onMessage: @Sendable (Channel, RemoteMessage) -> Void
+  private let mailbox: RemoteInputMailbox
   private let onInactive: @Sendable (Channel) -> Void
   private let onError: @Sendable (Error) -> Void
 
   init(
-    onMessage: @escaping @Sendable (Channel, RemoteMessage) -> Void,
+    mailbox: RemoteInputMailbox,
     onInactive: @escaping @Sendable (Channel) -> Void,
     onError: @escaping @Sendable (Error) -> Void
   ) {
-    self.onMessage = onMessage
+    self.mailbox = mailbox
     self.onInactive = onInactive
     self.onError = onError
   }
 
   func channelRead(context: ChannelHandlerContext, data: NIOAny) {
     let decoded = unwrapInboundIn(data)
-    onMessage(context.channel, decoded.message)
+    if !mailbox.enqueue(decoded.message, byteCount: decoded.byteCount) {
+      context.close(promise: nil)
+    }
   }
 
-  func channelInactive(context: ChannelHandlerContext) { onInactive(context.channel) }
+  func channelInactive(context: ChannelHandlerContext) {
+    mailbox.close()
+    onInactive(context.channel)
+  }
   func errorCaught(context: ChannelHandlerContext, error: Error) {
     onError(error)
     context.close(promise: nil)
