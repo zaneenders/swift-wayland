@@ -5,6 +5,7 @@ import Logging
 import NIOCore
 import NIOPosix
 import RemoteProtocol
+import Synchronization
 
 @MainActor
 public final class RemoteServer {
@@ -374,9 +375,9 @@ public final class RemoteServer {
   }
 }
 
-private final class RemoteServerConnectionFactory: @unchecked Sendable {
+private final class RemoteServerConnectionFactory: Sendable {
   private static let logger = Logger(label: "chroma.remote.server.connection")
-  weak var server: RemoteServer?
+  @MainActor weak var server: RemoteServer?
 
   func initialize(channel: Channel) -> EventLoopFuture<Void> {
     Self.logger.info("Accepted remote TCP connection")
@@ -400,7 +401,7 @@ private final class RemoteServerConnectionFactory: @unchecked Sendable {
   }
 }
 
-private final class RemoteServerHandler: ChannelInboundHandler, @unchecked Sendable {
+private final class RemoteServerHandler: ChannelInboundHandler, Sendable {
   typealias InboundIn = DecodedRemoteMessage
   private let mailbox: RemoteInputMailbox
   private let onInactive: @Sendable (Channel) -> Void
@@ -433,19 +434,25 @@ private final class RemoteServerHandler: ChannelInboundHandler, @unchecked Senda
   }
 }
 
-// Only accessed by the serial encoding queue. Reset resources on reconnect;
-// encoding happens only after a presentation credit is consumed.
-private final class ConnectionFrameEncoder: @unchecked Sendable {
-  private var channel: Channel?
-  private var images = RemoteImageCache()
+// Protect the connection and image cache together, including across reconnects.
+// Encoding still runs off the main actor on the encoding queue.
+private final class ConnectionFrameEncoder: Sendable {
+  private struct State: Sendable {
+    var channel: Channel?
+    var images = RemoteImageCache()
+  }
+  private let state = Mutex(State())
+
   func encode(_ message: RemoteMessage, channel: Channel) throws -> EncodedFrame {
-    if self.channel !== channel {
-      self.channel = channel
-      images = RemoteImageCache()
+    try state.withLock { state in
+      if state.channel !== channel {
+        state.channel = channel
+        state.images = RemoteImageCache()
+      }
+      let before = state.images.transmittedPixelBytes
+      let bytes = try RemoteWire.encode(message, images: &state.images)
+      return EncodedFrame(bytes: bytes, imageBytes: state.images.transmittedPixelBytes - before)
     }
-    let before = images.transmittedPixelBytes
-    let bytes = try RemoteWire.encode(message, images: &images)
-    return EncodedFrame(bytes: bytes, imageBytes: images.transmittedPixelBytes - before)
   }
 }
 

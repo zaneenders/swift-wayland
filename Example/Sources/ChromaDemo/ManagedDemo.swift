@@ -55,7 +55,10 @@ struct ManagedDemo {
     // AppKit terminate() does not unwind main(), so defer alone is insufficient.
     let observer = NotificationCenter.default.addObserver(
       forName: NSApplication.willTerminateNotification, object: nil, queue: .main
-    ) { _ in owner.stop() }
+    ) { _ in
+      // The main-queue observer must stop the backend before AppKit terminates.
+      MainActor.assumeIsolated { owner.stop() }
+    }
     defer { NotificationCenter.default.removeObserver(observer) }
     owner.process.terminationHandler = { process in
       DispatchQueue.main.async {
@@ -82,11 +85,11 @@ private enum LaunchError: Error, CustomStringConvertible {
 }
 
 /// Only this launcher owns this process. External RemoteDemoClient sessions do not.
-private final class OwnedBackend: @unchecked Sendable {
+@MainActor
+private final class OwnedBackend {
   let process = Process()
   private let control = Pipe()
   private let readiness = Pipe()
-  private let lock = NSLock()
   private var stopped = false
 
   func start(capture: DemoCaptureConfiguration) throws -> Int {
@@ -133,8 +136,6 @@ private final class OwnedBackend: @unchecked Sendable {
   }
 
   func stop() {
-    lock.lock()
-    defer { lock.unlock() }
     guard !stopped else { return }
     stopped = true
     process.terminationHandler = nil

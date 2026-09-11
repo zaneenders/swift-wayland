@@ -416,7 +416,7 @@ public final class RemoteMetalClient: NSObject, MTKViewDelegate, NSWindowDelegat
   }
 }
 
-private final class RemoteClientHandler: ChannelInboundHandler, @unchecked Sendable {
+private final class RemoteClientHandler: ChannelInboundHandler, Sendable {
   typealias InboundIn = DecodedRemoteMessage
   private let onMessage: @Sendable (RemoteMessage, Int, TimeInterval) -> Void
   private let onInactive: @Sendable () -> Void
