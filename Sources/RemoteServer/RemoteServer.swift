@@ -151,7 +151,11 @@ public final class RemoteServer {
     case .key(let sequence, let event):
       guard sequence > inputSequence else { return }
       inputSequence = sequence
-      if let chord = event.chord, let resolution = keyBindings.command(for: chord) {
+      if keyBindings.prefersTextInsertion(
+        chord: event.chord, text: event.text, isTextEditing: interaction.isTextEditing
+      ), let text = event.text {
+        render(input: InputState(textEvents: [.insert(text)]))
+      } else if let chord = event.chord, let resolution = keyBindings.command(for: chord) {
         if let command = resolution { execute(command) }
       } else if interaction.isTextEditing, let text = event.text {
         render(input: InputState(textEvents: [.insert(text)]))

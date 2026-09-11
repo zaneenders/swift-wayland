@@ -22,3 +22,21 @@ struct KeyBindingsTests {
     }
   }
 }
+
+struct TextInsertionRoutingTests {
+  @Test func printableShortcutsRemainTextWhileEditing() {
+    for (chord, text) in [(KeyChord(.space), " "), (KeyChord("f"), "f"), (KeyChord("j"), "j"), (KeyChord("f", modifiers: .shift), "F")] {
+      #expect(KeyBindings().prefersTextInsertion(chord: chord, text: text, isTextEditing: true))
+      #expect(!KeyBindings().prefersTextInsertion(chord: chord, text: text, isTextEditing: false))
+    }
+  }
+
+  @Test func modifiedShortcutsAndNonTextKeysKeepTheirBindings() {
+    for modifier: KeyModifiers in [.command, .control, .superKey] {
+      #expect(!KeyBindings().prefersTextInsertion(
+        chord: KeyChord("v", modifiers: modifier), text: "v", isTextEditing: true))
+    }
+    #expect(!KeyBindings().prefersTextInsertion(chord: KeyChord(.enter), text: nil, isTextEditing: true))
+    #expect(!KeyBindings().prefersTextInsertion(chord: KeyChord(.space), text: "", isTextEditing: true))
+  }
+}

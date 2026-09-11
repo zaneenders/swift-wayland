@@ -2,15 +2,11 @@
 import Chroma
 import DemoContent
 
-#if METAL_BACKEND
-import MetalBackend
-#elseif WAYLAND_BACKEND
+#if WAYLAND_BACKEND
 import WaylandBackend
 #endif
 
-#if METAL_BACKEND
-private protocol DemoApp: MetalApp {}
-#elseif WAYLAND_BACKEND
+#if WAYLAND_BACKEND
 private protocol DemoApp: WaylandApp {}
 #else
 private protocol DemoApp: App {}

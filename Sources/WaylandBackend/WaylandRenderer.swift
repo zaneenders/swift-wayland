@@ -13,7 +13,7 @@ import Glibc
 
 /// A Wayland window backed by EGL and OpenGL ES 3.
 ///
-/// Like `MetalRenderer`, this type owns the platform surface and consumes only
+/// This type owns the platform surface and consumes only
 /// backend-neutral `DrawList` commands produced by `BlockEngine`.
 @MainActor
 public final class WaylandRenderer: Renderer {

@@ -31,3 +31,15 @@ swift test --package-path Example
 ```
 
 [Rendering benchmarks and capture replay](Benchmarks/README.md).
+
+## macOS rendering architecture
+
+macOS applications use `RemoteServer` for the block graph and interaction state,
+and `RemoteMetalClient` for the window, input transport, and GPU presentation.
+Local apps use the same protocol over loopback; see the owned subprocess launcher
+in `Example/Sources/ChromaDemo/ManagedDemo.swift`.
+
+The former in-process `MetalApp` and `MetalRenderer` APIs have been removed.
+`MetalBackend` now supplies display-list rendering and input capture to the remote
+client, not a second application runner. Headless rendering and the Linux Wayland
+runner remain available.

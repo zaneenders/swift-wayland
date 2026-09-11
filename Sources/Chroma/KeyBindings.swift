@@ -80,6 +80,20 @@ public struct KeyBindings: Sendable {
 
   public func command(for chord: KeyChord) -> Command?? { entries[chord] }
 
+  /// Printable input belongs to the focused editor, not navigation shortcuts.
+  /// Modified shortcuts (copy, paste, etc.) still resolve through the keymap.
+  public func prefersTextInsertion(
+    chord: KeyChord?, text: String?, isTextEditing: Bool
+  ) -> Bool {
+    guard isTextEditing, let text, !text.isEmpty else { return false }
+    if let chord, let resolution = command(for: chord) {
+      guard let command = resolution else { return false }
+      if case .editing = command { return false }
+    }
+    return chord?.modifiers.intersection([.command, .control, .superKey]).isEmpty ?? true
+  }
+
+
   /// Returns a keymap where bindings in `content` shadow this map.
   public func overlay(@KeyBindingsBuilder _ content: () -> [KeyBinding]) -> KeyBindings {
     var result = self

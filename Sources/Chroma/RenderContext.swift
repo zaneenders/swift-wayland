@@ -24,6 +24,11 @@ public struct RenderContext {
   /// ending editing or moving focus returns to movement mode.
   public var interactionMode: InteractionMode { interaction.mode }
 
+  /// The editor currently receiving keyboard input, or nil outside editing mode.
+  public var activeTextInput: WidgetID? {
+    interaction.isTextEditing ? interaction.editingLeaf : nil
+  }
+
   public var fontMetrics: FontMetrics {
     get { interaction.fontMetrics }
     nonmutating set { interaction.fontMetrics = newValue }

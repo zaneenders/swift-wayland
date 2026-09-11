@@ -200,6 +200,9 @@ extension RemoteServerTests {
     server.keyBindings = KeyBindings {
       bind("a", modifiers: .command, to: .editing(.selectAll))
       disable("x")
+      bind(.space, to: .action(.activate))
+      bind("j", to: .navigation(.down))
+      bind("f", to: .application("picker.previous"))
     }
     let channel = EmbeddedChannel()
     try await channel.connect(to: SocketAddress(ipAddress: "127.0.0.1", port: 9328)).get()
@@ -215,7 +218,7 @@ extension RemoteServerTests {
         .key(
           sequence: UInt64(offset + 2),
           event: RemoteKeyEvent(
-            chord: KeyChord(character), text: String(character))), from: channel)
+            chord: character == " " ? KeyChord(.space) : KeyChord(character), text: String(character))), from: channel)
     }
     #expect(recorder.text == "jfd kls")
     server.receive(.key(sequence: 20, event: RemoteKeyEvent(chord: KeyChord("x"), text: "x")), from: channel)
@@ -227,5 +230,24 @@ extension RemoteServerTests {
           chord: KeyChord("a", modifiers: .command), text: "a")), from: channel)
     server.receive(.key(sequence: 22, event: RemoteKeyEvent(chord: nil, text: "replacement")), from: channel)
     #expect(recorder.text == "replacement")
+  }
+}
+
+extension RemoteServerTests {
+  @Test func commandEnterReachesBackendAsApplicationCommand() async throws {
+    let recorder = PointerRecorder()
+    let server = RemoteServer(content: PointerRecordingBlock(recorder: recorder))
+    let submit = Command.application("test.composer.submit")
+    server.keyBindings = KeyBindings { bind(.enter, modifiers: .command, to: submit) }
+    let channel = EmbeddedChannel()
+    try await channel.connect(to: SocketAddress(ipAddress: "127.0.0.1", port: 9328)).get()
+    defer {
+      server.disconnected(channel)
+      _ = try? channel.finish()
+      try? server.shutdown()
+    }
+    server.receive(.key(sequence: 1, event: RemoteKeyEvent(chord: KeyChord(.enter, modifiers: .command))), from: channel)
+    #expect(recorder.inputs.last?.commands == [submit])
+    #expect(recorder.inputs.last?.textEvents.isEmpty == true)
   }
 }

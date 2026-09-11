@@ -206,7 +206,7 @@ layout trace, screenshot, input recording, or continuous frame sequence.
 ### Consumer hook
 
 `App.frameObserver` defaults to nil; native app runners forward it to their
-renderer. `MetalRenderer`, `WaylandRenderer`, `HeadlessRenderer`, and `RemoteServer`
+renderer. `WaylandRenderer`, `HeadlessRenderer`, and `RemoteServer`
 also expose `frameObserver` directly. It receives a `FrameObservation` after
 interaction completion, before culling. This is a produced frame, not necessarily
 one presented to the user (especially with remote input-triggered evaluations).

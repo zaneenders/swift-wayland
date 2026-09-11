@@ -5,18 +5,14 @@ import Chroma
 import MetalKit
 
 public final class ChromaInputView: MTKView {
-  var interaction: Interaction?
   public var onRemoteKey: ((KeyChord?, String?) -> Void)?
   public var onInputAvailable: (() -> Void)?
-  public var keyBindings = KeyBindings()
   private var pointerPosition = Point(x: -1, y: -1)
   private var pointerPressPosition = Point(x: -1, y: -1)
   private var pointerDown = false
   private var pressedEdge = false
   private var releasedEdge = false
   private var scroll = Point.zero
-  private var pendingCommands: [Command] = []
-  private var pendingTextEvents: [TextEditEvent] = []
 
   public func frameInput() -> InputState {
     let input = InputState(
@@ -25,16 +21,12 @@ public final class ChromaInputView: MTKView {
       pointerDown: pointerDown,
       pointerPressed: pressedEdge,
       pointerReleased: releasedEdge,
-      scrollDelta: scroll,
-      commands: pendingCommands,
-      textEvents: pendingTextEvents
+      scrollDelta: scroll
     )
     pressedEdge = false
     releasedEdge = false
     pointerPressPosition = Point(x: -1, y: -1)
     scroll = .zero
-    pendingCommands = []
-    pendingTextEvents = []
     return input
   }
 
@@ -102,52 +94,7 @@ public final class ChromaInputView: MTKView {
       onRemoteKey(Self.keyChord(for: event), text)
       return
     }
-    guard interaction != nil else {
-      super.keyDown(with: event)
-      return
-    }
-    defer { scheduleRedraw() }
-    if let chord = Self.keyChord(for: event), let resolution = keyBindings.command(for: chord) {
-      guard let command = resolution else { return }
-      if !handlePlatformCommand(command) { pendingCommands.append(command) }
-    } else if interaction?.isTextEditing == true, let edit = Self.textInsertionEvent(for: event) {
-      pendingTextEvents.append(edit)
-    } else {
-      super.keyDown(with: event)
-    }
-  }
-
-  private func handlePlatformCommand(_ command: Command) -> Bool {
-    guard case .editing(let editing) = command else { return false }
-    switch editing {
-    case .insert(let text):
-      guard interaction?.mode == .editing else { return true }
-      pendingTextEvents.append(.insert(text))
-    case .copy:
-      guard let text = interaction?.copyText(), !text.isEmpty else { return true }
-      NSPasteboard.general.clearContents()
-      NSPasteboard.general.setString(text, forType: .string)
-    case .cut:
-      guard let text = interaction?.editableSelectionText(), !text.isEmpty else { return true }
-      NSPasteboard.general.clearContents()
-      NSPasteboard.general.setString(text, forType: .string)
-      pendingTextEvents.append(.deleteForward)
-    case .paste:
-      guard interaction?.mode == .editing,
-        let pasted = NSPasteboard.general.string(forType: .string),
-        !pasted.isEmpty
-      else { return true }
-      pendingTextEvents.append(.insert(pasted))
-    case .selectAll:
-      if interaction?.mode == .editing {
-        pendingTextEvents.append(.selectAll)
-      } else {
-        interaction?.selectAll(at: pointerPosition)
-      }
-    default:
-      if interaction?.isTextEditing == true { pendingTextEvents.append(editing) }
-    }
-    return true
+    super.keyDown(with: event)
   }
 
   private static func keyChord(for event: NSEvent) -> KeyChord? {
