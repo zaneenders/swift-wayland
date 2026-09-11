@@ -1,5 +1,6 @@
 import Chroma
 import DemoContent
+import DemoBackend
 import Foundation
 import HeadlessBackend
 import RemoteProtocol
@@ -71,14 +72,7 @@ struct RemoteDemoDaemon {
       return
     }
 
-    let server = RemoteServer(
-      content: demo.body,
-      size: demo.windowSize)
-    server.frameObserver = demo.frameObserver
-    server.keyBindings = demo.keyBindings.overlay {
-      bind(.enter, to: .action(.activate))
-    }
-    server.editingKeyBindings = demo.editingKeyBindings
+    let server = DemoBackend.makeServer(for: demo)
     try server.start(host: host, port: port)
     print("Interactive performance scene: \(itemCount) animated shapes")
     print("Click the controls in the remote window or use j/f/d/k and Enter")

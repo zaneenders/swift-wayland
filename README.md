@@ -6,7 +6,7 @@ UI library written in Swift
 
 ## Demo
 
-Run the native Metal demo on macOS:
+Run the managed local demo on macOS:
 
 ```sh
 swift run --package-path Example ChromaDemo
@@ -20,10 +20,17 @@ swift run --package-path Example ChromaDemo
 
 Both modes run the same `DemoApplication` from `Example/Sources/DemoContent`.
 The **Scene** tab contains animated shapes and the virtualized UUID list;
-**Clipboard** exercises text editing and copy/paste. `ChromaDemo` selects the local
-native backend at build time. `RemoteDemoDaemon` runs the same content remotely,
-and `RemoteDemoClient` is only a display/input client. There is no runtime
-local/remote switching.
+**Clipboard** exercises text editing and copy/paste. On macOS, `ChromaDemo`
+launches an owned backend subprocess and connects the existing `RemoteMetalClient`
+over loopback. The backend uses the same server configuration as `RemoteDemoDaemon`;
+there is no separate local Metal demo rendering/input path. A readiness pipe reports
+an OS-assigned port, so multiple demos can run without port conflicts. Closing the
+window stops and reaps its backend; loss of the parent also shuts the backend down.
+Backend startup is bounded to 15 seconds, and unexpected backend exits show an error.
+
+On Linux, `ChromaDemo` still uses the native Wayland backend. `RemoteDemoDaemon`
+and `RemoteDemoClient` remain available for separately managed remote sessions;
+those clients do not own or terminate their servers.
 
 Shared demo smoke tests run without a window or GPU:
 

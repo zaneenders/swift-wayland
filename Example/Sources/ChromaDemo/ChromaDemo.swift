@@ -1,3 +1,4 @@
+#if !os(macOS)
 import Chroma
 import DemoContent
 
@@ -62,3 +63,5 @@ private struct ConfiguredDemo: DemoApp {
   var keyBindings: KeyBindings { demo.keyBindings }
   var body: some Block { demo.body }
 }
+
+#endif

@@ -65,6 +65,9 @@ public final class RemoteServer {
     interaction.onRedrawRequested = { [weak self] in self?.scheduleRedraw() }
   }
 
+  /// The actual listening port, including when started with port zero.
+  public var boundPort: Int? { serverChannel?.localAddress?.port }
+
   public func start(host: String = "127.0.0.1", port: Int = 9328) throws {
     // A ChannelHandler is stateful and may only belong to one channel. Construct
     // a new handler for every accepted connection so reconnecting after a probe
@@ -77,7 +80,7 @@ public final class RemoteServer {
       .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
       .childChannelInitializer(connectionFactory.initialize)
       .bind(host: host, port: port).wait()
-    logger.info("Chroma remote daemon listening", metadata: ["host": "\(host)", "port": "\(port)"])
+    logger.info("Chroma remote daemon listening", metadata: ["host": "\(host)", "port": "\(boundPort ?? port)"])
   }
 
   /// Runs the executor used to evaluate the `@MainActor` block graph.

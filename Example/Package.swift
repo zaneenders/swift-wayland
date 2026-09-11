@@ -8,6 +8,10 @@ var dependencies: [Target.Dependency] = [
 var swiftSettings: [SwiftSetting] = []
 var chromaTraits: Set<Package.Dependency.Trait> = []
 var targets: [Target] = [
+  .target(name: "DemoBackend", dependencies: [
+    "DemoContent", .product(name: "Chroma", package: "chroma"),
+    .product(name: "RemoteServer", package: "chroma"),
+  ]),
   .testTarget(
     name: "DemoContentTests",
     dependencies: [
@@ -29,7 +33,7 @@ var targets: [Target] = [
   .executableTarget(
     name: "RemoteDemoDaemon",
     dependencies: [
-      "DemoContent",
+      "DemoContent", "DemoBackend",
       .product(name: "Chroma", package: "chroma"),
       .product(name: "RemoteServer", package: "chroma"),
       .product(name: "RemoteProtocol", package: "chroma"),
@@ -40,7 +44,8 @@ var targets: [Target] = [
 
 #if os(macOS)
 chromaTraits.insert("MetalBackend")
-dependencies.append(.product(name: "MetalBackend", package: "chroma"))
+dependencies.append("DemoBackend")
+dependencies.append(.product(name: "RemoteMetalClient", package: "chroma"))
 swiftSettings.append(.define("METAL_BACKEND"))
 targets.append(
   .executableTarget(
