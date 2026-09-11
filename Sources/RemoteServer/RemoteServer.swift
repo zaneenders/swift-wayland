@@ -226,6 +226,8 @@ public final class RemoteServer {
         guard let self, self.pendingClipboard?.id == id, self.clipboardEpoch == epoch else { return }
         self.finishClipboard()
       }
+    case .submit where !interaction.isTextEditing:
+      render(input: InputState(commands: [.action(.activate)]))
     case .selectAll where !interaction.isTextEditing:
       interaction.selectAll(at: pointerState.pointerPosition)
       render()

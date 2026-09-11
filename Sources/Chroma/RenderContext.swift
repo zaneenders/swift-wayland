@@ -82,6 +82,8 @@ public struct RenderContext {
   }
 
   /// Registers an editable leaf and applies text input translated by the backend.
+  /// `onTextEvent` may consume an event by returning replacement text; nil uses
+  /// normal editing. It receives the current buffer, including earlier events.
   ///
   /// `onEndEditing` can intercept an end-editing request. Return `.handled` to
   /// keep editing active, or `.ignored` to use the default behavior and leave
@@ -93,6 +95,7 @@ public struct RenderContext {
     onChange: (String) -> Void,
     onSubmit: ((String) -> Void)? = nil,
     onEndEditing: (() -> CommandResult)? = nil,
+    onTextEvent: ((TextEditEvent, String) -> String?)? = nil,
     pointerOffset: ((Point, Int?) -> Int)? = nil,
     verticalOffset: ((Int, Int) -> Int)? = nil
   ) -> TextInputState {
@@ -103,6 +106,7 @@ public struct RenderContext {
       onChange: onChange,
       onSubmit: onSubmit,
       onEndEditing: onEndEditing,
+      onTextEvent: onTextEvent,
       pointerOffset: pointerOffset,
       verticalOffset: verticalOffset
     )

@@ -7,6 +7,7 @@ extension Interaction {
     onChange: (String) -> Void,
     onSubmit: ((String) -> Void)? = nil,
     onEndEditing: (() -> CommandResult)? = nil,
+    onTextEvent: ((TextEditEvent, String) -> String?)? = nil,
     pointerOffset: ((Point, Int?) -> Int)? = nil,
     verticalOffset: ((Int, Int) -> Int)? = nil
   ) -> TextInputState {
@@ -68,6 +69,13 @@ extension Interaction {
 
       var changed = false
       eventLoop: for event in input.textEvents {
+        if let replacement = onTextEvent?(event, String(characters)) {
+          characters = Array(replacement)
+          caretOffset = characters.count
+          textSelectionRange = nil
+          changed = true
+          continue
+        }
         switch event {
         case .copy, .cut, .paste:
           // TODO: is continue the best way to handle this?

@@ -251,3 +251,42 @@ extension RemoteServerTests {
     #expect(recorder.inputs.last?.textEvents.isEmpty == true)
   }
 }
+
+extension RemoteServerTests {
+  @Test func enterActivatesFocusedButtonOutsideEditing() async throws {
+    var activations = 0
+    let server = RemoteServer(content: Button("Activate", id: WidgetID("button")) { activations += 1 })
+    server.keyBindings = KeyBindings { bind(.enter, to: .editing(.submit)) }
+    let channel = EmbeddedChannel()
+    try await channel.connect(to: SocketAddress(ipAddress: "127.0.0.1", port: 9328)).get()
+    defer {
+      server.disconnected(channel)
+      _ = try? channel.finish()
+      try? server.shutdown()
+    }
+    server.receive(.viewport(Size(width: 400, height: 100)), from: channel)
+    server.receive(.key(sequence: 1, event: RemoteKeyEvent(chord: KeyChord(.enter))), from: channel)
+    #expect(activations == 1)
+  }
+
+  @Test func enterStartsEditingThenSubmitsInsteadOfReactivating() async throws {
+    let recorder = EditorRecorder()
+    let server = RemoteServer(content: EditingBlock(recorder: recorder))
+    server.keyBindings = KeyBindings { bind(.enter, to: .editing(.submit)) }
+    let channel = EmbeddedChannel()
+    try await channel.connect(to: SocketAddress(ipAddress: "127.0.0.1", port: 9328)).get()
+    defer {
+      server.disconnected(channel)
+      _ = try? channel.finish()
+      try? server.shutdown()
+    }
+    server.receive(.viewport(Size(width: 400, height: 100)), from: channel)
+    server.receive(.key(sequence: 1, event: RemoteKeyEvent(chord: KeyChord(.enter))), from: channel)
+    server.receive(.key(sequence: 2, event: RemoteKeyEvent(chord: nil, text: "edited")), from: channel)
+    #expect(recorder.text == "edited")
+    // Without an onSubmit callback, submitting ends editing.
+    server.receive(.key(sequence: 3, event: RemoteKeyEvent(chord: KeyChord(.enter))), from: channel)
+    server.receive(.key(sequence: 4, event: RemoteKeyEvent(chord: nil, text: "ignored")), from: channel)
+    #expect(recorder.text == "edited")
+  }
+}
