@@ -52,6 +52,7 @@ private struct AppContent: PrimitiveBlock {
 private final class FailingAppRenderer: Renderer {
   let name = "Test"
   var content: (any Block)?
+  var frameObserver: FrameObserver?
   var onClose: (() -> Void)?
   let interaction = Interaction()
   let error: BackendError
@@ -69,6 +70,7 @@ private final class FailingAppRenderer: Renderer {
 private final class AppRenderer: Renderer {
   let name = "Test"
   var content: (any Block)?
+  var frameObserver: FrameObserver?
   var onClose: (() -> Void)?
   let interaction = Interaction()
   var title: String?

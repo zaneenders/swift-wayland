@@ -1,18 +1,5 @@
 # Chroma
 
-## Automated rendering benchmarks
-
-The standalone [Benchmarks package](Benchmarks/README.md) provides deterministic
-wire/offscreen Metal replay, correctness tests, JSON timing reports, regression
-comparisons, and automated `swift-profile-recorder` captures.
-
-```sh
-swift test --package-path Benchmarks -c release
-METAL=1 Benchmarks/Scripts/run.sh
-Benchmarks/Scripts/profile.sh Benchmarks/results/profile text metal
-```
-
-
 UI library written in Swift
 
 ⚠️ Unstable: Heavy AI • Active API [dogfooding](https://github.com/zaneenders/scribe)
@@ -43,6 +30,113 @@ Shared demo smoke tests run without a window or GPU:
 ```sh
 swift test --package-path Example
 ```
+
+
+## Automated rendering benchmarks
+
+The standalone [Benchmarks package](Benchmarks/README.md) provides deterministic
+wire/offscreen Metal replay, correctness tests, JSON timing reports, regression
+comparisons, and automated `swift-profile-recorder` captures.
+
+```sh
+swift test --package-path Benchmarks -c release
+METAL=1 Benchmarks/Scripts/run.sh
+Benchmarks/Scripts/profile.sh Benchmarks/results/profile text metal
+```
+
+
+## Scene capture and replay
+
+Capture a real demo frame, then replay its rendering workload without running the
+application or opening a window:
+
+1. Run `swift run --package-path Example -c release ChromaDemo`.
+2. Navigate to the scene you want and press **Ctrl+Shift+G** (Control, not Command).
+3. The demo saves `scene-<UUID>.chromacapture` directly in `Example/` by default.
+   The footer reports status and the launching terminal prints the full path.
+4. Replay the saved file from the repository root:
+
+   ```sh
+   swift run --package-path Benchmarks -c release RenderBenchmark \
+     --capture Example/scene-<UUID>.chromacapture --stage pipeline
+   ```
+
+The native default is the demo package directory resolved from the source path at
+build time, not the current working directory. Override it with
+`--capture-directory /existing/writable/folder`, especially if moving the binary
+away from its checkout. The remote demo remains opt-in: pass that flag to
+`RemoteDemoDaemon`, not the display client. No capture is saved automatically.
+
+### What gets replayed
+
+The shortcut requests one complete **produced, pre-culling display list** after
+interaction processing. The versioned archive stores drawing commands, viewport,
+optional raster scale, and self-contained image resources. This is a renderer
+snapshot, not an application checkpoint; a produced frame is not necessarily one
+that was presented on screen.
+
+The benchmark loads and validates the archive outside timed phases, then repeats
+the same frame. Choose a stage to isolate the work:
+
+| Stage | Work measured | Requirements |
+|---|---|---|
+| `wire` | In-memory protocol encode/decode with image caches | No GPU required |
+| `metal` | Direct display-list encoding and offscreen GPU rendering | macOS/Metal |
+| `pipeline` | Wire encode/decode, then offscreen Metal rendering | macOS/Metal |
+
+JSON output separates the first cold iteration from steady-state mean, p50, and
+p95 timings. Defaults are 30 warmup frames and 300 measured frames, configurable
+with `--warmup` and `--frames`. Image caches persist between iterations, so cold
+wire bytes include image definitions while later frames can reference them.
+Captured raster scale is preserved; an absent scale uses 1x.
+
+Use the exact same archive when comparing runs. The report identifies it with a
+stable content fingerprint (`scene: capture-...`). Actual command counts are in
+`commandCountMin`/`commandCountMax`; the report's `count` field remains the synthetic
+CLI default, not the capture's size. `--capture` cannot be combined with `--scene`
+or `--count`.
+
+### What it does not handle
+
+- **Application execution:** no Block graph, layout/measurement trace, state
+  restoration, input playback, clipboard behavior, or animation timeline. It
+  repeats one display list, not a recorded frame sequence.
+- **End-to-end performance:** no network transport, live server pacing,
+  window presentation, vsync, or input-to-display latency. Metal replay waits for
+  each GPU submission serially, rather than reproducing live in-flight scheduling.
+  Phase timings are not application FPS or total frame latency.
+- **Visual verification:** the replay command does not open a viewer, export a
+  screenshot, or compare rendered pixels against a golden image. Wire stages
+  check the first round trip for equality, but success is not proof of pixel
+  fidelity. There is no Wayland/OpenGL replay stage.
+- **All dynamic resource behavior:** repeating a single snapshot exercises cache
+  reuse, not a changing stream of image revisions, evictions, resizes, or scenes.
+- **Unlimited or cross-version archives:** the demo rejects encoded captures over
+  64 MiB; Metal replay limits raster targets to 8192 pixels per axis. The decoder
+  requires matching archive and wire-protocol versions; there is no migration
+  layer. Size limits do not bound all transient encoding allocations.
+- **Redaction:** captures contain exact text (potentially including offscreen
+  emitted text) and image pixels. Files are owner-only, but must still be reviewed
+  before sharing or committing; saved files remain until you remove them.
+
+### Initial local replay check
+
+The local capture `scene-38F530D1-ACF9-4AA0-B2FF-93C843A83B99.chromacapture`
+(fingerprint `capture-e95a0379badd09d3`) successfully ran in release `pipeline`
+mode with 2,091 commands, 30 warmup frames, and 300 measured frames:
+
+| Phase | Mean | p95 |
+|---|---:|---:|
+| Wire encode | 0.225 ms | 0.239 ms |
+| Wire decode | 0.108 ms | 0.116 ms |
+| Metal encode | 0.061 ms | 0.064 ms |
+| GPU | 1.694 ms | 3.548 ms |
+
+This is a local smoke-check result, not a portable performance target or a
+committed fixture. GPU, OS, build, and machine load affect these numbers.
+
+See [demo capture setup](Example/README.md#capture-a-live-scene) and
+[benchmark replay details](Benchmarks/README.md#replay-real-demo-captures).
 
 ## Remote rendering prototype
 

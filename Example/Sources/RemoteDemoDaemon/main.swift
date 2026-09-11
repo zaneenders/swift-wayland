@@ -13,17 +13,20 @@ struct RemoteDemoDaemon {
     print("Performance warning: debug build; use -c release on both client and daemon.")
     #endif
     let benchmark = CommandLine.arguments.contains("--benchmark")
-    let arguments = Array(CommandLine.arguments.dropFirst()).filter { $0 != "--benchmark" }
+    var arguments = Array(CommandLine.arguments.dropFirst()).filter { $0 != "--benchmark" }
     if arguments.contains("--help") || arguments.contains("-h") {
-      print("usage: RemoteDemoDaemon [bind-host] [port] [items] [--benchmark]")
+      print(
+        "usage: RemoteDemoDaemon [bind-host] [port] [items] [--benchmark] [--capture-directory EXISTING_WRITABLE_DIRECTORY]"
+      )
       print("example: RemoteDemoDaemon 0.0.0.0 9328 2000")
       return
     }
+    let capture = try DemoCaptureConfiguration.parse(arguments: &arguments)
     let host = arguments.first ?? "127.0.0.1"
     let port = arguments.dropFirst().first.flatMap(Int.init) ?? 9328
     let itemCount = arguments.dropFirst(2).first.flatMap(Int.init) ?? 2_000
     // The remote display currently targets macOS, regardless of the daemon host.
-    let demo = DemoApplication(itemCount: itemCount, shortcutModifier: .command)
+    let demo = DemoApplication(itemCount: itemCount, shortcutModifier: .command, captureConfiguration: capture)
 
     if benchmark {
       let renderer = HeadlessRenderer(size: demo.windowSize)
@@ -71,6 +74,7 @@ struct RemoteDemoDaemon {
     let server = RemoteServer(
       content: demo.body,
       size: demo.windowSize)
+    server.frameObserver = demo.frameObserver
     server.keyBindings = demo.keyBindings.overlay {
       bind(.enter, to: .action(.activate))
     }

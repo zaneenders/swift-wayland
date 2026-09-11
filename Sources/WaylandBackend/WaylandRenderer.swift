@@ -19,6 +19,7 @@ import Glibc
 public final class WaylandRenderer: Renderer {
   public let name = "Wayland"
   public var content: (any Block)?
+  public var frameObserver: FrameObserver?
   public var onClose: (() -> Void)?
 
   package let interaction = Interaction()
@@ -1018,6 +1019,9 @@ public final class WaylandRenderer: Renderer {
       )
     }
     interaction.endFrame()
+    frameObserver?(
+      FrameObservation(
+        drawList: drawList, viewport: viewport, rasterScale: Point(x: Float(bufferScale), y: Float(bufferScale))))
     _ = interaction.consumeRedrawRequest()
     render(drawList, viewport: viewport)
     _ = unsafe eglSwapBuffers(eglDisplay, eglSurface)

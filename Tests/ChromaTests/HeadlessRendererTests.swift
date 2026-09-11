@@ -71,3 +71,19 @@ struct HeadlessRendererTests {
 private final class Counter {
   var value = 0
 }
+
+@MainActor
+@Test func frameObserverSeesProducedCommandsAndCanBeRemoved() {
+  let renderer = HeadlessRenderer(size: Size(width: 40, height: 30))
+  renderer.content = Color.white
+  var observations: [FrameObservation] = []
+  renderer.frameObserver = { observations.append($0) }
+  let frame = renderer.render()
+  #expect(observations.count == 1)
+  #expect(observations[0].drawList.commands == frame.commands)
+  #expect(observations[0].viewport == frame.viewport)
+  #expect(observations[0].rasterScale == nil)
+  renderer.frameObserver = nil
+  renderer.render()
+  #expect(observations.count == 1)
+}

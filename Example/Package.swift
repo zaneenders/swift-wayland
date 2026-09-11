@@ -17,7 +17,10 @@ var targets: [Target] = [
   ),
   .target(
     name: "DemoContent",
-    dependencies: ["DemoImages", .product(name: "Chroma", package: "chroma")]
+    dependencies: [
+      "DemoImages", .product(name: "Chroma", package: "chroma"),
+      .product(name: "RemoteProtocol", package: "chroma"),
+    ]
   ),
   .target(
     name: "DemoImages",

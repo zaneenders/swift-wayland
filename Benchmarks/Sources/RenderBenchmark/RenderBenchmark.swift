@@ -51,11 +51,11 @@ struct RenderBenchmark {
     var arguments = Array(CommandLine.arguments.dropFirst())
     if arguments == ["--help"] {
       print(
-        "RenderBenchmark [--scene \(RenderFixture.names.joined(separator: "|"))] [--stage wire|metal|pipeline] [--count 2000] [--frames 300] [--warmup 30] [--seconds 0]"
+        "RenderBenchmark [--scene \(RenderFixture.names.joined(separator: "|"))] [--capture PATH] [--stage wire|metal|pipeline] [--count 2000] [--frames 300] [--warmup 30] [--seconds 0]"
       )
       return
     }
-    let allowed = Set(["--scene", "--stage", "--count", "--frames", "--warmup", "--seconds"])
+    let allowed = Set(["--scene", "--stage", "--count", "--frames", "--warmup", "--seconds", "--capture"])
     while !arguments.isEmpty {
       let key = arguments.removeFirst()
       guard allowed.contains(key), !arguments.isEmpty, options[key] == nil else {
@@ -63,7 +63,7 @@ struct RenderBenchmark {
       }
       options[key] = arguments.removeFirst()
     }
-    let scene = options["--scene"] ?? "shapes"
+    var scene = options["--scene"] ?? "shapes"
     let stage = options["--stage"] ?? "wire"
     guard RenderFixture.names.contains(scene), ["wire", "metal", "pipeline"].contains(stage),
       let count = Int(options["--count"] ?? "2000"), (1...100_000).contains(count),
@@ -83,9 +83,34 @@ struct RenderBenchmark {
       }
     }
     defer { profiler.cancel() }
-    let fixture = try RenderFixture(name: scene, count: count)
+    let sequence: [DrawList]
+    let viewport: Size
+    let rasterScale: Point
+    if let path = options["--capture"] {
+      guard options["--scene"] == nil, options["--count"] == nil else {
+        throw BenchmarkError.failed("--capture cannot be combined with --scene or --count")
+      }
+      let url = URL(fileURLWithPath: path)
+      let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+      guard let size = attributes[.size] as? NSNumber, size.intValue <= 65 * 1024 * 1024 else {
+        throw BenchmarkError.failed("Capture exceeds file size limit")
+      }
+      let data = try Data(contentsOf: url)
+      let frame = try SceneCapture.decode(data)
+      sequence = [frame.drawList]
+      viewport = frame.viewport
+      rasterScale = frame.rasterScale ?? Point(x: 1, y: 1)
+      // Stable content fingerprint for benchmark compatibility (not a security hash).
+      let fingerprint = data.reduce(UInt64(14_695_981_039_346_656_037)) { ($0 ^ UInt64($1)) &* 1_099_511_628_211 }
+      scene = "capture-" + String(fingerprint, radix: 16)
+    } else {
+      let fixture = try RenderFixture(name: scene, count: count)
+      sequence = fixture.sequence
+      viewport = fixture.viewport
+      rasterScale = Point(x: 1, y: 1)
+    }
     #if os(macOS)
-    let metal = stage == "wire" ? nil : try MetalReplay(viewport: fixture.viewport)
+    let metal = stage == "wire" ? nil : try MetalReplay(viewport: viewport, rasterScale: rasterScale)
     #else
     guard stage == "wire" else { throw BenchmarkError.failed("Metal stages require macOS") }
     #endif
@@ -102,13 +127,13 @@ struct RenderBenchmark {
       var durations: [String: Double] = [:]
       // Restart at frame zero after warmup so all trials cover identical sequences.
       let sequenceIndex = iteration > warmup ? measured : iteration
-      let source = fixture.sequence[sequenceIndex % fixture.sequence.count]
+      let source = sequence[sequenceIndex % sequence.count]
       var replay = source
       var bytes = 0
       if stage != "metal" {
         let message = RemoteMessage.frame(
           id: UInt64(iteration), inputSequence: 0,
-          viewport: fixture.viewport, commands: source.commands)
+          viewport: viewport, commands: source.commands)
         let encodeStart = now()
         var wire = try RemoteWire.encode(message, images: sender)
         durations["wireEncode"] = now() - encodeStart
@@ -116,8 +141,8 @@ struct RenderBenchmark {
         let decodeStart = now()
         let decoded = try RemoteWire.decode(from: &wire, images: receiver)
         durations["wireDecode"] = now() - decodeStart
-        guard case .frame(_, _, let viewport, let commands) = decoded,
-          viewport == fixture.viewport, wire.readableBytes == 0
+        guard case .frame(_, _, let decodedViewport, let commands) = decoded,
+          decodedViewport == viewport, wire.readableBytes == 0
         else {
           throw BenchmarkError.failed("Invalid replay frame")
         }
@@ -127,7 +152,7 @@ struct RenderBenchmark {
       }
       #if os(macOS)
       if let metal {
-        let timing = try metal.render(replay, viewport: fixture.viewport)
+        let timing = try metal.render(replay, viewport: viewport)
         durations["metalEncode"] = timing.cpu
         durations["gpu"] = timing.gpu
       }
@@ -147,9 +172,9 @@ struct RenderBenchmark {
     } while measured < frames || now() - measurementStart < seconds
     let report = Report(
       schemaVersion: 2, fixtureVersion: RenderFixture.version,
-      sequenceFrames: fixture.sequence.count,
-      commandCountMin: fixture.sequence.map { $0.commands.count }.min()!,
-      commandCountMax: fixture.sequence.map { $0.commands.count }.max()!,
+      sequenceFrames: sequence.count,
+      commandCountMin: sequence.map { $0.commands.count }.min()!,
+      commandCountMax: sequence.map { $0.commands.count }.max()!,
       protocolVersion: RemoteWire.version, os: ProcessInfo.processInfo.operatingSystemVersionString,
       processors: ProcessInfo.processInfo.activeProcessorCount, scene: scene, stage: stage,
       count: count, frames: measured, warmup: warmup, profilingEnabled: profiling,

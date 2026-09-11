@@ -16,6 +16,7 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
   package let interaction = Interaction()
 
   public var content: (any Block)?
+  public var frameObserver: FrameObserver?
   public var onClose: (() -> Void)?
   private var keyBindings = KeyBindings() {
     didSet { mtkView.keyBindings = keyBindings }
@@ -140,6 +141,12 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
       BlockEngine.draw(content, into: &drawList, in: Rect(origin: .zero, size: viewport), context: context)
     }
     interaction.endFrame()
+    frameObserver?(
+      FrameObservation(
+        drawList: drawList, viewport: viewport,
+        rasterScale: Point(
+          x: Float(drawable.texture.width) / max(1, viewport.width),
+          y: Float(drawable.texture.height) / max(1, viewport.height))))
     let redrawRequested = interaction.consumeRedrawRequest()
     displayRenderer.encode(
       drawList,

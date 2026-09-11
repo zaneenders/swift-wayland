@@ -8,6 +8,7 @@ import RemoteProtocol
 
 @MainActor
 public final class RemoteServer {
+  public var frameObserver: FrameObserver?
   public var keyBindings = KeyBindings()
   public var editingKeyBindings = KeyBindings()
   private var pointerPosition = Point.zero
@@ -286,6 +287,7 @@ public final class RemoteServer {
         context: RenderContext(interaction: interaction))
     }
     interaction.endFrame()
+    frameObserver?(FrameObservation(drawList: drawList, viewport: viewport))
     // Clear the coalescing flag after every frame. If drawing requested another
     // frame it has already scheduled a render through onRedrawRequested; leaving
     // the flag set would suppress every later invalidation.

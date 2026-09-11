@@ -15,6 +15,7 @@ public final class HeadlessRenderer: Renderer {
   public let name = "Headless"
 
   public var content: (any Block)?
+  public var frameObserver: FrameObserver?
   public var onClose: (() -> Void)?
   public var viewport: Size
 
@@ -51,6 +52,7 @@ public final class HeadlessRenderer: Renderer {
       )
     }
     interaction.endFrame()
+    frameObserver?(FrameObservation(drawList: drawList, viewport: viewport))
 
     let frame = HeadlessFrame(viewport: viewport, commands: drawList.commands)
     lastFrame = frame

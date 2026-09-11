@@ -2,6 +2,7 @@ import Chroma
 
 @MainActor
 public struct DemoApplication: App {
+  private let capture: DemoSceneCapture?
   private let state: PerformanceDemoState
   private let shortcutModifier: KeyModifiers
 
@@ -13,7 +14,10 @@ public struct DemoApplication: App {
     #endif
   }
 
-  public init(itemCount: Int = 2_000, shortcutModifier: KeyModifiers) {
+  public init(
+    itemCount: Int = 2_000, shortcutModifier: KeyModifiers, captureConfiguration: DemoCaptureConfiguration? = nil
+  ) {
+    capture = captureConfiguration.map { DemoSceneCapture(configuration: $0) }
     state = PerformanceDemoState(itemCount: itemCount)
     self.shortcutModifier = shortcutModifier
   }
@@ -22,8 +26,13 @@ public struct DemoApplication: App {
   public var windowSize: Size { Size(width: 1100, height: 720) }
   public var minimumRefreshRate: Double { 30 }
 
+  public var frameObserver: FrameObserver? {
+    guard let capture else { return nil }
+    return { [capture] frame in capture.observe(frame) }
+  }
+
   public var keyBindings: KeyBindings {
-    KeyBindings {
+    let bindings = KeyBindings {
       bind("c", modifiers: shortcutModifier, to: .editing(.copy))
       bind("x", modifiers: shortcutModifier, to: .editing(.cut))
       bind("v", modifiers: shortcutModifier, to: .editing(.paste))
@@ -50,6 +59,10 @@ public struct DemoApplication: App {
       bind("l", to: .navigation(.in))
       bind("s", to: .navigation(.out))
     }
+    guard capture != nil else { return bindings }
+    return bindings.overlay {
+      bind("g", modifiers: [.control, .shift], to: .application("demo.capture"))
+    }
   }
 
   // The current remote input adapter resolves an explicit editing overlay,
@@ -67,6 +80,25 @@ public struct DemoApplication: App {
   }
 
   public var body: some Block {
-    PerformanceDemo(state: state).chromaTheme(.dark)
+    if let capture {
+      VStack(spacing: 0) {
+        PerformanceDemo(state: state).sizing(x: .grow, y: .grow)
+        CaptureStatus(capture: capture)
+      }
+      .chromaTheme(.dark)
+      .onCommand(.application("demo.capture")) {
+        capture.request()
+        return .handled
+      }
+    } else {
+      PerformanceDemo(state: state).chromaTheme(.dark)
+    }
+  }
+}
+
+private struct CaptureStatus: Block {
+  let capture: DemoSceneCapture
+  @MainActor var body: some Block {
+    Text(capture.status).fontScale(0.45).padding(4)
   }
 }

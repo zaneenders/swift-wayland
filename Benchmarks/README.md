@@ -162,3 +162,28 @@ renderer replay fidelity, plus image revision/eviction and pixel-output checks.
 The synthetic replay is useful for localizing renderer/codec regressions, but a
 fast replay says nothing about graph cost, idle CPU, input latency, or how many
 unnecessary frames Scribe produces.
+
+## Replay real demo captures
+
+Launch the native demo and press **Ctrl+Shift+G** to save one real produced frame
+in `Example/` (the demo package directory resolved at build time). Override it with
+`--capture-directory /your/existing/folder`. The remote daemon requires that flag
+to enable capture. See
+[the demo capture instructions](../Example/README.md#capture-a-live-scene).
+
+```sh
+swift run --package-path Benchmarks -c release RenderBenchmark \
+  --capture /path/to/scene.chromacapture --stage metal
+```
+
+Capture loading/validation is outside measured phases. The frame is replayed with
+its recorded viewport and raster scale; a missing scale defaults to 1x. Metal
+replay rejects raster targets larger than 8192 pixels per axis. Do not combine
+`--capture` with `--scene` or `--count`. The report's scene identifier includes a
+stable archive fingerprint to distinguish capture workloads; its `count` option
+remains the CLI default, so use `commandCountMin/Max` for actual captured commands.
+For comparisons, reuse exactly the same archive. Existing suite scripts continue
+to run generated fixtures; capture replay is currently a direct CLI operation.
+
+For the workflow, measurement boundaries, current limitations, and an initial
+local replay result, see [scene capture and replay](../README.md#scene-capture-and-replay).

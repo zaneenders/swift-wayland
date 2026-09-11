@@ -148,3 +148,78 @@ encoding costs.
 The prototype currently sends complete frames and embeds image pixels. It does
 not yet provide authentication or encryption. Only expose it on a trusted local
 network.
+
+## Capture a live scene
+
+The native `ChromaDemo` defaults to the demo package directory (`Example/`),
+resolved from its source location at build time, not the launching directory.
+If you move the binary away from the source checkout, use the explicit override.
+Nothing is saved until you press **Ctrl+Shift+G**. Override the destination with
+an existing writable directory:
+
+```sh
+mkdir -p "$HOME/ChromaCaptures"
+swift run --package-path Example -c release ChromaDemo \
+  --capture-directory "$HOME/ChromaCaptures"
+# For remote rendering, configure the daemon instead:
+swift run --package-path Example -c release RemoteDemoDaemon \
+  --capture-directory "$HOME/ChromaCaptures"
+```
+
+Then press **Ctrl+Shift+G** (Control, not Command, on macOS). The shortcut requests
+one complete produced frame before renderer culling. The footer shows the chosen
+directory and request/save status; the full saved path is printed to the launching
+terminal. Files are named `scene-<UUID>.chromacapture` in that exact directory.
+
+The remote daemon remains **opt-in**: without `--capture-directory`, it installs
+no capture observer, shortcut, command handler, or footer. It has no default directory.
+A missing value, duplicate option, nonexistent explicit directory, or failed
+write-access probe rejects setup. Directories must already exist; setup does not create them. Relative paths resolve
+against the launching directory. Failure to validate the native default
+also rejects setup; there is no temporary fallback.
+Later write failures are reported in the footer, never redirected elsewhere.
+
+Encoding and writing run on a utility task. Repeated requests while a save is
+pending are ignored; there is no continuous logging or capture-specific timer.
+The demo's existing 30 Hz refresh updates the status after saving. The footer
+itself is included in this initial capture format. The remote demo supports the
+same command, but saves on the **daemon machine**, not the display client.
+
+Captures contain exact text (including potentially offscreen emitted text) and
+image pixels. They are not redacted. Files are created with owner-only permissions;
+review before sharing. The demo rejects encoded captures over 64 MiB; this is an
+output limit, not a strict bound on transient codec allocations. Saved files remain in your selected directory until you remove them.
+
+Replay a saved file without the application graph or window:
+
+```sh
+swift run --package-path Benchmarks -c release RenderBenchmark \
+  --capture /path/to/scene.chromacapture --stage pipeline
+```
+
+Use `--stage wire` without a GPU; `metal` and `pipeline` require macOS/Metal.
+Captured raster scale is preserved (unknown/headless scale defaults to 1x).
+This first version records one display list, not an executable Block graph,
+layout trace, screenshot, input recording, or continuous frame sequence.
+
+### Consumer hook
+
+`App.frameObserver` defaults to nil; native app runners forward it to their
+renderer. `MetalRenderer`, `WaylandRenderer`, `HeadlessRenderer`, and `RemoteServer`
+also expose `frameObserver` directly. It receives a `FrameObservation` after
+interaction completion, before culling. This is a produced frame, not necessarily
+one presented to the user (especially with remote input-triggered evaluations).
+
+Callbacks run synchronously on the main actor: check whether a capture is wanted,
+retain the snapshot, and dispatch expensive work elsewhere. Avoid mutating UI
+state or recursively rendering from the callback. With no observer installed,
+the optional callback does not construct a snapshot. An installed demo observer
+only checks its pending flag until the shortcut is used; overhead has not yet
+been quantified. The demo uses `DemoApplication(captureConfiguration:)`, whose default is nil.
+Constructing `DemoCaptureConfiguration(directory:)` requires and validates an
+explicit file URL before capture can be enabled. Consumers may gate installation using their own configuration
+or environment variables; Chroma defines no environment-variable policy.
+
+`SceneCapture.encode/decode` lives in `RemoteProtocol`, separate from the core
+Chroma hook, and uses a versioned header plus a self-contained wire frame. Capture
+and protocol versions must match; no migration support exists yet.

@@ -16,6 +16,8 @@ public protocol App {
   var minimumRefreshRate: Double { get }
 
   var keyBindings: KeyBindings { get }
+
+  var frameObserver: FrameObserver? { get }
 }
 
 extension App {
@@ -23,11 +25,13 @@ extension App {
   public var windowSize: Size { Size(width: 800, height: 600) }
   public var minimumRefreshRate: Double { 0 }
   public var keyBindings: KeyBindings { KeyBindings() }
+  public var frameObserver: FrameObserver? { nil }
 
   @MainActor
   package func run(on renderer: any Renderer) throws {
     renderer.setMinimumRefreshRate(minimumRefreshRate)
     renderer.setKeyBindings(keyBindings)
+    renderer.frameObserver = frameObserver
     renderer.content = body
     try renderer.run(title: "\(title) — \(renderer.name)")
   }
