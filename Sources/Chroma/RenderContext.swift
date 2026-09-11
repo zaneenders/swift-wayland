@@ -140,6 +140,11 @@ public struct RenderContext {
     interaction.requestRedraw()
   }
 
+  /// Ends editing without requiring focus to move to a different leaf.
+  public func endEditing() {
+    interaction.endEditing()
+  }
+
   /// Moves keyboard focus to a registered interactive leaf.
   public func focus(_ id: WidgetID, editing: Bool = false) {
     interaction.focus(id, editing: editing)
