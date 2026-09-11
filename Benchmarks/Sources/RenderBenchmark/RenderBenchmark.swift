@@ -33,6 +33,8 @@ struct Report: Codable {
   let stage: String
   let count: Int
   let frames: Int
+  let minimumFrames: Int
+  let minimumSeconds: Double
   let warmup: Int
   let profilingEnabled: Bool
   let coldWireBytes: Int
@@ -114,8 +116,8 @@ struct RenderBenchmark {
     #else
     guard stage == "wire" else { throw BenchmarkError.failed("Metal stages require macOS") }
     #endif
-    let sender = RemoteImageCache()
-    let receiver = RemoteImageCache()
+    var sender = RemoteImageCache()
+    var receiver = RemoteImageCache()
     var samples: [String: [Double]] = [:]
     var cold: [String: Double] = [:]
     var coldBytes = 0
@@ -135,11 +137,11 @@ struct RenderBenchmark {
           id: UInt64(iteration), inputSequence: 0,
           viewport: viewport, commands: source.commands)
         let encodeStart = now()
-        var wire = try RemoteWire.encode(message, images: sender)
+        var wire = try RemoteWire.encode(message, images: &sender)
         durations["wireEncode"] = now() - encodeStart
         bytes = wire.readableBytes
         let decodeStart = now()
-        let decoded = try RemoteWire.decode(from: &wire, images: receiver)
+        let decoded = try RemoteWire.decode(from: &wire, images: &receiver)
         durations["wireDecode"] = now() - decodeStart
         guard case .frame(_, _, let decodedViewport, let commands) = decoded,
           decodedViewport == viewport, wire.readableBytes == 0
@@ -171,13 +173,14 @@ struct RenderBenchmark {
       await Task.yield()
     } while measured < frames || now() - measurementStart < seconds
     let report = Report(
-      schemaVersion: 2, fixtureVersion: RenderFixture.version,
+      schemaVersion: 3, fixtureVersion: RenderFixture.version,
       sequenceFrames: sequence.count,
       commandCountMin: sequence.map { $0.commands.count }.min()!,
       commandCountMax: sequence.map { $0.commands.count }.max()!,
       protocolVersion: RemoteWire.version, os: ProcessInfo.processInfo.operatingSystemVersionString,
       processors: ProcessInfo.processInfo.activeProcessorCount, scene: scene, stage: stage,
-      count: count, frames: measured, warmup: warmup, profilingEnabled: profiling,
+      count: count, frames: measured, minimumFrames: frames, minimumSeconds: seconds, warmup: warmup,
+      profilingEnabled: profiling,
       coldWireBytes: coldBytes, steadyWireBytes: steadyBytes, coldMS: cold,
       timings: samples.mapValues(Distribution.init))
     let encoder = JSONEncoder()

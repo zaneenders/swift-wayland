@@ -187,3 +187,8 @@ to run generated fixtures; capture replay is currently a direct CLI operation.
 
 For the workflow, measurement boundaries, current limitations, and an initial
 local replay result, see [scene capture and replay](../README.md#scene-capture-and-replay).
+
+Benchmark report schema 3 separates requested `minimumFrames` and
+`minimumSeconds` from the actual measured `frames`. Comparisons require matching
+requested configuration, not matching sample counts in duration-based runs.
+Regenerate older reports before comparing them with schema 3 reports.

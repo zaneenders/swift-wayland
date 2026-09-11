@@ -9,7 +9,7 @@ struct BenchmarkRuns {
   static let metadataNames = ["toolchain.txt", "hardware.txt", "dependencies.json"]
   static let configKeys = [
     "schemaVersion", "fixtureVersion", "protocolVersion", "os", "processors",
-    "scene", "stage", "count", "warmup", "frames", "sequenceFrames",
+    "scene", "stage", "count", "warmup", "minimumFrames", "minimumSeconds", "sequenceFrames",
     "commandCountMin", "commandCountMax",
   ]
   var metadata: [Data] = []

@@ -21,53 +21,53 @@ struct RemoteImageCacheTests {
   }
 
   @Test func unchangedPixelsAreSentOnceAndGenerationsAreRedefined() throws {
-    let sender = RemoteImageCache()
-    let receiver = RemoteImageCache()
+    var sender = RemoteImageCache()
+    var receiver = RemoteImageCache()
     let original = try image()
     for resource in [original, original, try image(generation: 1), original] {
       let message = frame([resource, resource])
-      var bytes = try RemoteWire.encode(message, images: sender)
-      #expect(try RemoteWire.decode(from: &bytes, images: receiver) == message)
+      var bytes = try RemoteWire.encode(message, images: &sender)
+      #expect(try RemoteWire.decode(from: &bytes, images: &receiver) == message)
     }
     #expect(sender.transmittedPixelBytes == 3072)
     #expect(receiver.transmittedPixelBytes == sender.transmittedPixelBytes)
-    let compact = try RemoteWire.encode(frame([original]), images: sender)
-    let fresh = try RemoteWire.encode(frame([original]), images: RemoteImageCache())
+    let compact = try RemoteWire.encode(frame([original]), images: &sender)
+    let fresh = try RemoteWire.encode(frame([original]))
     #expect(fresh.readableBytes - compact.readableBytes == 1036)
     var missingResource = compact
     #expect(throws: RemoteProtocolError.malformedMessage) {
-      try RemoteWire.decode(from: &missingResource, images: RemoteImageCache())
+      try RemoteWire.decode(from: &missingResource)
     }
   }
 
   @Test func evictionIsDeterministicAndEvictedResourcesAreResent() throws {
-    let sender = RemoteImageCache()
-    let receiver = RemoteImageCache()
+    var sender = RemoteImageCache()
+    var receiver = RemoteImageCache()
     for id in (0..<130).map(String.init) + ["0"] {
       let message = frame([try image(id)])
-      var bytes = try RemoteWire.encode(message, images: sender)
-      #expect(try RemoteWire.decode(from: &bytes, images: receiver) == message)
+      var bytes = try RemoteWire.encode(message, images: &sender)
+      #expect(try RemoteWire.decode(from: &bytes, images: &receiver) == message)
     }
     #expect(sender.transmittedPixelBytes == 131 * 1024)
   }
 
   @Test func fragmentedDefinitionsDoNotMutateCacheAndFailureRollsBack() throws {
-    let sender = RemoteImageCache()
-    let receiver = RemoteImageCache()
+    var sender = RemoteImageCache()
+    var receiver = RemoteImageCache()
     let message = frame([try image()])
-    let bytes = try RemoteWire.encode(message, images: sender)
+    let bytes = try RemoteWire.encode(message, images: &sender)
     var prefix = try #require(bytes.getSlice(at: 0, length: bytes.readableBytes - 1))
-    #expect(try RemoteWire.decode(from: &prefix, images: receiver) == nil)
+    #expect(try RemoteWire.decode(from: &prefix, images: &receiver) == nil)
     #expect(receiver.transmittedPixelBytes == 0)
     var malformed = bytes
     malformed.setInteger(UInt32(bytes.readableBytes - 12 + 1), at: 8, endianness: .little)
     malformed.writeInteger(UInt8(0))
     #expect(throws: RemoteProtocolError.malformedMessage) {
-      try RemoteWire.decode(from: &malformed, images: receiver)
+      try RemoteWire.decode(from: &malformed, images: &receiver)
     }
     #expect(receiver.transmittedPixelBytes == 0)
     var complete = bytes
-    #expect(try RemoteWire.decode(from: &complete, images: receiver) == message)
+    #expect(try RemoteWire.decode(from: &complete, images: &receiver) == message)
   }
 
   @Test func pacingMessagesRoundTripAndRejectInvalidRates() throws {
@@ -80,5 +80,26 @@ struct RemoteImageCacheTests {
         try RemoteWire.encode(.frameRate(rate))
       }
     }
+  }
+}
+
+extension RemoteImageCacheTests {
+  @Test func copiedCacheIsIndependent() throws {
+    var original = RemoteImageCache()
+    let message = frame([try image()])
+    _ = try RemoteWire.encode(message, images: &original)
+    var copy = original
+    _ = try RemoteWire.encode(frame([try image(generation: 1)]), images: &copy)
+    #expect(original.transmittedPixelBytes == 1024)
+    #expect(copy.transmittedPixelBytes == 2048)
+    let reference = try RemoteWire.encode(message, images: &original)
+    #expect(reference.readableBytes < 1024)
+  }
+
+  @Test func selfContainedMessagesResolveRepeatedImages() throws {
+    let resource = try image()
+    let message = frame([resource, resource])
+    var bytes = try RemoteWire.encode(message)
+    #expect(try RemoteWire.decode(from: &bytes) == message)
   }
 }

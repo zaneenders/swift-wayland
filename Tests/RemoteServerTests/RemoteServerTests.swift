@@ -1,21 +1,26 @@
-import Chroma
 import Foundation
 import NIOCore
 import NIOEmbedded
 import RemoteProtocol
 import Testing
 
+@testable import Chroma
 @testable import RemoteServer
 
 @MainActor
 struct RemoteServerTests {
-  private func reply(from channel: EmbeddedChannel, images: RemoteImageCache = RemoteImageCache()) async throws
+  private func reply(from channel: EmbeddedChannel) async throws -> RemoteMessage {
+    var images = RemoteImageCache()
+    return try await reply(from: channel, images: &images)
+  }
+
+  private func reply(from channel: EmbeddedChannel, images: inout RemoteImageCache) async throws
     -> RemoteMessage
   {
     for _ in 0..<500 {
       channel.embeddedEventLoop.run()
       if var bytes = try channel.readOutbound(as: ByteBuffer.self) {
-        return try #require(try RemoteWire.decode(from: &bytes, images: images))
+        return try #require(try RemoteWire.decode(from: &bytes, images: &images))
       }
       try await Task.sleep(for: .milliseconds(2))
     }
@@ -146,7 +151,7 @@ extension RemoteServerTests {
       rgba8: Data(repeating: 255, count: 16))
     let server = RemoteServer(content: Image(image))
     let channel = EmbeddedChannel()
-    let images = RemoteImageCache()
+    var images = RemoteImageCache()
     try await channel.connect(to: SocketAddress(ipAddress: "127.0.0.1", port: 9328)).get()
     defer {
       server.disconnected(channel)
@@ -154,7 +159,7 @@ extension RemoteServerTests {
       try? server.shutdown()
     }
     server.receive(.requestFrame, from: channel)
-    guard case .frame = try await reply(from: channel, images: images) else {
+    guard case .frame = try await reply(from: channel, images: &images) else {
       Issue.record("First credit must produce a full frame")
       return
     }
@@ -162,12 +167,65 @@ extension RemoteServerTests {
     let resized = Size(width: 820, height: 520)
     server.receive(.viewport(resized), from: channel)
     server.receive(.requestFrame, from: channel)
-    guard case .frame(_, _, let viewport, let commands) = try await reply(from: channel, images: images) else {
+    guard case .frame(_, _, let viewport, let commands) = try await reply(from: channel, images: &images) else {
       Issue.record("Viewport change must produce a full frame")
       return
     }
     #expect(viewport == resized)
     #expect(!commands.isEmpty)
     #expect(images.transmittedPixelBytes == image.rgba8.count)
+  }
+}
+
+@MainActor private final class EditorRecorder {
+  var text = ""
+}
+
+private struct EditingBlock: PrimitiveBlock {
+  let recorder: EditorRecorder
+  @MainActor func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { proposal }
+  @MainActor func draw(into list: inout DrawList, in rect: Rect, context: RenderContext) {
+    context.interaction.beginGroup(.vertical, rect: rect)
+    _ = context.interaction.textInputBehavior(
+      id: WidgetID("editor"), rect: rect, text: recorder.text,
+      onChange: { recorder.text = $0 })
+    context.interaction.endGroup()
+  }
+}
+
+extension RemoteServerTests {
+  @Test func keyboardUsesTextOrExplicitShortcutsWithoutAnEditingOverlay() async throws {
+    let recorder = EditorRecorder()
+    let server = RemoteServer(content: EditingBlock(recorder: recorder))
+    server.keyBindings = KeyBindings {
+      bind("a", modifiers: .command, to: .editing(.selectAll))
+      disable("x")
+    }
+    let channel = EmbeddedChannel()
+    try await channel.connect(to: SocketAddress(ipAddress: "127.0.0.1", port: 9328)).get()
+    defer {
+      server.disconnected(channel)
+      _ = try? channel.finish()
+      try? server.shutdown()
+    }
+    server.receive(.viewport(Size(width: 400, height: 100)), from: channel)
+    server.receive(.input(sequence: 1, state: InputState(commands: [.action(.activate)])), from: channel)
+    for (offset, character) in "jfd kls".enumerated() {
+      server.receive(
+        .key(
+          sequence: UInt64(offset + 2),
+          event: RemoteKeyEvent(
+            chord: KeyChord(character), text: String(character))), from: channel)
+    }
+    #expect(recorder.text == "jfd kls")
+    server.receive(.key(sequence: 20, event: RemoteKeyEvent(chord: KeyChord("x"), text: "x")), from: channel)
+    #expect(recorder.text == "jfd kls")
+    server.receive(
+      .key(
+        sequence: 21,
+        event: RemoteKeyEvent(
+          chord: KeyChord("a", modifiers: .command), text: "a")), from: channel)
+    server.receive(.key(sequence: 22, event: RemoteKeyEvent(chord: nil, text: "replacement")), from: channel)
+    #expect(recorder.text == "replacement")
   }
 }

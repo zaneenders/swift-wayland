@@ -49,33 +49,10 @@ public struct DemoApplication: App {
       bind(.end, to: .editing(.moveCaretToEnd))
       bind(.enter, to: .editing(.submit))
       bind(.escape, to: .editing(.endEditing))
-      bind(.space, to: .action(.activate))
-      bind(.pageUp, to: .navigation(.pageUp))
-      bind(.pageDown, to: .navigation(.pageDown))
-      bind("j", to: .navigation(.down))
-      bind("f", to: .navigation(.up))
-      bind("d", to: .navigation(.left))
-      bind("k", to: .navigation(.right))
-      bind("l", to: .navigation(.in))
-      bind("s", to: .navigation(.out))
     }
     guard capture != nil else { return bindings }
     return bindings.overlay {
       bind("g", modifiers: [.control, .shift], to: .application("demo.capture"))
-    }
-  }
-
-  // The current remote input adapter resolves an explicit editing overlay,
-  // whereas native input lets printable movement keys insert text while editing.
-  public var editingKeyBindings: KeyBindings {
-    keyBindings.overlay {
-      bind("j", to: .editing(.insert("j")))
-      bind("f", to: .editing(.insert("f")))
-      bind("d", to: .editing(.insert("d")))
-      bind("k", to: .editing(.insert("k")))
-      bind("l", to: .editing(.insert("l")))
-      bind("s", to: .editing(.insert("s")))
-      bind(.space, to: .editing(.insert(" ")))
     }
   }
 

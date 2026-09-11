@@ -44,22 +44,22 @@ struct RemoteFrameValidationTests {
   }
 
   @Test func rejectedPresentationStillDefinesImagesForNextFrame() throws {
-    let sender = RemoteImageCache()
-    let receiver = RemoteImageCache()
+    var sender = RemoteImageCache()
+    var receiver = RemoteImageCache()
     let image = try ImageResource(id: ImageID("test"), width: 1, height: 1, rgba8: Data([0, 0, 0, 255]))
     let commands: [DrawCommand] = [.image(rect: rect, image: image, scaling: .contain, alignment: .center)]
     var bad = try RemoteWire.encode(
       .frame(
         id: 1, inputSequence: 0,
-        viewport: Size(width: .infinity, height: 600), commands: commands), images: sender)
-    guard case .frame(_, _, let size, let decoded) = try RemoteWire.decode(from: &bad, images: receiver) else {
+        viewport: Size(width: .infinity, height: 600), commands: commands), images: &sender)
+    guard case .frame(_, _, let size, let decoded) = try RemoteWire.decode(from: &bad, images: &receiver) else {
       Issue.record("Expected frame")
       return
     }
     #expect(!RemoteFrameValidation.isValid(viewport: size, commands: decoded))
     let good = RemoteMessage.frame(id: 2, inputSequence: 0, viewport: viewport, commands: commands)
-    var bytes = try RemoteWire.encode(good, images: sender)
-    #expect(try RemoteWire.decode(from: &bytes, images: receiver) == good)
+    var bytes = try RemoteWire.encode(good, images: &sender)
+    #expect(try RemoteWire.decode(from: &bytes, images: &receiver) == good)
     #expect(sender.transmittedPixelBytes == 4)
   }
 }

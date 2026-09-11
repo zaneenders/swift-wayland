@@ -4,7 +4,7 @@ import Chroma
 /// FIFO eviction (128 IDs / 64 MiB); an evicted resource is redefined inline on
 /// its next use. No independent client eviction or dropped encoded frames is safe.
 /// Failed encodes/decodes leave the caller's cache unchanged.
-public final class RemoteImageCache {
+public struct RemoteImageCache: Sendable {
   private var resources: [ImageID: ImageResource] = [:]
   private var order: [ImageID] = []
   private var bytes = 0
@@ -12,7 +12,7 @@ public final class RemoteImageCache {
   public init() {}
 
   func image(id: ImageID) -> ImageResource? { resources[id] }
-  func insert(_ image: ImageResource) {
+  mutating func insert(_ image: ImageResource) {
     transmittedPixelBytes += image.rgba8.count
     if let old = resources.removeValue(forKey: image.id) {
       bytes -= old.rgba8.count
@@ -25,16 +25,5 @@ public final class RemoteImageCache {
       let id = order.removeFirst()
       bytes -= resources.removeValue(forKey: id)!.rgba8.count
     }
-  }
-  func copy() -> RemoteImageCache {
-    let result = RemoteImageCache()
-    result.replace(with: self)
-    return result
-  }
-  func replace(with other: RemoteImageCache) {
-    resources = other.resources
-    order = other.order
-    bytes = other.bytes
-    transmittedPixelBytes = other.transmittedPixelBytes
   }
 }

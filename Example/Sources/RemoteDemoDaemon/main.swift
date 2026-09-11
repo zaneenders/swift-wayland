@@ -38,8 +38,8 @@ struct RemoteDemoDaemon {
       var encodeTotal: TimeInterval = 0
       var decodeTotal: TimeInterval = 0
       var wireBytes = 0
-      let senderImages = RemoteImageCache()
-      let receiverImages = RemoteImageCache()
+      var senderImages = RemoteImageCache()
+      var receiverImages = RemoteImageCache()
       for frame in 0...60 {
         let started = ProcessInfo.processInfo.systemUptime
         let list = DrawList(commands: renderer.render().commands).culled(to: demo.windowSize)
@@ -49,11 +49,11 @@ struct RemoteDemoDaemon {
         var wire = try RemoteWire.encode(
           .frame(
             id: UInt64(frame), inputSequence: 0, viewport: demo.windowSize,
-            commands: list.commands), images: senderImages)
+            commands: list.commands), images: &senderImages)
         let encodeElapsed = ProcessInfo.processInfo.systemUptime - encodeStarted
         wireBytes = wire.readableBytes
         let decodeStarted = ProcessInfo.processInfo.systemUptime
-        let decoded = try RemoteWire.decode(from: &wire, images: receiverImages)
+        let decoded = try RemoteWire.decode(from: &wire, images: &receiverImages)
         precondition(decoded != nil && wire.readableBytes == 0)
         let decodeElapsed = ProcessInfo.processInfo.systemUptime - decodeStarted
         if frame == 0 {

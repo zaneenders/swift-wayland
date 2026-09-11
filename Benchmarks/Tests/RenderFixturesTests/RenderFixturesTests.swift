@@ -7,16 +7,16 @@ import Testing
 func deterministicReplay(scene: String) throws {
   let fixture = try RenderFixture(name: scene, count: 256)
   #expect(fixture.list.commands == (try RenderFixture(name: scene, count: 256)).list.commands)
-  let sender = RemoteImageCache()
-  let receiver = RemoteImageCache()
+  var sender = RemoteImageCache()
+  var receiver = RemoteImageCache()
   var sizes: [Int] = []
   for frame in 0..<(fixture.sequence.count * 2 + 1) {
     let message = RemoteMessage.frame(
       id: UInt64(frame), inputSequence: 0,
       viewport: fixture.viewport, commands: fixture.sequence[frame % fixture.sequence.count].commands)
-    var wire = try RemoteWire.encode(message, images: sender)
+    var wire = try RemoteWire.encode(message, images: &sender)
     sizes.append(wire.readableBytes)
-    #expect(try RemoteWire.decode(from: &wire, images: receiver) == message)
+    #expect(try RemoteWire.decode(from: &wire, images: &receiver) == message)
     #expect(wire.readableBytes == 0)
   }
   if fixture.sequence.count == 1 { #expect(sizes[1] == sizes[2]) }

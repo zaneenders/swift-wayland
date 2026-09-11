@@ -44,10 +44,23 @@ public enum RemoteWire {
     case requestFrame = 4
   }
 
+  /// Encodes a self-contained message without retaining resources between calls.
   public static func encode(
-    _ message: RemoteMessage, allocator: ByteBufferAllocator = .init(), images: RemoteImageCache? = nil
+    _ message: RemoteMessage, allocator: ByteBufferAllocator = .init()
   ) throws -> ByteBuffer {
-    let workingImages = images?.copy()
+    var images = RemoteImageCache()
+    return try encode(message, allocator: allocator, images: &images)
+  }
+
+  public static func decode(from buffer: inout ByteBuffer) throws -> RemoteMessage? {
+    var images = RemoteImageCache()
+    return try decode(from: &buffer, images: &images)
+  }
+
+  public static func encode(
+    _ message: RemoteMessage, allocator: ByteBufferAllocator = .init(), images: inout RemoteImageCache
+  ) throws -> ByteBuffer {
+    var workingImages = images
     var payload = allocator.buffer(capacity: 1024)
     let type: MessageType
     switch message {
@@ -84,7 +97,7 @@ public enum RemoteWire {
         throw RemoteProtocolError.messageTooLarge(commands.count)
       }
       payload.writeInteger(UInt32(commands.count), endianness: .little)
-      for command in commands { try payload.writeCommand(command, images: workingImages) }
+      for command in commands { try payload.writeCommand(command, images: &workingImages) }
     }
     guard payload.readableBytes <= maximumPayloadBytes else {
       throw RemoteProtocolError.messageTooLarge(payload.readableBytes)
@@ -95,12 +108,12 @@ public enum RemoteWire {
     result.writeInteger(type.rawValue, endianness: .little)
     result.writeInteger(UInt32(payload.readableBytes), endianness: .little)
     result.writeBuffer(&payload)
-    if let workingImages { images?.replace(with: workingImages) }
+    images = workingImages
     return result
   }
 
   /// Decodes one complete message, returning nil until the buffer contains it all.
-  public static func decode(from buffer: inout ByteBuffer, images: RemoteImageCache? = nil) throws -> RemoteMessage? {
+  public static func decode(from buffer: inout ByteBuffer, images: inout RemoteImageCache) throws -> RemoteMessage? {
     guard buffer.readableBytes >= 12 else { return nil }
     guard
       let magic: UInt32 = buffer.getInteger(at: buffer.readerIndex, endianness: .little),
@@ -121,7 +134,7 @@ public enum RemoteWire {
     guard let type = MessageType(rawValue: rawType) else {
       throw RemoteProtocolError.unknownMessage(rawType)
     }
-    let workingImages = images?.copy()
+    var workingImages = images
     let message: RemoteMessage
     switch type {
     case .key:
@@ -161,11 +174,11 @@ public enum RemoteWire {
       }
       var commands: [DrawCommand] = []
       commands.reserveCapacity(count)
-      for _ in 0..<count { commands.append(try payload.readDrawCommand(images: workingImages)) }
+      for _ in 0..<count { commands.append(try payload.readDrawCommand(images: &workingImages)) }
       message = .frame(id: id, inputSequence: sequence, viewport: viewport, commands: commands)
     }
     guard payload.readableBytes == 0 else { throw RemoteProtocolError.malformedMessage }
-    if let workingImages { images?.replace(with: workingImages) }
+    images = workingImages
     return message
   }
 }
@@ -222,7 +235,7 @@ extension ByteBuffer {
     for event in input.textEvents { try writeTextEvent(event) }
   }
 
-  fileprivate mutating func writeCommand(_ command: DrawCommand, images: RemoteImageCache?) throws {
+  fileprivate mutating func writeCommand(_ command: DrawCommand, images: inout RemoteImageCache) throws {
     switch command {
     case .fillRect(let rect, let color):
       writeInteger(UInt8(1))
@@ -252,7 +265,7 @@ extension ByteBuffer {
       writeFloat(scale)
       writeInteger(face.rawValue)
     case .image(let rect, let image, let scaling, let alignment):
-      if let cached = images?.image(id: image.id), cached.generation == image.generation,
+      if let cached = images.image(id: image.id), cached.generation == image.generation,
         cached.width == image.width, cached.height == image.height
       {
         writeInteger(UInt8(9))
@@ -275,7 +288,7 @@ extension ByteBuffer {
       }
       writeInteger(UInt32(image.rgba8.count), endianness: .little)
       writeBytes(image.rgba8)
-      images?.insert(image)
+      images.insert(image)
       writeInteger(scaling.wireValue)
       writeFloat(alignment.x)
       writeFloat(alignment.y)
@@ -330,7 +343,7 @@ extension ByteBuffer {
       scrollDelta: scroll, commands: commands, textEvents: text)
   }
 
-  fileprivate mutating func readDrawCommand(images: RemoteImageCache?) throws -> DrawCommand {
+  fileprivate mutating func readDrawCommand(images: inout RemoteImageCache) throws -> DrawCommand {
     switch try read(UInt8.self) {
     case 1: return .fillRect(rect: try readRect(), color: try readColor())
     case 2: return .strokeRect(rect: try readRect(), width: try readFloat(), color: try readColor())
@@ -351,7 +364,7 @@ extension ByteBuffer {
       let rect = try readRect()
       let id = ImageID(try readStringValue())
       let generation = try read(UInt64.self)
-      guard let image = images?.image(id: id), image.generation == generation,
+      guard let image = images.image(id: id), image.generation == generation,
         let scaling = ImageScaling(wireValue: try read(UInt8.self))
       else {
         throw RemoteProtocolError.malformedMessage
@@ -376,7 +389,7 @@ extension ByteBuffer {
       let alignment = ImageAlignment(x: try readFloat(), y: try readFloat())
       let image = try ImageResource(
         id: ImageID(id), generation: generation, width: width, height: height, rgba8: bytes)
-      images?.insert(image)
+      images.insert(image)
       return .image(rect: rect, image: image, scaling: scaling, alignment: alignment)
     case 7: return .pushClip(try readRect())
     case 8: return .popClip

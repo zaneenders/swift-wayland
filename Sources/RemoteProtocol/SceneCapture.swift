@@ -22,8 +22,7 @@ public enum SceneCapture {
       scaleX: frame.rasterScale?.x, scaleY: frame.rasterScale?.y)
     let header = try JSONEncoder().encode(metadata)
     let wire = try RemoteWire.encode(
-      .frame(id: 0, inputSequence: 0, viewport: frame.viewport, commands: frame.drawList.commands),
-      images: RemoteImageCache())
+      .frame(id: 0, inputSequence: 0, viewport: frame.viewport, commands: frame.drawList.commands))
     var buffer = ByteBufferAllocator().buffer(capacity: 12 + header.count + wire.readableBytes)
     buffer.writeBytes(magic)
     buffer.writeInteger(UInt32(header.count), endianness: .little)
@@ -59,7 +58,7 @@ public enum SceneCapture {
     }
     guard
       case .frame(_, _, let viewport, let commands) = try RemoteWire.decode(
-        from: &buffer, images: RemoteImageCache()), buffer.readableBytes == 0,
+        from: &buffer), buffer.readableBytes == 0,
       viewport.width.isFinite, viewport.height.isFinite, viewport.width > 0, viewport.height > 0
     else {
       throw RemoteProtocolError.malformedMessage

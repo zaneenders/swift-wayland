@@ -10,8 +10,6 @@ import RemoteProtocol
 public final class RemoteServer {
   public var frameObserver: FrameObserver?
   public var keyBindings = KeyBindings()
-  public var editingKeyBindings = KeyBindings()
-  private var pointerPosition = Point.zero
   private var pointerState = InputState()
   private var clipboardEpoch: UInt64 = 0
   private struct EditorSnapshot {
@@ -22,7 +20,6 @@ public final class RemoteServer {
   private struct PendingClipboard {
     enum Operation { case copy, cut, paste }
     let id: UInt64
-    let epoch: UInt64
     let operation: Operation
     let snapshot: EditorSnapshot
   }
@@ -154,8 +151,7 @@ public final class RemoteServer {
     case .key(let sequence, let event):
       guard sequence > inputSequence else { return }
       inputSequence = sequence
-      let map = interaction.isTextEditing ? keyBindings.overlay(editingKeyBindings) : keyBindings
-      if let chord = event.chord, let resolution = map.command(for: chord) {
+      if let chord = event.chord, let resolution = keyBindings.command(for: chord) {
         if let command = resolution { execute(command) }
       } else if interaction.isTextEditing, let text = event.text {
         render(input: InputState(textEvents: [.insert(text)]))
@@ -166,7 +162,6 @@ public final class RemoteServer {
       render()
     case .input(let sequence, let state):
       guard sequence > inputSequence else { return }
-      pointerPosition = state.pointerPosition
       pointerState = InputState(
         pointerPosition: state.pointerPosition, pointerPressPosition: state.pointerPressPosition,
         pointerDown: state.pointerDown)
@@ -203,7 +198,7 @@ public final class RemoteServer {
       clipboardEpoch &+= 1
       let epoch = clipboardEpoch
       pendingClipboard = PendingClipboard(
-        id: id, epoch: epoch,
+        id: id,
         operation: event == .cut ? .cut : (event == .paste ? .paste : .copy),
         snapshot: EditorSnapshot(
           text: interaction.editingText,
@@ -216,11 +211,11 @@ public final class RemoteServer {
         return
       }
       DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-        guard let self, self.pendingClipboard?.id == id, self.pendingClipboard?.epoch == epoch else { return }
+        guard let self, self.pendingClipboard?.id == id, self.clipboardEpoch == epoch else { return }
         self.finishClipboard()
       }
     case .selectAll where !interaction.isTextEditing:
-      interaction.selectAll(at: pointerPosition)
+      interaction.selectAll(at: pointerState.pointerPosition)
       render()
     default:
       render(input: InputState(textEvents: [event]))
@@ -242,7 +237,6 @@ public final class RemoteServer {
     clipboardEpoch &+= 1
     deferredInput.removeAll()
     inputSequence = 0
-    pointerPosition = .zero
     pointerState = InputState()
     connectionEpoch &+= 1
     redrawScheduled = false
@@ -433,7 +427,7 @@ private final class ConnectionFrameEncoder: @unchecked Sendable {
       images = RemoteImageCache()
     }
     let before = images.transmittedPixelBytes
-    let bytes = try RemoteWire.encode(message, images: images)
+    let bytes = try RemoteWire.encode(message, images: &images)
     return EncodedFrame(bytes: bytes, imageBytes: images.transmittedPixelBytes - before)
   }
 }

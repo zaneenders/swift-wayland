@@ -40,16 +40,7 @@ public final class ChromaInputView: MTKView {
 
   private func scheduleRedraw() {
     needsDisplay = true
-    // Windowed renderers consume input on a later display callback. Preserve
-    // that ordering for remote consumers so keyDown can finish enqueueing its
-    // command before frameInput() drains the accumulator.
-    if onInputAvailable != nil {
-      if onRemoteKey != nil {
-        onInputAvailable?()
-      } else {
-        DispatchQueue.main.async { [weak self] in self?.onInputAvailable?() }
-      }
-    }
+    onInputAvailable?()
   }
 
   public override func updateTrackingAreas() {
@@ -111,53 +102,16 @@ public final class ChromaInputView: MTKView {
       onRemoteKey(Self.keyChord(for: event), text)
       return
     }
-    scheduleRedraw()
-    guard let chord = Self.keyChord(for: event) else {
-      if interaction == nil {
-        if let edit = Self.textInsertionEvent(for: event) { pendingTextEvents.append(edit) }
-      } else if interaction?.mode == .editing, let edit = Self.textInsertionEvent(for: event) {
-        pendingTextEvents.append(edit)
-      } else {
-        super.keyDown(with: event)
-      }
+    guard interaction != nil else {
+      super.keyDown(with: event)
       return
     }
-    let resolution = keyBindings.command(for: chord)
-    if interaction == nil {
-      if let resolution {
-        guard let command = resolution else { return }
-        if case .editing(let editing) = command {
-          pendingTextEvents.append(editing)
-        } else {
-          pendingCommands.append(command)
-        }
-      } else if let edit = Self.textInsertionEvent(for: event) {
-        pendingTextEvents.append(edit)
-      } else {
-        super.keyDown(with: event)
-      }
-      return
-    }
-    if interaction?.mode == .editing {
-      // Editing commands are explicit. Movement-mode commands on printable keys are ignored
-      // here so bindings such as Space-to-activate and j-to-move still insert text while editing.
-      if case .some(.some(let command)) = resolution,
-        case .editing = command,
-        handlePlatformCommand(command)
-      {
-        return
-      }
-      if case .some(.none) = resolution { return }
-      if let edit = Self.textInsertionEvent(for: event) {
-        pendingTextEvents.append(edit)
-        return
-      }
-    }
-    // A disabled binding is still owned by the keymap and must not fall through.
-    if let resolution {
+    defer { scheduleRedraw() }
+    if let chord = Self.keyChord(for: event), let resolution = keyBindings.command(for: chord) {
       guard let command = resolution else { return }
-      if handlePlatformCommand(command) { return }
-      pendingCommands.append(command)
+      if !handlePlatformCommand(command) { pendingCommands.append(command) }
+    } else if interaction?.isTextEditing == true, let edit = Self.textInsertionEvent(for: event) {
+      pendingTextEvents.append(edit)
     } else {
       super.keyDown(with: event)
     }
@@ -190,36 +144,8 @@ public final class ChromaInputView: MTKView {
       } else {
         interaction?.selectAll(at: pointerPosition)
       }
-    case .backspace:
-      guard interaction?.mode == .editing else { return true }
-      pendingTextEvents.append(.backspace)
-    case .deleteForward:
-      guard interaction?.mode == .editing else { return true }
-      pendingTextEvents.append(.deleteForward)
-    case .moveCaretLeft:
-      guard interaction?.mode == .editing else { return false }
-      pendingTextEvents.append(.moveCaretLeft)
-    case .moveCaretRight:
-      guard interaction?.mode == .editing else { return false }
-      pendingTextEvents.append(.moveCaretRight)
-    case .moveCaretUp, .moveCaretDown, .selectCaretUp, .selectCaretDown:
-      guard interaction?.mode == .editing else { return false }
-      pendingTextEvents.append(editing)
-    case .moveCaretToStart:
-      guard interaction?.mode == .editing else { return false }
-      pendingTextEvents.append(.moveCaretToStart)
-    case .moveCaretToEnd:
-      guard interaction?.mode == .editing else { return false }
-      pendingTextEvents.append(.moveCaretToEnd)
-    case .submit:
-      if interaction?.mode == .editing {
-        pendingTextEvents.append(.submit)
-      } else {
-        pendingCommands.append(.action(.activate))
-      }
-    case .endEditing:
-      guard interaction?.mode == .editing else { return true }
-      pendingTextEvents.append(.endEditing)
+    default:
+      if interaction?.isTextEditing == true { pendingTextEvents.append(editing) }
     }
     return true
   }
