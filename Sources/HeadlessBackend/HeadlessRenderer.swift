@@ -14,7 +14,13 @@ public struct HeadlessFrame: Equatable, Sendable {
 public final class HeadlessRenderer: Renderer {
   public let name = "Headless"
 
-  public var content: (any Block)?
+  public var content: (any Block)? {
+    didSet { frameProducer.reset() }
+  }
+  private let frameProducer = FrameProducer()
+
+  /// Called after an observed model changes. Rendering remains explicitly driven by the caller.
+  public var onRedrawRequested: (@MainActor () -> Void)?
   public var frameObserver: FrameObserver?
   public var onClose: (() -> Void)?
   public var viewport: Size
@@ -41,17 +47,10 @@ public final class HeadlessRenderer: Renderer {
   /// behavior while retaining focus and interaction state between calls.
   @discardableResult
   public func render(input: InputState = InputState()) -> HeadlessFrame {
-    interaction.beginFrame(input: input)
-    var drawList = DrawList()
-    if let content {
-      BlockEngine.draw(
-        content,
-        into: &drawList,
-        in: Rect(origin: .zero, size: viewport),
-        context: context
-      )
-    }
-    interaction.endFrame()
+    let drawList = frameProducer.render(
+      content: content, viewport: viewport, input: input, context: context,
+      onChange: { [weak self] in self?.onRedrawRequested?() })
+    _ = interaction.consumeRedrawRequest()
     frameObserver?(FrameObservation(drawList: drawList, viewport: viewport))
 
     let frame = HeadlessFrame(viewport: viewport, commands: drawList.commands)
@@ -61,6 +60,7 @@ public final class HeadlessRenderer: Renderer {
 
   /// Invokes the same close callback used by windowed renderers.
   public func close() {
+    frameProducer.reset()
     onClose?()
   }
 }

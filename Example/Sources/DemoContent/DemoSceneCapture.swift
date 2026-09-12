@@ -1,9 +1,11 @@
 import Chroma
 import Foundation
+import Observation
 import RemoteProtocol
 
 /// Demo-owned activation and persistence policy; Chroma never reads an environment flag.
 @MainActor
+@Observable
 final class DemoSceneCapture {
   private(set) var status = "Ctrl+Shift+G: capture next frame (includes text/images)"
   private let configuration: DemoCaptureConfiguration

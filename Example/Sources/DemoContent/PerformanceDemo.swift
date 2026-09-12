@@ -1,8 +1,10 @@
 import Chroma
 import DemoImages
 import Foundation
+import Observation
 
 @MainActor
+@Observable
 final class PerformanceDemoState {
   enum Palette: String, CaseIterable {
     case neon = "NEON"
@@ -29,6 +31,8 @@ final class PerformanceDemoState {
   var palette: Palette = .neon
   var shape: Shape = .mixed
   var isPaused = false
+  private let clock: @MainActor () -> TimeInterval
+  private let startedAt: TimeInterval
   var timeOffset: TimeInterval = 0
   var pauseStartedAt: TimeInterval?
   var burst = 0
@@ -36,7 +40,12 @@ final class PerformanceDemoState {
   var identifiers = (1...10_000).map { _ in UUID().uuidString }
   var lastAction = "Ready — choose a control"
 
-  init(itemCount: Int) {
+  init(
+    itemCount: Int,
+    clock: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+  ) {
+    self.clock = clock
+    startedAt = clock()
     image = DemoImages.mandelbrot
     self.itemCount = min(20_000, max(100, itemCount))
   }
@@ -69,7 +78,7 @@ final class PerformanceDemoState {
   }
 
   func togglePaused() {
-    let now = Date().timeIntervalSinceReferenceDate
+    let now = clock()
     if let pauseStartedAt {
       timeOffset += now - pauseStartedAt
       self.pauseStartedAt = nil
@@ -90,8 +99,10 @@ final class PerformanceDemoState {
   var speedLabel: String { String(format: "%.1f×", speed) }
 
   func elapsedTime() -> Float {
-    let now = pauseStartedAt ?? Date().timeIntervalSinceReferenceDate
-    return Float(now - timeOffset) * speed
+    let now = pauseStartedAt ?? clock()
+    // Subtract in Double before narrowing: absolute timestamps lose frame-sized
+    // increments when converted to Float (tens of seconds for dates since 2001).
+    return Float(now - startedAt - timeOffset) * speed
   }
 }
 

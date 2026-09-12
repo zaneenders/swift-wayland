@@ -17,7 +17,10 @@ import Glibc
 @MainActor
 public final class WaylandRenderer: Renderer {
   public let name = "Wayland"
-  public var content: (any Block)?
+  private let frameProducer = FrameProducer()
+  public var content: (any Block)? {
+    didSet { frameProducer.reset() }
+  }
   public var frameObserver: FrameObserver?
   public var onClose: (() -> Void)?
 
@@ -832,19 +835,10 @@ public final class WaylandRenderer: Renderer {
     // once per frame, matching the Metal backend's event coalescing.
     updateFrameRate()
     input.drainKeyboard(keyboard, editingSession: interaction.editingSessionGeneration)
-    interaction.beginFrame(input: input.frameInput())
-
     let viewport = Size(width: Float(width), height: Float(height))
-    var drawList = DrawList()
-    if let content {
-      BlockEngine.draw(
-        content,
-        into: &drawList,
-        in: Rect(origin: .zero, size: viewport),
-        context: context
-      )
-    }
-    interaction.endFrame()
+    let drawList = frameProducer.render(
+      content: content, viewport: viewport, input: input.frameInput(), context: context,
+      onChange: { [weak self] in self?.requestFrame() })
     frameObserver?(
       FrameObservation(
         drawList: drawList, viewport: viewport, rasterScale: Point(x: Float(bufferScale), y: Float(bufferScale))))
@@ -870,6 +864,7 @@ public final class WaylandRenderer: Renderer {
   }
 
   private func cleanup() {
+    frameProducer.reset()
     interaction.onRedrawRequested = nil
     refreshTimer?.cancel()
     keyboardRepeatTimer?.cancel()

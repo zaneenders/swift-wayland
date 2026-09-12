@@ -32,6 +32,7 @@ public final class RemoteServer {
   private var serverChannel: Channel?
   private(set) var clientChannel: Channel?
   private let interaction = Interaction()
+  private let frameProducer = FrameProducer()
   private var content: (any Block)?
   private var viewport: Size
   private var frameID: UInt64 = 0
@@ -57,6 +58,14 @@ public final class RemoteServer {
 
   public convenience init(content: any Block, size: Size = Size(width: 800, height: 600)) {
     self.init(content: content, size: size, encodingQueue: DispatchQueue(label: "chroma.remote.frame-encoding"))
+  }
+
+  /// Builds root content afresh during each observed frame evaluation.
+  public convenience init<Content: Block>(
+    size: Size = Size(width: 800, height: 600),
+    @BlockBuilder content: @escaping @MainActor () -> Content
+  ) {
+    self.init(content: DeferredBlock(content: content), size: size)
   }
 
   // Injectable serial queue lets lifecycle tests hold encoding across a disconnect.
@@ -101,6 +110,7 @@ public final class RemoteServer {
   }
 
   public func shutdown() throws {
+    frameProducer.reset()
     let client = clientChannel
     clientChannel = nil
     connectionEpoch &+= 1
@@ -247,6 +257,7 @@ public final class RemoteServer {
   func disconnected(_ channel: Channel) {
     guard clientChannel === channel else { return }
     clientChannel = nil
+    frameProducer.reset()
     pendingClipboard = nil
     clipboardEpoch &+= 1
     deferredInput.removeAll()
@@ -302,14 +313,10 @@ public final class RemoteServer {
     input.pointerPosition = pointerState.pointerPosition
     input.pointerPressPosition = pointerState.pointerPressPosition
     input.pointerDown = pointerState.pointerDown
-    interaction.beginFrame(input: input)
-    var drawList = DrawList()
-    if let content {
-      BlockEngine.draw(
-        content, into: &drawList, in: Rect(origin: .zero, size: viewport),
-        context: RenderContext(interaction: interaction))
-    }
-    interaction.endFrame()
+    var drawList = frameProducer.render(
+      content: content, viewport: viewport, input: input,
+      context: RenderContext(interaction: interaction),
+      onChange: { [weak self] in self?.scheduleRedraw() })
     frameObserver?(FrameObservation(drawList: drawList, viewport: viewport))
     // Clear the coalescing flag after every frame. If drawing requested another
     // frame it has already scheduled a render through onRedrawRequested; leaving

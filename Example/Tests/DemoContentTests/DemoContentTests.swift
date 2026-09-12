@@ -8,6 +8,35 @@ import Testing
 
 @MainActor
 struct DemoContentTests {
+  @Test func animationPreservesFrameSizedTimeIncrements() {
+    var now: TimeInterval = 800_000_000
+    let state = PerformanceDemoState(itemCount: 100, clock: { now })
+    #expect(state.elapsedTime() == 0)
+    now += 1.0 / 60
+    let first = state.elapsedTime()
+    now += 1.0 / 60
+    let second = state.elapsedTime()
+    #expect(abs(first - 1.0 / 60) < 0.00001)
+    #expect(abs(second - 2.0 / 60) < 0.00001)
+    #expect(second > first)
+  }
+
+  @Test func animationPauseExcludesPausedTimeAndRetainsSpeed() {
+    var now: TimeInterval = 800_000_000
+    let state = PerformanceDemoState(itemCount: 100, clock: { now })
+    now += 2
+    state.togglePaused()
+    #expect(state.elapsedTime() == 2)
+    now += 100
+    #expect(state.elapsedTime() == 2)
+    state.togglePaused()
+    #expect(state.elapsedTime() == 2)
+    now += 0.5
+    #expect(state.elapsedTime() == 2.5)
+    state.speed = 2
+    #expect(state.elapsedTime() == 5)
+  }
+
   @Test func sharedSceneSurvivesWireRoundTrip() throws {
     let demo = DemoApplication(itemCount: 100, shortcutModifier: .command)
     let renderer = HeadlessRenderer(size: demo.windowSize)

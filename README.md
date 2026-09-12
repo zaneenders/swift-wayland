@@ -71,3 +71,49 @@ Chroma's single text font is derived from Noto Sans Mono under SIL OFL 1.1.
 Distributions must include the ChromaFont resource bundle containing the prebuilt
 font atlas and `OFL.txt`. The atlas is loaded from that bundle at runtime.
 See [font provenance and regeneration](Sources/ChromaFont/README.md).
+
+## Observable application state
+
+Chroma tracks Swift Observation property reads while evaluating a frame. Keep UI
+models main-actor isolated and mark them `@Observable`:
+
+```swift
+import Chroma
+import Observation
+import RemoteServer
+
+@MainActor
+@Observable
+final class CounterModel {
+  var count = 0
+}
+
+@MainActor
+func makeServer(model: CounterModel) -> RemoteServer {
+  RemoteServer {
+    VStack {
+      Text("Count: \(model.count)")
+      Button("Increment", id: WidgetID("increment")) { model.count += 1 }
+    }
+  }
+}
+```
+
+The server's builder runs during frame evaluation, so root-level property reads
+and conditionals stay live. `App` runners defer their root body automatically.
+For directly assigned content, use `renderer.content = DeferredBlock { ... }`;
+the existing `content:` server initializer still accepts prebuilt blocks.
+
+Changes to properties read by the current frame request another evaluation on
+the main queue after the setter completes. Tracking is renewed each frame;
+unread properties do not request redraws. Frame-capture observer callbacks are
+outside dependency tracking. `RenderContext.requestRedraw()` remains available
+for non-observable state and custom primitives.
+
+Headless rendering remains explicitly driven: assign `onRedrawRequested` to
+receive model-change notifications, then call `render()` when appropriate.
+Windowed backends retain their scheduling policies. Remote updates still obey
+client presentation credits and frame-rate limits; frame requests currently
+reevaluate the graph even when no observed property has changed. Observation
+does not track time passing, so animations and caret blinking still require
+refresh scheduling. This is whole-frame invalidation, not per-block caching.

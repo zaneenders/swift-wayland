@@ -32,7 +32,7 @@ extension App {
     renderer.setMinimumRefreshRate(minimumRefreshRate)
     renderer.setKeyBindings(keyBindings)
     renderer.frameObserver = frameObserver
-    renderer.content = body
+    renderer.content = DeferredBlock { self.body }
     try renderer.run(title: "\(title) — \(renderer.name)")
   }
 }
