@@ -83,6 +83,15 @@ struct FontGlyphTests {
     #expect(a.0 >= 0 && a.1 >= 0 && a.2 <= 1 && a.3 <= 1)
   }
 
+  @Test func atlasFitsGuaranteedGLES3TextureDimensions() {
+    let atlas = HighResolutionFontAtlas()
+    // OpenGL ES 3 guarantees GL_MAX_TEXTURE_SIZE is at least 4096.
+    // Both faces and all compositions must fit in the single shared texture.
+    let guaranteedMaximumTextureSize = 4096
+    #expect(atlas.width > 0 && atlas.width <= guaranteedMaximumTextureSize)
+    #expect(atlas.height > 0 && atlas.height <= guaranteedMaximumTextureSize)
+  }
+
   @Test func latinAccentsShareCellsAcrossCanonicalSpellingsAndFaces() {
     let atlas = HighResolutionFontAtlas()
     for entry in LatinCompositions.entries {

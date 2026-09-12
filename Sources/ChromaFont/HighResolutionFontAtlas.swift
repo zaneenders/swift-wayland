@@ -10,7 +10,9 @@ public struct FontAtlasMipLevel: Sendable {
 
 public struct HighResolutionFontAtlas: Sendable {
   public static let scale = 3
-  public static let columns = 16
+  // Keep both atlas dimensions within the 4096-pixel minimum texture limit
+  // guaranteed by OpenGL ES 3, including the compositions for both faces.
+  public static let columns = 32
   public static let sourceGlyphWidth = 20
   public static let sourceGlyphHeight = 28
   public static let padding = scale
