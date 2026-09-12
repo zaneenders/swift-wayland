@@ -28,15 +28,16 @@ public struct HStack: PrimitiveBlock {
     }
   }
 
-  @MainActor private func layout(proposal: Size, context: RenderContext) -> [Size] {
-    var sizes = children.map { BlockEngine.measure($0, proposal: proposal, context: context) }
-    for index in sizes.indices where children[index] is Spacer {
+  @MainActor private func layout(children: [any PrimitiveBlock], proposal: Size, context: RenderContext) -> [Size] {
+    var sizes = children.map { $0.sizeThatFits(proposal, context: context) }
+    for index in sizes.indices where self.children[index] is Spacer {
       sizes[index].height = 0
     }
     var fixedTotal: Float = 0
     var expanderCount = 0
-    for (child, size) in zip(children, sizes) {
-      if BlockEngine.expandsHorizontally(child) {
+    let expands = children.map { $0.expandsHorizontally }
+    for (index, size) in sizes.enumerated() {
+      if expands[index] {
         expanderCount += 1
       } else {
         fixedTotal += size.width
@@ -45,7 +46,7 @@ public struct HStack: PrimitiveBlock {
     if expanderCount > 0 {
       let spacingTotal = spacing * Float(max(0, children.count - 1))
       let share = max(0, proposal.width - fixedTotal - spacingTotal) / Float(expanderCount)
-      for index in sizes.indices where BlockEngine.expandsHorizontally(children[index]) {
+      for index in sizes.indices where expands[index] {
         sizes[index].width = share
       }
     }
@@ -54,14 +55,15 @@ public struct HStack: PrimitiveBlock {
 
   @MainActor public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
     guard !children.isEmpty else { return .zero }
-    let sizes = layout(proposal: proposal, context: context)
+    let sizes = layout(children: children.map { BlockEngine.resolve($0) }, proposal: proposal, context: context)
     let width = sizes.reduce(0) { $0 + $1.width } + spacing * Float(sizes.count - 1)
     let height = sizes.map(\.height).max() ?? 0
     return Size(width: width, height: height)
   }
 
   @MainActor public func draw(into drawList: inout DrawList, in rect: Rect, context: RenderContext) {
-    let sizes = layout(proposal: rect.size, context: context)
+    let children = children.map { BlockEngine.resolve($0) }
+    let sizes = layout(children: children, proposal: rect.size, context: context)
     let interaction = context.interaction
     interaction.beginGroup(.horizontal, rect: rect)
     let cursorOnGroup = interaction.isCurrentGroupSelected
@@ -72,8 +74,8 @@ public struct HStack: PrimitiveBlock {
       if isLayoutReversed {
         x -= size.width
       }
-      BlockEngine.draw(
-        child, into: &drawList, in: Rect(x: x, y: y, width: size.width, height: height), context: context)
+      child.draw(
+        into: &drawList, in: Rect(x: x, y: y, width: size.width, height: height), context: context)
       x += isLayoutReversed ? -spacing : size.width + spacing
     }
     let retainedFocusGroup = interaction.endGroup()
