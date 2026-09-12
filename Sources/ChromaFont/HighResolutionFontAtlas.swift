@@ -1,157 +1,106 @@
-/// One Noto-derived text atlas with generated terminal-symbol fallbacks.
+import Foundation
+
 public struct FontAtlasMipLevel: Sendable {
   public let width: Int
   public let height: Int
   public let pixels: [UInt8]
+
+  public init(width: Int, height: Int, pixels: [UInt8]) {
+    self.width = width
+    self.height = height
+    self.pixels = pixels
+  }
 }
 
+/// Prebuilt coverage and mipmaps shared by both GPU backends.
 public struct HighResolutionFontAtlas: Sendable {
   public static let scale = 3
-  // Keep both atlas dimensions within the 4096-pixel minimum texture limit
-  // guaranteed by OpenGL ES 3, including accented compositions.
   public static let columns = 32
   public static let sourceGlyphWidth = 20
   public static let sourceGlyphHeight = 28
   public static let padding = scale
 
-  public let characters: [UInt32]
-  public let characterIndices: [UInt32: Int]
-  public let pixels: [UInt8]
-  public let width: Int
-  public let height: Int
-  private let compositionIndices: [Character: Int]
+  private static let bundled: HighResolutionFontAtlas = {
+    do {
+      guard let url = Bundle.module.url(forResource: "FontAtlas", withExtension: "atlas", subdirectory: "Resources")
+      else {
+        preconditionFailure("Missing ChromaFont resource bundle")
+      }
+      return try HighResolutionFontAtlas(data: Data(contentsOf: url))
+    } catch {
+      preconditionFailure("Invalid bundled font atlas: \(error)")
+    }
+  }()
 
+  public let characterIndices: [UInt32: Int]
+  private let indices: [Character: Int]
+  private let levels: [FontAtlasMipLevel]
+  private let fallback: Int
+
+  public var width: Int { levels[0].width }
+  public var height: Int { levels[0].height }
+  public var pixels: [UInt8] { levels[0].pixels }
   public var glyphWidth: Int { Self.sourceGlyphWidth * Self.scale }
   public var glyphHeight: Int { Self.sourceGlyphHeight * Self.scale }
   public var cellWidth: Int { glyphWidth + 2 * Self.padding }
   public var cellHeight: Int { glyphHeight + 2 * Self.padding }
 
-  public init() {
-    let generated = GlyphGenerator.generated
-    let glyphs = generated
-    let characters = Set(glyphs.keys).union(BundledFont.firstScalar...BundledFont.lastScalar).sorted()
-    let indices = Dictionary(
-      uniqueKeysWithValues: characters.enumerated().map { ($0.element, $0.offset) })
-    let compositionStartIndex = characters.count
-    let count = compositionStartIndex + LatinCompositions.entries.count
-    let rows = (count + Self.columns - 1) / Self.columns
-    let cellWidth = Self.sourceGlyphWidth * Self.scale + 2 * Self.padding
+  public init() { self = Self.bundled }
+
+  enum AssetError: Error { case invalidAtlas }
+
+  init(data: Data) throws {
+    // CATL, version, width, height, glyph count; all integers UInt32 LE.
+    let bytes = [UInt8](data)
+    var cursor = 0
+    func word() throws -> UInt32 {
+      guard bytes.count - cursor >= 4 else { throw AssetError.invalidAtlas }
+      defer { cursor += 4 }
+      return (0..<4).reduce(UInt32(0)) { $0 | UInt32(bytes[cursor + $1]) << ($1 * 8) }
+    }
+    guard try word() == 0x4C54_4143, try word() == 1 else { throw AssetError.invalidAtlas }
+    let width = Int(try word())
+    let height = Int(try word())
+    let count = Int(try word())
     let cellHeight = Self.sourceGlyphHeight * Self.scale + 2 * Self.padding
-    let width = Self.columns * cellWidth
-    let height = rows * cellHeight
-    let glyphHeight = Self.sourceGlyphHeight * Self.scale
-    var pixels = [UInt8](repeating: 0, count: width * height)
-
-    for scalar in characters {
-      guard let index = indices[scalar], let glyph = glyphs[scalar] else { continue }
-      let originX = (index % Self.columns) * cellWidth + Self.padding
-      let originY = (index / Self.columns) * cellHeight + Self.padding
-
-      for y in 0..<glyphHeight {
-        let sourceY = y / Self.scale
-        // Generated symbols fill the 12-point advance, not the 20-point
-        // texture quad. Area filtering retains thin strokes while shrinking
-        // the authored 20-column bitmap to 36 atlas pixels. The remaining
-        // columns stay transparent, just like the bundled text coverage.
-        let symbolWidth = 12 * Self.scale
-        for x in 0..<symbolWidth {
-          let start = x * Self.sourceGlyphWidth
-          let end = (x + 1) * Self.sourceGlyphWidth
-          var coverage = 0
-          for sourceX in (start / symbolWidth)...((end - 1) / symbolWidth) {
-            let mask = UInt32(1) << UInt32(Self.sourceGlyphWidth - sourceX - 1)
-            if glyph.rows[sourceY] & mask != 0 {
-              coverage += min(end, (sourceX + 1) * symbolWidth) - max(start, sourceX * symbolWidth)
-            }
-          }
-          pixels[(originY + y) * width + originX + x] =
-            UInt8((coverage * 255 + Self.sourceGlyphWidth / 2) / Self.sourceGlyphWidth)
-        }
-      }
+    guard width == Self.columns * (Self.sourceGlyphWidth * Self.scale + 2 * Self.padding),
+      height > 0, height <= 4096, height % cellHeight == 0,
+      count > 0, count <= (height / cellHeight) * Self.columns
+    else { throw AssetError.invalidAtlas }
+    var scalars: [UInt32] = []
+    for _ in 0..<count { scalars.append(try word()) }
+    var levels: [FontAtlasMipLevel] = []
+    var w = width
+    var h = height
+    while true {
+      let size = w * h
+      guard bytes.count - cursor >= size else { throw AssetError.invalidAtlas }
+      levels.append(FontAtlasMipLevel(width: w, height: h, pixels: Array(bytes[cursor..<(cursor + size)])))
+      cursor += size
+      if w == 1 && h == 1 { break }
+      w = max(1, w / 2)
+      h = max(1, h / 2)
     }
-
-    for offset in 0..<Int(BundledFont.lastScalar - BundledFont.firstScalar + 1) {
-      let index = indices[BundledFont.firstScalar + UInt32(offset)]!
-      let originX = (index % Self.columns) * cellWidth + Self.padding
-      let originY = (index / Self.columns) * cellHeight + Self.padding
-      let sourceOffset = offset * BundledFont.glyphWidth * BundledFont.glyphHeight
-      for y in 0..<BundledFont.glyphHeight {
-        let sourceRow = sourceOffset + y * BundledFont.glyphWidth
-        let destinationRow = (originY + y) * width + originX
-        pixels.replaceSubrange(
-          destinationRow..<(destinationRow + BundledFont.glyphWidth),
-          with: BundledFont.pixels[
-            sourceRow..<(sourceRow + BundledFont.glyphWidth)])
-      }
+    guard cursor == bytes.count else { throw AssetError.invalidAtlas }
+    var indices: [Character: Int] = [:]
+    var scalarIndices: [UInt32: Int] = [:]
+    for (index, value) in scalars.enumerated() {
+      guard let scalar = UnicodeScalar(value) else { throw AssetError.invalidAtlas }
+      let character = Character(String(scalar))
+      guard indices.updateValue(index, forKey: character) == nil else { throw AssetError.invalidAtlas }
+      scalarIndices[value] = index
     }
-
-    // Character equality maps canonical spellings to one composed cell.
-    var compositionIndices: [Character: Int] = [:]
-    for (offset, entry) in LatinCompositions.entries.enumerated() {
-      let character = Character(String(UnicodeScalar(entry.scalar)!))
-      let destinationIndex = compositionStartIndex + offset
-      compositionIndices[character] = destinationIndex
-      Self.composeAccent(
-        pixels: &pixels, width: width, cellWidth: cellWidth, cellHeight: cellHeight,
-        baseIndex: indices[entry.base]!, destinationIndex: destinationIndex,
-        base: entry.base, mark: entry.mark)
-    }
-    self.compositionIndices = compositionIndices
-
-    self.characters = characters
-    characterIndices = indices
-    self.pixels = pixels
-    self.width = width
-    self.height = height
+    guard let fallback = scalarIndices[0xFFFD] else { throw AssetError.invalidAtlas }
+    self.indices = indices
+    characterIndices = scalarIndices
+    self.levels = levels
+    self.fallback = fallback
   }
 
-  /// Builds box-filtered mip levels for the atlas. Supplying these to the GPU
-  /// avoids the unstable one-sample-per-fragment result seen when the 3× atlas
-  /// is reduced to small UI text.
-  public func mipLevels() -> [FontAtlasMipLevel] {
-    var levels = [FontAtlasMipLevel(width: width, height: height, pixels: pixels)]
-    var source = pixels
-    var sourceWidth = width
-    var sourceHeight = height
+  public func mipLevels() -> [FontAtlasMipLevel] { levels }
 
-    while sourceWidth > 1 || sourceHeight > 1 {
-      let destinationWidth = max(1, sourceWidth / 2)
-      let destinationHeight = max(1, sourceHeight / 2)
-      var destination = [UInt8](
-        repeating: 0, count: destinationWidth * destinationHeight)
-
-      for y in 0..<destinationHeight {
-        for x in 0..<destinationWidth {
-          var total = 0
-          var count = 0
-          for sourceY in (y * 2)..<min(y * 2 + 2, sourceHeight) {
-            for sourceX in (x * 2)..<min(x * 2 + 2, sourceWidth) {
-              total += Int(source[sourceY * sourceWidth + sourceX])
-              count += 1
-            }
-          }
-          destination[y * destinationWidth + x] = UInt8((total + count / 2) / count)
-        }
-      }
-
-      levels.append(
-        FontAtlasMipLevel(
-          width: destinationWidth, height: destinationHeight, pixels: destination))
-      source = destination
-      sourceWidth = destinationWidth
-      sourceHeight = destinationHeight
-    }
-    return levels
-  }
-
-  public func glyphUV(
-    _ character: Character
-  ) -> (Float, Float, Float, Float) {
-    let scalar =
-      character.unicodeScalars.count == 1
-      ? character.unicodeScalars.first!.value : UInt32(0xFFFD)
-    let fallback = characterIndices[0xFFFD] ?? characterIndices[0x3F] ?? 0
-    let index = compositionIndices[character] ?? characterIndices[scalar] ?? fallback
+  public func glyphUV(_ character: Character) -> (Float, Float, Float, Float) {
+    let index = indices[character] ?? fallback
     let x = (index % Self.columns) * cellWidth + Self.padding
     let y = (index / Self.columns) * cellHeight + Self.padding
     return (

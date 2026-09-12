@@ -31,20 +31,7 @@ var targets: [Target] = [
   ),
   .target(name: "Chroma"),
   .target(
-    name: "ChromaFont", exclude: ["README.md", "FontData"], resources: [.copy("Resources/OFL.txt")],
-    plugins: [.plugin(name: "LatinCompositionPlugin"), .plugin(name: "BundledFontPlugin")]),
-  .executableTarget(name: "BundledFontGenerator"),
-  .plugin(
-    name: "BundledFontPlugin",
-    capability: .buildTool(),
-    dependencies: ["BundledFontGenerator"]
-  ),
-  .executableTarget(name: "LatinCompositionGenerator"),
-  .plugin(
-    name: "LatinCompositionPlugin",
-    capability: .buildTool(),
-    dependencies: ["LatinCompositionGenerator"]
-  ),
+    name: "ChromaFont", exclude: ["README.md"], resources: [.copy("Resources")]),
   .target(name: "HeadlessBackend", dependencies: ["Chroma"]),
   .target(
     name: "RemoteProtocol",

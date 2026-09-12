@@ -92,16 +92,12 @@ public final class MetalDisplayListRenderer {
   private var textInstances: [TextInstance] = []
   public private(set) var lastDrawCallCount = 0
   public private(set) var lastInstanceCount = 0
-  private struct TextKey: Hashable {
-    let text: String
-  }
-  private var glyphRuns: [TextKey: [SIMD4<Float>]] = [:]
-  private var glyphRunOrder: [TextKey] = []
+  private var glyphRuns: [String: [SIMD4<Float>]] = [:]
+  private var glyphRunOrder: [String] = []
   private var cachedGlyphCount = 0
 
   private func glyphRun(_ text: String) -> [SIMD4<Float>] {
-    let key = TextKey(text: text)
-    if let cached = glyphRuns[key] { return cached }
+    if let cached = glyphRuns[text] { return cached }
     let run = text.map { character in
       let (u0, v0, u1, v1) = fontAtlas.glyphUV(character)
       return SIMD4<Float>(u0, v0, u1, v1)
@@ -112,8 +108,8 @@ public final class MetalDisplayListRenderer {
         let oldest = glyphRunOrder.removeFirst()
         cachedGlyphCount -= glyphRuns.removeValue(forKey: oldest)!.count
       }
-      glyphRuns[key] = run
-      glyphRunOrder.append(key)
+      glyphRuns[text] = run
+      glyphRunOrder.append(text)
       cachedGlyphCount += run.count
     }
     return run

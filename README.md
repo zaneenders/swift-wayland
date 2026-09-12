@@ -68,6 +68,6 @@ It does not require a Metal window.
 ## Bundled font license
 
 Chroma's single text font is derived from Noto Sans Mono under SIL OFL 1.1.
-Distributions must include the ChromaFont resource bundle containing `OFL.txt`
-(or provide an accessible copy of that copyright/license notice).
+Distributions must include the ChromaFont resource bundle containing the prebuilt
+font atlas and `OFL.txt`. The atlas is loaded from that bundle at runtime.
 See [font provenance and regeneration](Sources/ChromaFont/README.md).
