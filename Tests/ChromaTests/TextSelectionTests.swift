@@ -132,8 +132,7 @@ struct TextSelectionTests {
     let metrics = FontMetrics()
     #expect(metrics.measure("ASCII").width == metrics.cellAdvance * 5)
     #expect(metrics.measure("👨‍👩‍👧‍👦e\u{301}🇺🇸").width == metrics.cellAdvance * 3)
-    #expect(
-      metrics.measure("ASCII", face: .display).width == metrics.displayCellAdvance * 5)
+    #expect(metrics.measure("ASCII", scale: 2).width == metrics.cellAdvance * 10)
   }
 
   @Test func invalidCellWidthsDoNotTrapDuringHitTesting() {

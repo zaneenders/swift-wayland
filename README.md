@@ -44,6 +44,14 @@ The former in-process `MetalApp` and `MetalRenderer` APIs have been removed.
 client, not a second application runner. Headless rendering and the Linux Wayland
 runner remain available.
 
+### Single-font API and wire format
+
+Text uses one bundled font. `FontFace`, `.fontFace(...)`, and `face:` arguments
+have been removed; use `FontMetrics.cellAdvance` for character spacing.
+Remote wire version 4 removes the font-face byte from text commands. Rebuild
+clients and servers together; captures from older wire versions must be recorded
+again.
+
 ### Remote input limits
 
 Each server connection has a bounded NIO-to-main-actor mailbox: at most 256
@@ -56,3 +64,10 @@ a replacement for the protocol's per-message validation or authentication.
 `swift test --filter RemoteLoopbackTests` exercises real loopback TCP reconnects,
 disconnects during frame encoding and clipboard operations, and server shutdown.
 It does not require a Metal window.
+
+## Bundled font license
+
+Chroma's single text font is derived from Noto Sans Mono under SIL OFL 1.1.
+Distributions must include the ChromaFont resource bundle containing the prebuilt
+font atlas and `OFL.txt`. The atlas is loaded from that bundle at runtime.
+See [font provenance and regeneration](Sources/ChromaFont/README.md).

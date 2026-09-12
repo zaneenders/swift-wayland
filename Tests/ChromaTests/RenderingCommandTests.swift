@@ -50,7 +50,7 @@ struct RenderingCommandTests {
     #expect(
       list.commands == [
         .fillRect(rect: rect, color: background),
-        .text(position: rect.origin, text: "content", color: .white, scale: 1, face: .readable),
+        .text(position: rect.origin, text: "content", color: .white, scale: 1),
         .strokeRect(rect: rect, width: 2, color: border),
       ])
   }
@@ -68,7 +68,7 @@ struct RenderingCommandTests {
       list.commands == [
         .pushClip(rect),
         .pushClip(inner),
-        .text(position: inner.origin, text: "clipped", color: .white, scale: 1, face: .readable),
+        .text(position: inner.origin, text: "clipped", color: .white, scale: 1),
         .popClip,
         .popClip,
       ])
@@ -79,8 +79,7 @@ struct RenderingCommandTests {
     var metrics = FontMetrics()
     metrics.glyphWidth = 8
     metrics.glyphHeight = 14
-    metrics.readableAdvance = 8
-    metrics.glyphSpacing = 0
+    metrics.cellAdvance = 8
     metrics.lineAdvance = 16
     interaction.fontMetrics = metrics
     let context = RenderContext(interaction: interaction, theme: .light)
@@ -108,33 +107,32 @@ struct RenderingCommandTests {
         .fillRect(
           rect: Rect(x: 18, y: 5, width: 16, height: 16),
           color: ChromaTheme.light.focus.selectionBackground),
-        .text(position: Point(x: 10, y: 5), text: "A", color: textColor, scale: 1, face: .readable),
+        .text(position: Point(x: 10, y: 5), text: "A", color: textColor, scale: 1),
         .text(
           position: Point(x: 18, y: 5), text: "BC",
-          color: ChromaTheme.light.focus.selectionForeground, scale: 1, face: .readable),
-        .text(position: Point(x: 34, y: 5), text: "D", color: textColor, scale: 1, face: .readable),
+          color: ChromaTheme.light.focus.selectionForeground, scale: 1),
+        .text(position: Point(x: 34, y: 5), text: "D", color: textColor, scale: 1),
       ])
   }
 
-  @Test func displayTextUsesDisplayAdvanceForMeasurementAndSelection() {
+  @Test func textUsesSameAdvanceForMeasurementAndSelection() {
     let interaction = Interaction()
     var metrics = FontMetrics()
     metrics.glyphWidth = 10
-    metrics.readableAdvance = 6
-    metrics.glyphSpacing = 2
+    metrics.cellAdvance = 6
     metrics.lineAdvance = 16
     interaction.fontMetrics = metrics
     let context = RenderContext(interaction: interaction, theme: .light)
-    let id = WidgetID("display-selection")
-    let text = Text("ABC").fontFace(.display).selectable(id)
+    let id = WidgetID("text-selection")
+    let text = Text("ABC").selectable(id)
     let rect = Rect(x: 4, y: 5, width: 36, height: 16)
 
     #expect(
       BlockEngine.measure(text, proposal: rect.size, context: context).width
-        == 3 * metrics.displayCellAdvance)
+        == 3 * metrics.cellAdvance)
 
-    let press = Point(x: 17, y: 6)
-    let drag = Point(x: 29, y: 6)
+    let press = Point(x: 11, y: 6)
+    let drag = Point(x: 17, y: 6)
     _ = render(
       text, in: rect, context: context,
       input: InputState(
@@ -150,18 +148,15 @@ struct RenderingCommandTests {
     #expect(
       list.commands == [
         .fillRect(
-          rect: Rect(x: 16, y: 5, width: 12, height: 16),
+          rect: Rect(x: 10, y: 5, width: 6, height: 16),
           color: ChromaTheme.light.focus.selectionBackground),
         .text(
-          position: Point(x: 4, y: 5), text: "A", color: .white, scale: 1,
-          face: .display),
+          position: Point(x: 4, y: 5), text: "A", color: .white, scale: 1),
         .text(
-          position: Point(x: 16, y: 5), text: "B",
-          color: ChromaTheme.light.focus.selectionForeground, scale: 1,
-          face: .display),
+          position: Point(x: 10, y: 5), text: "B",
+          color: ChromaTheme.light.focus.selectionForeground, scale: 1),
         .text(
-          position: Point(x: 28, y: 5), text: "C", color: .white, scale: 1,
-          face: .display),
+          position: Point(x: 16, y: 5), text: "C", color: .white, scale: 1),
       ])
   }
 
@@ -221,7 +216,7 @@ struct RenderingCommandTests {
       list.commands == [
         .pushClip(rect),
         .fillRect(rect: rect, color: background),
-        .text(position: Point(x: 32, y: 32), text: "deep", color: .white, scale: 1, face: .readable),
+        .text(position: Point(x: 32, y: 32), text: "deep", color: .white, scale: 1),
         .strokeRect(rect: rect, width: 2, color: .yellow),
         .popClip,
       ])
@@ -241,7 +236,7 @@ struct RenderingCommandTests {
     #expect(
       list.commands == [
         .fillRoundedRect(rect: rect, radii: radii, color: .black),
-        .text(position: rect.origin, text: "rounded", color: .white, scale: 1, face: .readable),
+        .text(position: rect.origin, text: "rounded", color: .white, scale: 1),
         .strokeRoundedRect(rect: rect, radii: radii, width: 2, color: .yellow),
       ])
   }
@@ -279,7 +274,7 @@ struct RenderingCommandTests {
           width: theme.button.borderWidth, color: theme.button.border),
         .text(
           position: rect.origin, text: "Composite",
-          color: theme.button.foreground, scale: 1, face: .readable),
+          color: theme.button.foreground, scale: 1),
       ])
   }
 }

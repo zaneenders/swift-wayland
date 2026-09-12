@@ -19,7 +19,7 @@ struct DrawListCullingTests {
   @Test func glyphOverhangAndAntialiasFringeArePreserved() {
     let commands: [DrawCommand] = [
       .fillRect(rect: Rect(x: -10, y: 0, width: 9.5, height: 5), color: .white),
-      .text(position: Point(x: -15, y: 0), text: "a", color: .white, scale: 1, face: .readable),
+      .text(position: Point(x: -15, y: 0), text: "a", color: .white, scale: 1),
       .fillRect(rect: Rect(x: 200, y: 0, width: 10, height: 10), color: .white),
     ]
     #expect(

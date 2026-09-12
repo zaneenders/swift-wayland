@@ -54,7 +54,7 @@ struct DemoContentTests {
   let requested = renderer.render(input: InputState(commands: [.application("demo.capture")]))
   #expect(
     requested.commands.contains { command in
-      if case .text(_, let text, _, _, _) = command { return text == "Scene capture requested" }
+      if case .text(_, let text, _, _) = command { return text == "Scene capture requested" }
       return false
     })
 }
@@ -75,7 +75,7 @@ struct DemoContentTests {
     try await Task.sleep(for: .milliseconds(25))
     let frame = renderer.render()
     for command in frame.commands {
-      if case .text(_, let text, _, _, _) = command, text.hasPrefix("Saved scene: ") {
+      if case .text(_, let text, _, _) = command, text.hasPrefix("Saved scene: ") {
         let filename = String(text.dropFirst("Saved scene: ".count))
         let url = directory.appendingPathComponent(filename)
         defer { try? FileManager.default.removeItem(at: url) }
@@ -105,7 +105,7 @@ private func captureTestDirectory() throws -> URL {
   let frame = renderer.render(input: InputState(commands: [.application("demo.capture")]))
   #expect(
     !frame.commands.contains { command in
-      if case .text(_, let text, _, _, _) = command { return text.contains("capture") }
+      if case .text(_, let text, _, _) = command { return text.contains("capture") }
       return false
     })
 }
@@ -157,7 +157,7 @@ private func captureTestDirectory() throws -> URL {
   let initial = renderer.render()
   let position = try #require(
     initial.commands.compactMap { command -> Point? in
-      if case .text(let point, "Font", _, _, _) = command { return point }
+      if case .text(let point, "Font", _, _) = command { return point }
       return nil
     }.first)
   let click = Point(x: position.x + 2, y: position.y + 2)
@@ -170,12 +170,12 @@ private func captureTestDirectory() throws -> URL {
   let frame = renderer.render()
   #expect(
     frame.commands.contains { command in
-      if case .text(_, "BUNDLED MONOSPACE FONT", _, _, _) = command { return true }
+      if case .text(_, "BUNDLED MONOSPACE FONT", _, _) = command { return true }
       return false
     })
   #expect(
     frame.commands.contains { command in
-      if case .text(_, "café Ångström naïve façade Český", _, _, .readable) = command { return true }
+      if case .text(_, "café Ångström naïve façade Český", _, _) = command { return true }
       return false
     })
   var bytes = try RemoteWire.encode(
@@ -188,16 +188,15 @@ private func captureTestDirectory() throws -> URL {
 }
 
 @MainActor
-@Test func terminalSpecimenUsesContiguousDisplayCells() {
+@Test func terminalSpecimenUsesContiguousBundledFontCells() {
   let renderer = HeadlessRenderer(size: Size(width: 500, height: 84))
   renderer.content = TerminalSpecimen()
-  let rows = renderer.render().commands.compactMap { command -> (Point, FontFace)? in
-    if case .text(let position, _, _, _, let face) = command { return (position, face) }
+  let rows = renderer.render().commands.compactMap { command -> Point? in
+    if case .text(let position, _, _, _) = command { return position }
     return nil
   }
   #expect(rows.count == 3)
-  #expect(rows.map { $0.0.y } == [0, 28, 56])
-  #expect(rows.allSatisfy { $0.1 == .display })
+  #expect(rows.map { $0.y } == [0, 28, 56])
 }
 
 @MainActor
@@ -216,11 +215,10 @@ private func captureTestDirectory() throws -> URL {
       pointerPosition: point, pointerPressPosition: point,
       pointerReleased: true))
   #expect(state.inspectedGlyph == "A")
-  state.fontFace = .display
   let frame = renderer.render()
   #expect(
     frame.commands.contains { command in
-      if case .text(_, "A", _, _, .display) = command { return true }
+      if case .text(_, "A", _, _) = command { return true }
       return false
     })
 }

@@ -6,6 +6,15 @@ import Testing
 
 @Suite("Remote wire protocol")
 struct RemoteProtocolTests {
+  @Test func rejectsPreviousFontFaceWireFormat() throws {
+    var bytes = try RemoteWire.encode(.requestFrame)
+    bytes.setInteger(UInt16(3), at: 4, endianness: .little)
+    #expect(RemoteWire.version == 4)
+    #expect(throws: RemoteProtocolError.unsupportedVersion(3)) {
+      _ = try RemoteWire.decode(from: &bytes)
+    }
+  }
+
   @Test func messageTypeNumbersAndHeaderStayWireCompatible() throws {
     let cases: [(RemoteMessage, UInt16, UInt32)] = [
       (.viewport(Size(width: 800, height: 600)), 1, 8),
@@ -45,7 +54,7 @@ struct RemoteProtocolTests {
         .fillRect(rect: Rect(x: 0, y: 0, width: 800, height: 520), color: .black),
         .text(
           position: Point(x: 275, y: 180), text: "Remote button count: 1",
-          color: .white, scale: 0.9, face: .readable),
+          color: .white, scale: 0.9),
       ])
     let messages: [RemoteMessage] = [viewport, .requestFrame, press, release, frame]
 
@@ -111,7 +120,7 @@ struct RemoteProtocolTests {
       .strokeRect(rect: rect, width: 2.5, color: color),
       .fillRoundedRect(rect: rect, radii: radii, color: color),
       .strokeRoundedRect(rect: rect, radii: radii, width: 3.5, color: color),
-      .text(position: Point(x: -1, y: 9), text: "CHROMA 🟨", color: color, scale: 1.25, face: .display),
+      .text(position: Point(x: -1, y: 9), text: "CHROMA 🟨", color: color, scale: 1.25),
       .image(rect: rect, image: image, scaling: .cover, alignment: ImageAlignment(x: 0.25, y: 0.75)),
       .pushClip(rect), .popClip,
     ]

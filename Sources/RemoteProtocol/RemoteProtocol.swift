@@ -28,7 +28,7 @@ public enum RemoteMessage: Equatable, Sendable {
 
 public enum RemoteWire {
   public static let magic: UInt32 = 0x4348_524D  // CHRM
-  public static let version: UInt16 = 3
+  public static let version: UInt16 = 4
   public static let maximumClipboardBytes = 1024 * 1024
   public static let maximumPayloadBytes = 64 * 1024 * 1024
   public static let maximumCommandsPerFrame = 1_000_000
@@ -257,13 +257,12 @@ extension ByteBuffer {
       writeRadii(radii)
       writeFloat(width)
       writeColor(color)
-    case .text(let position, let text, let color, let scale, let face):
+    case .text(let position, let text, let color, let scale):
       writeInteger(UInt8(5))
       writePoint(position)
       try writeStringValue(text)
       writeColor(color)
       writeFloat(scale)
-      writeInteger(face.rawValue)
     case .image(let rect, let image, let scaling, let alignment):
       if let cached = images.image(id: image.id), cached.generation == image.generation,
         cached.width == image.width, cached.height == image.height
@@ -356,10 +355,7 @@ extension ByteBuffer {
       let text = try readStringValue()
       let color = try readColor()
       let scale = try readFloat()
-      guard let face = FontFace(rawValue: try read(UInt8.self)) else {
-        throw RemoteProtocolError.malformedMessage
-      }
-      return .text(position: point, text: text, color: color, scale: scale, face: face)
+      return .text(position: point, text: text, color: color, scale: scale)
     case 9:
       let rect = try readRect()
       let id = ImageID(try readStringValue())

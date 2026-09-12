@@ -35,10 +35,10 @@ public enum RemoteFrameValidation {
         guard rect(r), radii(corners), color(c) else { return false }
       case .strokeRoundedRect(let r, let corners, let width, let c):
         guard rect(r), radii(corners), width.isFinite, width >= 0, color(c) else { return false }
-      case .text(let p, let text, let c, let scale, let face):
+      case .text(let p, let text, let c, let scale):
         guard point(p), color(c), scale.isFinite, scale > 0 else { return false }
         let metrics = FontMetrics()
-        let width = Float(text.count) * metrics.advance(for: face) * scale + metrics.glyphWidth * scale
+        let width = Float(text.count) * metrics.cellAdvance * scale + metrics.glyphWidth * scale
         guard rect(Rect(origin: p, size: Size(width: width, height: metrics.glyphHeight * scale))) else {
           return false
         }

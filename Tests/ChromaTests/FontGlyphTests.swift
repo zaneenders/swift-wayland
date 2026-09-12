@@ -1,27 +1,40 @@
 import Chroma
+import Foundation
 import Testing
 
 @testable import ChromaFont
 
 @Suite("Backend-neutral font glyphs")
 struct FontGlyphTests {
-  private var glyphs: [UInt32: Glyph] {
-    Font20x28.glyphs.merging(GlyphGenerator.generated) { authored, _ in authored }
-  }
-
-  @Test func allGlyphsAreValidTwentyByTwentyEightBitmaps() {
-    #expect(!glyphs.isEmpty)
-    for glyph in glyphs.values {
-      #expect(glyph.rows.count == 28)
-      #expect(glyph.rows.allSatisfy { $0 < (1 << 20) })
+  @Test func rejectsMalformedAtlasResources() throws {
+    #expect(throws: (any Error).self) {
+      _ = try HighResolutionFontAtlas(data: Data([0, 1, 2]))
     }
-  }
-
-  @Test func shadeGlyphsHaveStandardCoverage() {
-    let pixelCount = 20 * 28
-    #expect(glyphs[0x2591]?.rows.reduce(0) { $0 + $1.nonzeroBitCount } == pixelCount / 4)
-    #expect(glyphs[0x2592]?.rows.reduce(0) { $0 + $1.nonzeroBitCount } == pixelCount / 2)
-    #expect(glyphs[0x2593]?.rows.reduce(0) { $0 + $1.nonzeroBitCount } == pixelCount * 3 / 4)
+    let atlas = HighResolutionFontAtlas()
+    var valid = Data()
+    func word(_ value: UInt32) {
+      for shift in stride(from: 0, to: 32, by: 8) { valid.append(UInt8(truncatingIfNeeded: value >> shift)) }
+    }
+    for value: UInt32 in [0x4C54_4143, 1, UInt32(atlas.width), UInt32(atlas.height), 1, 0xFFFD] { word(value) }
+    for level in atlas.mipLevels() { valid.append(contentsOf: level.pixels) }
+    _ = try HighResolutionFontAtlas(data: valid)
+    for cut in [0, 4, 19, 23, valid.count - 1] {
+      #expect(throws: HighResolutionFontAtlas.AssetError.self) {
+        _ = try HighResolutionFontAtlas(data: Data(valid.prefix(cut)))
+      }
+    }
+    for (offset, value): (Int, UInt32) in [
+      (0, 0), (4, 2), (8, 0), (12, 4097), (16, UInt32.max), (20, 0xD800), (20, 65),
+    ] {
+      var corrupt = valid
+      for i in 0..<4 { corrupt[offset + i] = UInt8(truncatingIfNeeded: value >> (i * 8)) }
+      #expect(throws: HighResolutionFontAtlas.AssetError.self) {
+        _ = try HighResolutionFontAtlas(data: corrupt)
+      }
+    }
+    #expect(throws: HighResolutionFontAtlas.AssetError.self) {
+      _ = try HighResolutionFontAtlas(data: valid + Data([0]))
+    }
   }
 
   @Test func coversTerminalStructureAndPromptSymbols() {
@@ -36,7 +49,7 @@ struct FontGlyphTests {
       0xFFFD,  // visible unsupported-glyph fallback
     ]
     for codepoint in required {
-      #expect(glyphs[codepoint] != nil)
+      #expect(HighResolutionFontAtlas().characterIndices[codepoint] != nil)
     }
   }
 
@@ -55,13 +68,62 @@ struct FontGlyphTests {
       0x23F9,  // ⏹ Stop control
     ]
     for codepoint in required {
-      #expect(glyphs[codepoint] != nil)
+      #expect(HighResolutionFontAtlas().characterIndices[codepoint] != nil)
+    }
+  }
+
+  @Test func generatedSymbolsFitTheTextAdvance() {
+    let atlas = HighResolutionFontAtlas()
+    let advance = Int(FontMetrics().cellAdvance) * HighResolutionFontAtlas.scale
+    #expect(advance == 36)
+    for scalar in atlas.characterIndices.keys where scalar >= 0x250 {
+      let index = atlas.characterIndices[scalar]!
+      let x = (index % HighResolutionFontAtlas.columns) * atlas.cellWidth + HighResolutionFontAtlas.padding
+      let y = (index / HighResolutionFontAtlas.columns) * atlas.cellHeight + HighResolutionFontAtlas.padding
+      for row in 0..<atlas.glyphHeight {
+        let start = (y + row) * atlas.width + x
+        #expect(atlas.pixels[(start + advance)..<(start + atlas.glyphWidth)].allSatisfy { $0 == 0 })
+        if scalar == 0x2588 {
+          #expect(atlas.pixels[start..<(start + advance)].allSatisfy { $0 == 255 })
+        }
+        if scalar == 0x2500 {
+          // Horizontal strokes must meet at both sides of consecutive cells.
+          #expect(atlas.pixels[start] == atlas.pixels[start + advance - 1])
+          #expect(atlas.pixels[start] == ((39..<45).contains(row) ? 255 : 0))
+        }
+      }
     }
   }
 
   @Test func coversPrintableASCII() {
+    let atlas = HighResolutionFontAtlas()
     for codepoint in UInt32(0x20)...UInt32(0x7E) {
-      #expect(glyphs[codepoint] != nil)
+      #expect(atlas.characterIndices[codepoint] != nil)
+    }
+  }
+
+  @Test func bundledPixelsRemainUnchanged() {
+    let atlas = HighResolutionFontAtlas()
+    #expect(atlas.characterIndices.count == 762)
+    // Pin every mip pixel and mapping without retaining a second font pipeline.
+    var hash: UInt64 = 14_695_981_039_346_656_037
+    for scalar in atlas.characterIndices.sorted(by: { $0.value < $1.value }).map(\.key) {
+      for shift in stride(from: 0, to: 32, by: 8) {
+        hash = (hash ^ UInt64(UInt8(truncatingIfNeeded: scalar >> shift))) &* 1_099_511_628_211
+      }
+    }
+    for level in atlas.mipLevels() {
+      for pixel in level.pixels { hash = (hash ^ UInt64(pixel)) &* 1_099_511_628_211 }
+    }
+    #expect(hash == 999_759_037_810_430_912)
+    let uv = atlas.glyphUV(" ")
+    let x = Int((uv.0 * Float(atlas.width)).rounded())
+    let y = Int((uv.1 * Float(atlas.height)).rounded())
+    for row in 0..<atlas.glyphHeight {
+      #expect(
+        atlas.pixels[((y + row) * atlas.width + x)..<((y + row) * atlas.width + x + atlas.glyphWidth)].allSatisfy {
+          $0 == 0
+        })
     }
   }
 
@@ -76,7 +138,6 @@ struct FontGlyphTests {
 
     let a = atlas.glyphUV("A")
     let b = atlas.glyphUV("B")
-    #expect(atlas.glyphUV("A", readable: true) != a)
     let fallback = atlas.glyphUV("�")
     #expect(a != b)
     #expect(atlas.glyphUV("🙂") == fallback)
@@ -86,53 +147,56 @@ struct FontGlyphTests {
   @Test func atlasFitsGuaranteedGLES3TextureDimensions() {
     let atlas = HighResolutionFontAtlas()
     // OpenGL ES 3 guarantees GL_MAX_TEXTURE_SIZE is at least 4096.
-    // Both faces and all compositions must fit in the single shared texture.
+    // All glyphs and compositions must fit in the single shared texture.
     let guaranteedMaximumTextureSize = 4096
     #expect(atlas.width > 0 && atlas.width <= guaranteedMaximumTextureSize)
     #expect(atlas.height > 0 && atlas.height <= guaranteedMaximumTextureSize)
   }
 
-  @Test func latinAccentsShareCellsAcrossCanonicalSpellingsAndFaces() {
+  @Test func latinAccentsShareCellsAcrossCanonicalSpellings() {
     let atlas = HighResolutionFontAtlas()
-    for entry in LatinCompositions.entries {
-      let composed = Character(String(UnicodeScalar(entry.scalar)!))
-      let decomposed = Character(
-        String(UnicodeScalar(entry.base)!) + String(UnicodeScalar(entry.mark)!))
-      let base = Character(String(UnicodeScalar(entry.base)!))
-      for readable in [false, true] {
-        let uv = atlas.glyphUV(composed, readable: readable)
-        #expect(uv == atlas.glyphUV(decomposed, readable: readable))
-        #expect(uv != atlas.glyphUV("�", readable: readable))
-        #expect(uv != atlas.glyphUV(base, readable: readable))
-        #expect(uv.0 >= 0 && uv.1 >= 0 && uv.2 <= 1 && uv.3 <= 1)
-        let x = Int((uv.0 * Float(atlas.width)).rounded())
-        let y = Int((uv.1 * Float(atlas.height)).rounded())
-        let ink = (0..<atlas.glyphHeight).reduce(0) { total, row in
-          total
-            + atlas.pixels[((y + row) * atlas.width + x)..<((y + row) * atlas.width + x + atlas.glyphWidth)]
-            .filter { $0 != 0 }.count
-        }
-        #expect(ink > 0)
+    let accented = atlas.characterIndices.keys.filter {
+      (0xC0..<0x250).contains($0)
+        && String(UnicodeScalar($0)!).decomposedStringWithCanonicalMapping.unicodeScalars.count == 2
+    }
+    #expect(accented.count == 190)
+    for scalar in accented {
+      let spelling = String(UnicodeScalar(scalar)!)
+      let composed = Character(spelling)
+      let decomposition = spelling.decomposedStringWithCanonicalMapping
+      let decomposed = Character(decomposition)
+      let base = Character(String(decomposition.unicodeScalars.first!))
+      let uv = atlas.glyphUV(composed)
+      #expect(uv == atlas.glyphUV(decomposed))
+      #expect(uv != atlas.glyphUV("�"))
+      #expect(uv != atlas.glyphUV(base))
+      #expect(uv.0 >= 0 && uv.1 >= 0 && uv.2 <= 1 && uv.3 <= 1)
+      let x = Int((uv.0 * Float(atlas.width)).rounded())
+      let y = Int((uv.1 * Float(atlas.height)).rounded())
+      let ink = (0..<atlas.glyphHeight).reduce(0) { total, row in
+        total
+          + atlas.pixels[((y + row) * atlas.width + x)..<((y + row) * atlas.width + x + atlas.glyphWidth)]
+          .filter { $0 != 0 }.count
       }
+      #expect(ink > 0)
+
     }
   }
 
   @Test func unsupportedClustersAreNotSilentlyStripped() {
     let atlas = HighResolutionFontAtlas()
-    for readable in [false, true] {
-      let fallback = atlas.glyphUV("�", readable: readable)
-      for character: Character in ["e\u{0301}\u{0308}", "e\u{0338}", "\u{0301}", "👩‍💻", "🇺🇸"] {
-        #expect(atlas.glyphUV(character, readable: readable) == fallback)
-      }
+    let fallback = atlas.glyphUV("�")
+    for character: Character in ["e\u{0301}\u{0308}", "e\u{0338}", "\u{0301}", "👩‍💻", "🇺🇸"] {
+      #expect(atlas.glyphUV(character) == fallback)
     }
+
   }
 
   @Test func accentedTextKeepsMonospaceMeasurement() {
     let metrics = FontMetrics()
-    for face: FontFace in [.readable, .display] {
-      #expect(metrics.measure("café", face: face) == metrics.measure("cafe", face: face))
-      #expect(metrics.measure("cafe\u{0301}", face: face) == metrics.measure("café", face: face))
-    }
+    #expect(metrics.measure("café") == metrics.measure("cafe"))
+    #expect(metrics.measure("cafe\u{0301}") == metrics.measure("café"))
+
   }
 
   @Test func atlasMipmapsPreserveCoverageWhileReducingForGPUOutput() {
@@ -159,39 +223,4 @@ struct FontGlyphTests {
       })
   }
 
-  @Test func roundedCornersConnectTheSameEdgesAsTheirSquareEquivalents() throws {
-    // ╭ ╮ ╯ ╰ must open toward the same cell edges as ┌ ┐ ┘ └: a "down"
-    // corner keeps all ink in the bottom half and touches the bottom edge,
-    // an "up" corner the top half and top edge, and left/right likewise.
-    // Regresses a vertical flip that rendered ╭ as ╰.
-    func rowHasInk(_ glyph: Glyph, _ y: Int) -> Bool { glyph.rows[y] != 0 }
-    func columnHasInk(_ glyph: Glyph, _ x: Int) -> Bool {
-      (0..<28).contains { glyph.rows[$0] & (1 << (19 - x)) != 0 }
-    }
-
-    let downRight = try #require(glyphs[0x256D])  // ╭
-    let downLeft = try #require(glyphs[0x256E])  // ╮
-    let upLeft = try #require(glyphs[0x256F])  // ╯
-    let upRight = try #require(glyphs[0x2570])  // ╰
-
-    // The middle band is rows 13...14; the 2px brush may spill one row past
-    // it, so the empty halves are asserted with one row of slack.
-    for (glyph, name) in [(downRight, "╭"), (downLeft, "╮")] {
-      for y in 0...11 {
-        #expect(!rowHasInk(glyph, y), "\(name) must not ink row \(y) above the middle band")
-      }
-      #expect(rowHasInk(glyph, 27), "\(name) must touch the bottom edge")
-    }
-    for (glyph, name) in [(upLeft, "╯"), (upRight, "╰")] {
-      for y in 16...27 {
-        #expect(!rowHasInk(glyph, y), "\(name) must not ink row \(y) below the middle band")
-      }
-      #expect(rowHasInk(glyph, 0), "\(name) must touch the top edge")
-    }
-
-    #expect(columnHasInk(downRight, 19) && !columnHasInk(downRight, 0))  // ╭ opens right, not left
-    #expect(columnHasInk(downLeft, 0) && !columnHasInk(downLeft, 19))  // ╮
-    #expect(columnHasInk(upLeft, 0) && !columnHasInk(upLeft, 19))  // ╯
-    #expect(columnHasInk(upRight, 19) && !columnHasInk(upRight, 0))  // ╰
-  }
 }

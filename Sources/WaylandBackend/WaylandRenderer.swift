@@ -974,6 +974,12 @@ public final class WaylandRenderer: Renderer {
     var texture: GLuint = 0
     unsafe glGenTextures(1, &texture)
     glBindTexture(GLenum(GL_TEXTURE_2D), texture)
+    // Single-byte mip rows are tightly packed, even when their widths are not multiples of four.
+    var unpackAlignment: GLint = 0
+    unsafe glGetIntegerv(GLenum(GL_UNPACK_ALIGNMENT), &unpackAlignment)
+    glPixelStorei(GLenum(GL_UNPACK_ALIGNMENT), 1)
+    defer { glPixelStorei(GLenum(GL_UNPACK_ALIGNMENT), unpackAlignment) }
+
     for (level, mip) in atlas.mipLevels.enumerated() {
       mip.pixels.withUnsafeBytes {
         unsafe glTexImage2D(
@@ -1040,8 +1046,8 @@ public final class WaylandRenderer: Renderer {
         drawShape(rect, radii: radii, color: color)
       case .strokeRoundedRect(let rect, let radii, let width, let color):
         drawShape(rect, radii: radii, borderWidth: width, color: color)
-      case .text(let position, let text, let color, let scale, let face):
-        drawText(text, at: position, color: color, scale: scale, face: face)
+      case .text(let position, let text, let color, let scale):
+        drawText(text, at: position, color: color, scale: scale)
       case .image(let destination, let image, let scaling, let alignment):
         guard
           let rect = scaling.drawRect(
@@ -1203,14 +1209,13 @@ public final class WaylandRenderer: Renderer {
     _ text: String,
     at position: Point,
     color: Color,
-    scale: Float,
-    face: FontFace
+    scale: Float
   ) {
     let metrics = FontMetrics()
     guard let fontAtlas else { return }
     var x = position.x
     for character in text {
-      let uv = fontAtlas.glyphUV(character, readable: face == .readable)
+      let uv = fontAtlas.glyphUV(character)
       draw(
         Rect(
           x: x,
@@ -1223,7 +1228,7 @@ public final class WaylandRenderer: Renderer {
         uv0: (uv.0, uv.1),
         uv1: (uv.2, uv.3)
       )
-      x += metrics.advance(for: face) * scale
+      x += metrics.cellAdvance * scale
     }
   }
 
