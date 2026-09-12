@@ -1,4 +1,4 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.4
 import PackageDescription
 
 var products: [Product] = [
@@ -170,7 +170,7 @@ targets.append(contentsOf: [
 
 let package = Package(
   name: "chroma",
-  platforms: [.macOS(.v26)],
+  platforms: [.macOS(.v27)],
   products: products,
   traits: backendTraits.union([
     .default(enabledTraits: defaultBackendTraits)

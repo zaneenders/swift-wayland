@@ -87,6 +87,20 @@ struct ObservationLifetimeTests {
     #expect(counter.redraws.withLock { $0 } == 0)
   }
 
+  @Test func producerDestructionReleasesSubscriptionWithoutMutation() async {
+    let model = Model()
+    let counter = SubscriptionLifetimeCounter()
+    var producer: FrameProducer? = FrameProducer()
+    render(producer!, model: model, counter: counter)
+    #expect(counter.live.withLock { $0 } == 1)
+
+    producer = nil
+    #expect(counter.live.withLock { $0 } == 0)
+    model.color = .yellow
+    await drainChanges()
+    #expect(counter.redraws.withLock { $0 } == 0)
+  }
+
   @Test func resetDiscardsAlreadyQueuedModelChange() async {
     let model = Model()
     let producer = FrameProducer()

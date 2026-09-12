@@ -1,4 +1,4 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.4
 import PackageDescription
 
 var dependencies: [Target.Dependency] = [
@@ -75,7 +75,7 @@ targets.append(
 
 let package = Package(
   name: "ChromaExample",
-  platforms: [.macOS(.v26)],
+  platforms: [.macOS(.v27)],
   dependencies: [
     .package(path: "..", traits: chromaTraits)
   ],

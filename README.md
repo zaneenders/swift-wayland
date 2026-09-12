@@ -10,8 +10,25 @@ UI library written in Swift.
 swift run --package-path Example ChromaDemo
 ```
 
-Requires Swift 6.3. On macOS, the demo launches a local backend subprocess and
-Metal client. Linux uses Wayland/EGL/OpenGL ES.
+Requires Swift tools 6.4 or newer. Until a release toolchain is available, this
+repository pins `main-snapshot-2026-09-10` in `.swift-version` (the compiler
+identifies itself as Swift 6.5-dev). Install and use the pinned toolchain with
+[Swiftly](https://www.swift.org/install/):
+
+```sh
+swiftly install
+swiftly run swift --version
+swiftly run swift test
+swiftly run swift test --package-path Example
+```
+
+The root pin also applies to `Example` and `Benchmarks`. If Swiftly's proxies are
+on your `PATH`, plain `swift` commands select it automatically. The package tools
+requirement is 6.4; testing with this snapshot does not establish compatibility
+with a released 6.4 compiler. The macOS deployment minimum is macOS 27 for post-setter Observation tracking.
+
+On macOS, the demo launches a local backend subprocess and Metal client. Linux
+uses Wayland/EGL/OpenGL ES.
 
 For separate remote sessions:
 
