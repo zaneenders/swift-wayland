@@ -16,7 +16,12 @@ final class PerformanceDemoState {
     case outline = "OUTLINE"
   }
 
-  var clipboardPage = false
+  enum Page { case scene, clipboard, font }
+  var page: Page = .scene
+  var fontSample = "café Ångström naïve façade Český"
+  var fontScale: Float = 1
+  var fontFace: FontFace = .readable
+  var inspectedGlyph = "é"
   var pastedText = ""
   var sourceText = "Copy this text — hello from Chroma!"
   let image: ImageResource
@@ -327,15 +332,18 @@ struct PerformanceDemo: Block {
   var body: some Block {
     VStack(spacing: 12) {
       HStack(spacing: 12) {
-        Button(state.clipboardPage ? "Scene" : "[Scene]", id: WidgetID("tab.scene")) {
-          state.clipboardPage = false
+        Button(state.page == .scene ? "[Scene]" : "Scene", id: WidgetID("tab.scene")) {
+          state.page = .scene
         }
-        Button(state.clipboardPage ? "[Clipboard]" : "Clipboard", id: WidgetID("tab.clipboard")) {
-          state.clipboardPage = true
+        Button(state.page == .clipboard ? "[Clipboard]" : "Clipboard", id: WidgetID("tab.clipboard")) {
+          state.page = .clipboard
+        }
+        Button(state.page == .font ? "[Font]" : "Font", id: WidgetID("tab.font")) {
+          state.page = .font
         }
         Spacer()
       }
-      if state.clipboardPage {
+      if state.page == .clipboard {
         VStack(spacing: 16) {
           Text("CLIPBOARD")
           Text("Drag to select this text, then copy it to another app.")
@@ -351,6 +359,8 @@ struct PerformanceDemo: Block {
             .fontScale(0.55)
           Spacer()
         }.padding(20)
+      } else if state.page == .font {
+        FontDemo(state: state)
       } else {
         PerformanceScene(state: state)
       }
