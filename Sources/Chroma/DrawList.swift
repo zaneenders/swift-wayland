@@ -39,11 +39,10 @@ public struct DrawList: Sendable {
     _ text: String,
     at position: Point,
     color: Color,
-    scale: Float = 1,
-    face: FontFace = .readable
+    scale: Float = 1
   ) {
     commands.append(
-      .text(position: position, text: text, color: color, scale: scale, face: face))
+      .text(position: position, text: text, color: color, scale: scale))
   }
 
   public mutating func image(

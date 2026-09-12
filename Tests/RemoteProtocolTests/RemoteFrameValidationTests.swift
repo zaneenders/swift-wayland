@@ -23,7 +23,7 @@ struct RemoteFrameValidationTests {
       .strokeRect(rect: rect, width: .infinity, color: .white),
       .fillRoundedRect(rect: rect, radii: CornerRadii(.nan), color: .white),
       .strokeRoundedRect(rect: rect, radii: .zero, width: -1, color: .white),
-      .text(position: .zero, text: "x", color: .white, scale: .greatestFiniteMagnitude, face: .readable),
+      .text(position: .zero, text: "x", color: .white, scale: .greatestFiniteMagnitude),
       .image(rect: Rect(x: .infinity, y: 0, width: 1, height: 1), image: image, scaling: .cover, alignment: .center),
       .pushClip(Rect(x: 0, y: 0, width: -1, height: 1)),
       .fillRect(rect: rect, color: Color(r: .nan, g: 0, b: 0, a: 1)),

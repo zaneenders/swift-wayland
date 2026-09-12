@@ -39,7 +39,6 @@ public struct HighResolutionFontAtlas: Sendable {
     let cellHeight = Self.sourceGlyphHeight * Self.scale + 2 * Self.padding
     let width = Self.columns * cellWidth
     let height = rows * cellHeight
-    let glyphWidth = Self.sourceGlyphWidth * Self.scale
     let glyphHeight = Self.sourceGlyphHeight * Self.scale
     var pixels = [UInt8](repeating: 0, count: width * height)
 
@@ -50,12 +49,23 @@ public struct HighResolutionFontAtlas: Sendable {
 
       for y in 0..<glyphHeight {
         let sourceY = y / Self.scale
-        for x in 0..<glyphWidth {
-          let sourceX = x / Self.scale
-          let mask = UInt32(1) << UInt32(Self.sourceGlyphWidth - sourceX - 1)
-          if glyph.rows[sourceY] & mask != 0 {
-            pixels[(originY + y) * width + originX + x] = 255
+        // Generated symbols fill the 12-point advance, not the 20-point
+        // texture quad. Area filtering retains thin strokes while shrinking
+        // the authored 20-column bitmap to 36 atlas pixels. The remaining
+        // columns stay transparent, just like the bundled text coverage.
+        let symbolWidth = 12 * Self.scale
+        for x in 0..<symbolWidth {
+          let start = x * Self.sourceGlyphWidth
+          let end = (x + 1) * Self.sourceGlyphWidth
+          var coverage = 0
+          for sourceX in (start / symbolWidth)...((end - 1) / symbolWidth) {
+            let mask = UInt32(1) << UInt32(Self.sourceGlyphWidth - sourceX - 1)
+            if glyph.rows[sourceY] & mask != 0 {
+              coverage += min(end, (sourceX + 1) * symbolWidth) - max(start, sourceX * symbolWidth)
+            }
           }
+          pixels[(originY + y) * width + originX + x] =
+            UInt8((coverage * 255 + Self.sourceGlyphWidth / 2) / Self.sourceGlyphWidth)
         }
       }
     }
@@ -135,7 +145,7 @@ public struct HighResolutionFontAtlas: Sendable {
   }
 
   public func glyphUV(
-    _ character: Character, readable _: Bool = false
+    _ character: Character
   ) -> (Float, Float, Float, Float) {
     let scalar =
       character.unicodeScalars.count == 1

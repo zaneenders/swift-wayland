@@ -4,7 +4,6 @@ public struct Text: PrimitiveBlock {
   public var scale: Float
   public var isSelectable: Bool = false
   public var selectionID: WidgetID?
-  public var face: FontFace = .readable
 
   public init(_ content: String) {
     self.content = content
@@ -24,12 +23,6 @@ public struct Text: PrimitiveBlock {
     return copy
   }
 
-  public func fontFace(_ face: FontFace) -> Text {
-    var copy = self
-    copy.face = face
-    return copy
-  }
-
   public func selectable(_ id: WidgetID) -> Text {
     var copy = self
     copy.isSelectable = true
@@ -39,7 +32,7 @@ public struct Text: PrimitiveBlock {
 
   public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
     context.interaction.fontMetrics.measure(
-      content, scale: scale * context.textScale, face: face)
+      content, scale: scale * context.textScale)
   }
 
   public func draw(into drawList: inout DrawList, in rect: Rect, context: RenderContext) {
@@ -47,7 +40,7 @@ public struct Text: PrimitiveBlock {
     if isSelectable, let id = selectionID {
       let interaction = context.interaction
       let metrics = interaction.fontMetrics
-      let cellWidth = metrics.advance(for: face) * effectiveScale
+      let cellWidth = metrics.cellAdvance * effectiveScale
       let lineHeight = metrics.lineAdvance * effectiveScale
       let layout = PlainTextLayout(
         text: content, rect: rect, cellWidth: cellWidth,
@@ -64,7 +57,7 @@ public struct Text: PrimitiveBlock {
         let prefix = content.prefix(sel.from)
         if !prefix.isEmpty {
           drawList.text(
-            String(prefix), at: rect.origin, color: color, scale: effectiveScale, face: face)
+            String(prefix), at: rect.origin, color: color, scale: effectiveScale)
         }
         let selected = content.dropFirst(sel.from).prefix(sel.to - sel.from)
         if !selected.isEmpty {
@@ -72,17 +65,17 @@ public struct Text: PrimitiveBlock {
           drawList.text(
             String(selected), at: selOrigin,
             color: context.theme.focus.selectionForeground,
-            scale: effectiveScale, face: face)
+            scale: effectiveScale)
         }
         let suffix = content.dropFirst(sel.to)
         if !suffix.isEmpty {
           let suffixOrigin = Point(x: rect.minX + Float(sel.to) * cellWidth, y: rect.minY)
           drawList.text(
-            String(suffix), at: suffixOrigin, color: color, scale: effectiveScale, face: face)
+            String(suffix), at: suffixOrigin, color: color, scale: effectiveScale)
         }
         return
       }
     }
-    drawList.text(content, at: rect.origin, color: color, scale: effectiveScale, face: face)
+    drawList.text(content, at: rect.origin, color: color, scale: effectiveScale)
   }
 }

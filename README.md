@@ -44,6 +44,14 @@ The former in-process `MetalApp` and `MetalRenderer` APIs have been removed.
 client, not a second application runner. Headless rendering and the Linux Wayland
 runner remain available.
 
+### Single-font API and wire format
+
+Text uses one bundled font. `FontFace`, `.fontFace(...)`, and `face:` arguments
+have been removed; use `FontMetrics.cellAdvance` for character spacing.
+Remote wire version 4 removes the font-face byte from text commands. Rebuild
+clients and servers together; captures from older wire versions must be recorded
+again.
+
 ### Remote input limits
 
 Each server connection has a bounded NIO-to-main-actor mailbox: at most 256

@@ -1,9 +1,9 @@
 # Bundled font
 
 Chroma uses **one** text font: a rasterized subset of Noto Sans Mono Regular
-2.007. `.readable` and `.display` remain API/wire compatibility values only;
-both use identical glyphs and a 12-point monospace advance. Generated terminal
-and interface symbols supplement the font, not a second ASCII alphabet.
+2.007, with a 12-point monospace advance. There is no font-face selector.
+Generated terminal and interface symbols supplement the font, not a second
+ASCII alphabet.
 There is no runtime font lookup or font rasterizer dependency.
 
 ## License and provenance
@@ -24,17 +24,29 @@ Pinned upstream revision: `ffebf8c1ee449e544955a7e813c54f9b73848eac`.
 - [Upstream license](https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/LICENSE)
 - TTF SHA-256: `d9e2b23d19f8230be7146f409a52b1d23117e635e28f2e2892cf91b7382f325b`
 
-To regenerate `BundledFont.swift`, download the pinned TTF and run:
+`BundledFontPlugin` runs the Swift `BundledFontGenerator` during normal builds.
+It validates `FontData/BundledFont.rle` and generates `BundledFont.swift` in the
+SwiftPM plugin work directory. Both the input and generator executable are
+tracked, so unchanged builds reuse the output. No Python, network access, or
+system font lookup is required.
 
 ```sh
-# Offline development tool only; not a build/runtime dependency.
-# Pillow 11.3.0
-python3 Tools/rasterize-font.py /path/to/NotoSansMono-Regular.ttf
+swift build
+swift test --filter FontGlyphTests
 ```
 
-The generator verifies the source hash and rasterizes printable ASCII at 60 px,
-in 60×84 coverage cells with a baseline at 65 px and a 36 px advance. The
-converted subset is named Chroma's bundled font, not an unmodified Noto font.
+The checked-in RLE file preserves the existing rasterized printable ASCII
+coverage byte-for-byte. Each record is a nonzero unsigned 16-bit big-endian run
+length followed by an 8-bit coverage value. The decoded data contains 95
+row-major 60×84 glyphs ordered from U+0020 through U+007E. The generator rejects
+malformed records and incorrect decoded lengths.
+
+This is source generation from pinned bitmap coverage, not a TTF rasterizer.
+The original coverage was rasterized with Pillow 11.3.0 from the pinned TTF at
+60 px, with a baseline at 65 px and a 36 px advance. Changing the underlying
+TTF requires a separate rasterization step; the build plugin does not interpret
+TTF files. The converted subset is named Chroma's bundled font, not an
+unmodified Noto font.
 
 ## Latin accents
 

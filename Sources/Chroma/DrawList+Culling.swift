@@ -25,14 +25,14 @@ extension DrawList {
           x: rect.minX - 1, y: rect.minY - 1,
           width: rect.size.width + 2, height: rect.size.height + 2)
       case .image(let rect, _, _, _): bounds = rect
-      case .text(let position, let text, _, let scale, let face):
+      case .text(let position, let text, _, let scale):
         // Keep unusual scales conservatively rather than incorrectly culling them.
         guard scale > 0, scale.isFinite else {
           result.append(command)
           continue
         }
         let width =
-          Float(max(0, text.count - 1)) * metrics.advance(for: face) * scale
+          Float(max(0, text.count - 1)) * metrics.cellAdvance * scale
           + metrics.glyphWidth * scale
         bounds = Rect(
           x: position.x, y: position.y, width: width,

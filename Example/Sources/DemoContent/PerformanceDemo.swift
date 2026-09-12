@@ -20,7 +20,6 @@ final class PerformanceDemoState {
   var page: Page = .scene
   var fontSample = "café Ångström naïve façade Český"
   var fontScale: Float = 1
-  var fontFace: FontFace = .readable
   var inspectedGlyph = "é"
   var pastedText = ""
   var sourceText = "Copy this text — hello from Chroma!"

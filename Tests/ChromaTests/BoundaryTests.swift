@@ -61,7 +61,7 @@ struct BoundaryTests {
     #expect(
       outerBackground.commands == [
         .fillRect(rect: viewport, color: red),
-        .text(position: Point(x: 5, y: 5), text: "content", color: .white, scale: 1, face: .readable),
+        .text(position: Point(x: 5, y: 5), text: "content", color: .white, scale: 1),
       ])
 
     var innerBackground = DrawList()
@@ -71,7 +71,7 @@ struct BoundaryTests {
     #expect(
       innerBackground.commands == [
         .fillRect(rect: Rect(x: 5, y: 5, width: 30, height: 30), color: blue),
-        .text(position: Point(x: 5, y: 5), text: "content", color: .white, scale: 1, face: .readable),
+        .text(position: Point(x: 5, y: 5), text: "content", color: .white, scale: 1),
       ])
   }
 
@@ -87,7 +87,7 @@ struct BoundaryTests {
     #expect(
       list.commands == [
         .pushClip(viewport), .pushClip(viewport),
-        .text(position: .zero, text: "x", color: .white, scale: 1, face: .readable),
+        .text(position: .zero, text: "x", color: .white, scale: 1),
         .popClip, .popClip,
       ])
     #expect(interaction.clipStack.isEmpty)

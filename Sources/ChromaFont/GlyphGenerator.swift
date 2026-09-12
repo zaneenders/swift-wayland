@@ -252,9 +252,9 @@ private func buildGlyphs() -> [UInt32: Glyph] {
     0x2564: (n, l, d, d), 0x2565: (n, d, l, l), 0x2566: (n, d, d, d),
     0x2567: (l, n, d, d), 0x2568: (d, n, l, l), 0x2569: (d, n, d, d),
     0x256A: (l, l, d, d), 0x256B: (d, d, l, l), 0x256C: (d, d, d, d),
-    0x2574: (n, n, h, n), 0x2575: (h, n, n, n), 0x2576: (n, n, n, h), 0x2577: (n, h, n, n),
-    0x2578: (n, n, h, l), 0x2579: (l, h, n, n), 0x257A: (n, n, l, h), 0x257B: (h, l, n, n),
-    0x257C: (n, n, l, d), 0x257D: (l, d, n, n), 0x257E: (n, n, d, l), 0x257F: (d, l, n, n),
+    0x2574: (n, n, l, n), 0x2575: (l, n, n, n), 0x2576: (n, n, n, l), 0x2577: (n, l, n, n),
+    0x2578: (n, n, h, n), 0x2579: (h, n, n, n), 0x257A: (n, n, n, h), 0x257B: (n, h, n, n),
+    0x257C: (n, n, l, h), 0x257D: (l, h, n, n), 0x257E: (n, n, h, l), 0x257F: (h, l, n, n),
   ]
   for (codepoint, arms) in boxArms {
     var canvas = Canvas()
@@ -475,7 +475,7 @@ private func buildGlyphs() -> [UInt32: Glyph] {
 
   var leftTriangle = Canvas()
   for x in 2...17 {
-    let half = Int((Double(17 - x) / 15.0) * 7 + 0.5)
+    let half = max(1, Int((Double(x - 2) / 15.0) * 7 + 0.5))
     leftTriangle.fillRect(x, 14 - half, x, 13 + half)
   }
   out[0x25C0] = leftTriangle.glyph  // ◀
@@ -567,7 +567,7 @@ private func buildGlyphs() -> [UInt32: Glyph] {
 
   var play = Canvas()
   for x in 4...16 {
-    let half = Int((Double(x - 4) / 12.0) * 8 + 0.5)
+    let half = Int((Double(16 - x) / 12.0) * 8 + 0.5)
     play.fillRect(x, 14 - half, x, 14 + half)
   }
   out[0x23F5] = play.glyph  // ⏵

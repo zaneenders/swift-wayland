@@ -217,7 +217,7 @@ public final class MetalDisplayListRenderer {
         closeText()
         if shapeStart == nil { shapeStart = shapeInstances.count }
         appendShape(rect, radii: radii, borderWidth: width, color: color)
-      case .text(let position, let text, let color, let scale, _):
+      case .text(let position, let text, let color, let scale):
         closeShapes()
         let glyphSize = SIMD2<Float>(metrics.glyphWidth, metrics.glyphHeight) * scale
         let advance =
