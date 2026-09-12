@@ -1210,7 +1210,7 @@ public final class WaylandRenderer: Renderer {
     guard let fontAtlas else { return }
     var x = position.x
     for character in text {
-      let uv = fontAtlas.glyphUV(character, readable: face == .readable)
+      let uv = fontAtlas.glyphUV(character)
       draw(
         Rect(
           x: x,

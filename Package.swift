@@ -30,7 +30,9 @@ var targets: [Target] = [
     ]
   ),
   .target(name: "Chroma"),
-  .target(name: "ChromaFont", exclude: ["README.md"], plugins: [.plugin(name: "LatinCompositionPlugin")]),
+  .target(
+    name: "ChromaFont", exclude: ["README.md"], resources: [.copy("Resources/OFL.txt")],
+    plugins: [.plugin(name: "LatinCompositionPlugin")]),
   .executableTarget(name: "LatinCompositionGenerator"),
   .plugin(
     name: "LatinCompositionPlugin",

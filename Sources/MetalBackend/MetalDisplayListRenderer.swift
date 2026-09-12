@@ -94,17 +94,16 @@ public final class MetalDisplayListRenderer {
   public private(set) var lastInstanceCount = 0
   private struct TextKey: Hashable {
     let text: String
-    let face: UInt8
   }
   private var glyphRuns: [TextKey: [SIMD4<Float>]] = [:]
   private var glyphRunOrder: [TextKey] = []
   private var cachedGlyphCount = 0
 
-  private func glyphRun(_ text: String, face: FontFace) -> [SIMD4<Float>] {
-    let key = TextKey(text: text, face: face.rawValue)
+  private func glyphRun(_ text: String) -> [SIMD4<Float>] {
+    let key = TextKey(text: text)
     if let cached = glyphRuns[key] { return cached }
     let run = text.map { character in
-      let (u0, v0, u1, v1) = fontAtlas.glyphUV(character, readable: face == .readable)
+      let (u0, v0, u1, v1) = fontAtlas.glyphUV(character)
       return SIMD4<Float>(u0, v0, u1, v1)
     }
     // Bound both entry overhead and glyph storage. Oversized runs are transient.
@@ -136,7 +135,7 @@ public final class MetalDisplayListRenderer {
 
   private enum Batch {
     case shape(instanceOffset: Int, instanceCount: Int)
-    case text(instanceOffset: Int, instanceCount: Int, face: FontFace)
+    case text(instanceOffset: Int, instanceCount: Int)
     case image(rect: Rect, clip: Rect, texture: MTLTexture)
     case pushClip(Rect)
     case popClip
@@ -162,7 +161,6 @@ public final class MetalDisplayListRenderer {
     var batches: [Batch] = []
     var shapeStart: Int?
     var textStart: Int?
-    var textFace: FontFace?
 
     func closeShapes() {
       guard let start = shapeStart else { return }
@@ -178,11 +176,9 @@ public final class MetalDisplayListRenderer {
         batches.append(
           .text(
             instanceOffset: start,
-            instanceCount: textInstances.count - start,
-            face: textFace ?? .readable))
+            instanceCount: textInstances.count - start))
       }
       textStart = nil
-      textFace = nil
     }
 
     func appendShape(_ rect: Rect, radii requestedRadii: CornerRadii, borderWidth: Float, color: Color) {
@@ -221,17 +217,15 @@ public final class MetalDisplayListRenderer {
         closeText()
         if shapeStart == nil { shapeStart = shapeInstances.count }
         appendShape(rect, radii: radii, borderWidth: width, color: color)
-      case .text(let position, let text, let color, let scale, let face):
+      case .text(let position, let text, let color, let scale, _):
         closeShapes()
         let glyphSize = SIMD2<Float>(metrics.glyphWidth, metrics.glyphHeight) * scale
         let advance =
-          (face == .readable ? metrics.cellAdvance : metrics.displayCellAdvance) * scale
+          metrics.cellAdvance * scale
         var pen = SIMD2<Float>(position.x, position.y)
-        for uv in glyphRun(text, face: face) {
-          if textFace != nil, textFace != face { closeText() }
+        for uv in glyphRun(text) {
           if textStart == nil {
             textStart = textInstances.count
-            textFace = face
           }
           textInstances.append(
             TextInstance(
@@ -306,7 +300,7 @@ public final class MetalDisplayListRenderer {
           vertexStart: 0,
           vertexCount: 4,
           instanceCount: instanceCount)
-      case .text(let instanceOffset, let instanceCount, _):
+      case .text(let instanceOffset, let instanceCount):
         guard let textBuffer else { continue }
         enc.setRenderPipelineState(textPipeline)
         enc.setFragmentTexture(fontAtlas.texture, index: 0)

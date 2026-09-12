@@ -1,11 +1,4 @@
-/// Synthesizes bitmaps for the symbol ranges terminal programs emit but the
-/// hand-drawn ASCII font does not cover: box drawing, block elements, braille,
-/// arrows, geometric shapes, and Powerline separators. Without these, the
-/// atlas silently substitutes a blank space, which breaks shell prompts
-/// (`➜`, `✗`), TUI borders (`╭──╮`), and dashboards.
-///
-/// Hand-drawn glyphs in `Font20x28.glyphs` always win; these fill the
-/// gaps around them.
+/// Generated terminal and interface symbols supplement the bundled text font.
 public enum GlyphGenerator {
   public static let generated: [UInt32: Glyph] = buildGlyphs()
 }
@@ -691,5 +684,14 @@ private func buildGlyphs() -> [UInt32: Glyph] {
   powerDiagonalRight.flipHorizontally()
   out[0xE0BA] = powerDiagonalRight.glyph  // lower-right diagonal
 
+  out[0x21BB] = Glyph(rows: [
+    0x00000, 0x00000, 0x00000, 0x00000,
+    0x00E00, 0x00700, 0x00380, 0x03FC0,
+    0x0E180, 0x18300, 0x38600, 0x30C00,
+    0x60000, 0x60000, 0x6000C, 0x6000C,
+    0x6000C, 0x60008, 0x30018, 0x38030,
+    0x18070, 0x0E0C0, 0x03F80, 0x00000,
+    0x00000, 0x00000, 0x00000, 0x00000,
+  ])
   return out
 }

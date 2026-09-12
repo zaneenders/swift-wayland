@@ -56,3 +56,10 @@ a replacement for the protocol's per-message validation or authentication.
 `swift test --filter RemoteLoopbackTests` exercises real loopback TCP reconnects,
 disconnects during frame encoding and clipboard operations, and server shutdown.
 It does not require a Metal window.
+
+## Bundled font license
+
+Chroma's single text font is derived from Noto Sans Mono under SIL OFL 1.1.
+Distributions must include the ChromaFont resource bundle containing `OFL.txt`
+(or provide an accessible copy of that copyright/license notice).
+See [font provenance and regeneration](Sources/ChromaFont/README.md).

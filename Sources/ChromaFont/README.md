@@ -1,11 +1,44 @@
-# Bundled bitmap font
+# Bundled font
 
-Chroma renders bundled coverage bitmaps without a runtime font library. ASCII
-and generated terminal symbols retain their existing mappings and advances.
+Chroma uses **one** text font: a rasterized subset of Noto Sans Mono Regular
+2.007. `.readable` and `.display` remain API/wire compatibility values only;
+both use identical glyphs and a 12-point monospace advance. Generated terminal
+and interface symbols supplement the font, not a second ASCII alphabet.
+There is no runtime font lookup or font rasterizer dependency.
+
+## License and provenance
+
+The font and derived bitmap coverage are distributed under **SIL OFL 1.1**.
+The exact TTF embeds `Copyright 2015-2021 Google LLC. All Rights Reserved.`
+and explicitly states SIL OFL 1.1. The upstream repository also includes the
+Noto Project Authors copyright notice. Both are preserved with the full license
+in [Resources/OFL.txt](Resources/OFL.txt), copied into ChromaFont's SwiftPM
+resource bundle. Applications must ship that bundle (or an accessible copy of
+the notice and license) with distributed binaries. This does not license the
+application itself under OFL. No Reserved Font Names are specified in the
+source copyright notices.
+
+Pinned upstream revision: `ffebf8c1ee449e544955a7e813c54f9b73848eac`.
+
+- [Original TTF](https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansMono/NotoSansMono-Regular.ttf)
+- [Upstream license](https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/LICENSE)
+- TTF SHA-256: `d9e2b23d19f8230be7146f409a52b1d23117e635e28f2e2892cf91b7382f325b`
+
+To regenerate `BundledFont.swift`, download the pinned TTF and run:
+
+```sh
+# Offline development tool only; not a build/runtime dependency.
+# Pillow 11.3.0
+python3 Tools/rasterize-font.py /path/to/NotoSansMono-Regular.ttf
+```
+
+The generator verifies the source hash and rasterizes printable ASCII at 60 px,
+in 60×84 coverage cells with a baseline at 65 px and a 36 px advance. The
+converted subset is named Chroma's bundled font, not an unmodified Noto font.
 
 ## Latin accents
 
-The atlas builds 190 additional canonical Latin compositions for each face from
+The atlas builds 190 additional canonical Latin compositions from
 an ASCII letter and one supported accent. Swift `Character` dictionary equality
 maps precomposed and canonically equivalent decomposed spellings to the same
 cell, without rewriting application text. Examples include `café`, `Ångström`,

@@ -116,7 +116,7 @@ struct RenderingCommandTests {
       ])
   }
 
-  @Test func displayTextUsesDisplayAdvanceForMeasurementAndSelection() {
+  @Test func displayTextUsesSameAdvanceForMeasurementAndSelection() {
     let interaction = Interaction()
     var metrics = FontMetrics()
     metrics.glyphWidth = 10
@@ -133,8 +133,8 @@ struct RenderingCommandTests {
       BlockEngine.measure(text, proposal: rect.size, context: context).width
         == 3 * metrics.displayCellAdvance)
 
-    let press = Point(x: 17, y: 6)
-    let drag = Point(x: 29, y: 6)
+    let press = Point(x: 11, y: 6)
+    let drag = Point(x: 17, y: 6)
     _ = render(
       text, in: rect, context: context,
       input: InputState(
@@ -150,17 +150,17 @@ struct RenderingCommandTests {
     #expect(
       list.commands == [
         .fillRect(
-          rect: Rect(x: 16, y: 5, width: 12, height: 16),
+          rect: Rect(x: 10, y: 5, width: 6, height: 16),
           color: ChromaTheme.light.focus.selectionBackground),
         .text(
           position: Point(x: 4, y: 5), text: "A", color: .white, scale: 1,
           face: .display),
         .text(
-          position: Point(x: 16, y: 5), text: "B",
+          position: Point(x: 10, y: 5), text: "B",
           color: ChromaTheme.light.focus.selectionForeground, scale: 1,
           face: .display),
         .text(
-          position: Point(x: 28, y: 5), text: "C", color: .white, scale: 1,
+          position: Point(x: 16, y: 5), text: "C", color: .white, scale: 1,
           face: .display),
       ])
   }

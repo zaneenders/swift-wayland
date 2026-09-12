@@ -18,9 +18,9 @@ struct FontAtlas {
   }
 
   func glyphUV(
-    _ character: Character, readable: Bool = false
+    _ character: Character
   ) -> (Float, Float, Float, Float) {
-    shared.glyphUV(character, readable: readable)
+    shared.glyphUV(character)
   }
 }
 

@@ -6,7 +6,7 @@ import Testing
 @Suite("Backend-neutral font glyphs")
 struct FontGlyphTests {
   private var glyphs: [UInt32: Glyph] {
-    Font20x28.glyphs.merging(GlyphGenerator.generated) { authored, _ in authored }
+    GlyphGenerator.generated
   }
 
   @Test func allGlyphsAreValidTwentyByTwentyEightBitmaps() {
@@ -60,8 +60,33 @@ struct FontGlyphTests {
   }
 
   @Test func coversPrintableASCII() {
+    let atlas = HighResolutionFontAtlas()
     for codepoint in UInt32(0x20)...UInt32(0x7E) {
-      #expect(glyphs[codepoint] != nil)
+      #expect(atlas.characterIndices[codepoint] != nil)
+    }
+  }
+
+  @Test func legacyFacesShareEveryGlyphAndAdvance() {
+    let atlas = HighResolutionFontAtlas()
+    for scalar in atlas.characters {
+      let character = Character(String(UnicodeScalar(scalar)!))
+      #expect(atlas.glyphUV(character, readable: true) == atlas.glyphUV(character, readable: false))
+    }
+    for entry in LatinCompositions.entries {
+      let character = Character(String(UnicodeScalar(entry.scalar)!))
+      #expect(atlas.glyphUV(character, readable: true) == atlas.glyphUV(character, readable: false))
+    }
+    let metrics = FontMetrics()
+    #expect(metrics.measure("SCRIBE", face: .display) == metrics.measure("SCRIBE", face: .readable))
+    #expect(metrics.cellAdvance == 12)
+  }
+
+  @Test func bundledCoverageHasExpectedSizeAndBlankSpace() {
+    #expect(BundledFont.pixels.count == 95 * 60 * 84)
+    #expect(BundledFont.pixels.prefix(60 * 84).allSatisfy { $0 == 0 })
+    for scalar in 1..<95 {
+      let glyph = BundledFont.pixels[(scalar * 60 * 84)..<((scalar + 1) * 60 * 84)]
+      #expect(glyph.contains { $0 > 0 })
     }
   }
 
@@ -76,7 +101,7 @@ struct FontGlyphTests {
 
     let a = atlas.glyphUV("A")
     let b = atlas.glyphUV("B")
-    #expect(atlas.glyphUV("A", readable: true) != a)
+    #expect(atlas.glyphUV("A", readable: true) == a)
     let fallback = atlas.glyphUV("�")
     #expect(a != b)
     #expect(atlas.glyphUV("🙂") == fallback)
@@ -86,7 +111,7 @@ struct FontGlyphTests {
   @Test func atlasFitsGuaranteedGLES3TextureDimensions() {
     let atlas = HighResolutionFontAtlas()
     // OpenGL ES 3 guarantees GL_MAX_TEXTURE_SIZE is at least 4096.
-    // Both faces and all compositions must fit in the single shared texture.
+    // All glyphs and compositions must fit in the single shared texture.
     let guaranteedMaximumTextureSize = 4096
     #expect(atlas.width > 0 && atlas.width <= guaranteedMaximumTextureSize)
     #expect(atlas.height > 0 && atlas.height <= guaranteedMaximumTextureSize)
