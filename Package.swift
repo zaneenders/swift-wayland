@@ -5,16 +5,46 @@ var products: [Product] = [
   .library(name: "Chroma", targets: ["Chroma"]),
   .library(name: "ChromaFont", targets: ["ChromaFont"]),
   .library(name: "HeadlessBackend", targets: ["HeadlessBackend"]),
+  .library(name: "RemoteProtocol", targets: ["RemoteProtocol"]),
+  .library(name: "RemoteServer", targets: ["RemoteServer"]),
 ]
 
 var targets: [Target] = [
   .testTarget(
+    name: "RemoteServerTests",
+    dependencies: [
+      "RemoteServer", "RemoteProtocol", "Chroma",
+      .product(name: "NIOPosix", package: "swift-nio"),
+      .product(name: "NIOEmbedded", package: "swift-nio"),
+    ]),
+  .testTarget(
     name: "ChromaTests",
     dependencies: ["Chroma", "ChromaFont", "HeadlessBackend"]
+  ),
+  .testTarget(
+    name: "RemoteProtocolTests",
+    dependencies: [
+      "Chroma", "RemoteProtocol",
+      .product(name: "NIOEmbedded", package: "swift-nio"),
+      .product(name: "NIOCore", package: "swift-nio"),
+    ]
   ),
   .target(name: "Chroma"),
   .target(name: "ChromaFont"),
   .target(name: "HeadlessBackend", dependencies: ["Chroma"]),
+  .target(
+    name: "RemoteProtocol",
+    dependencies: ["Chroma", .product(name: "NIOCore", package: "swift-nio")]
+  ),
+  .target(
+    name: "RemoteServer",
+    dependencies: [
+      "Chroma", "RemoteProtocol",
+      .product(name: "Logging", package: "swift-log"),
+      .product(name: "NIOCore", package: "swift-nio"),
+      .product(name: "NIOPosix", package: "swift-nio"),
+    ]
+  ),
 ]
 var backendTraits: Set<Trait> = []
 var defaultBackendTraits: Set<String> = []
@@ -32,7 +62,9 @@ backendTraits.insert(
 )
 defaultBackendTraits.insert("MetalBackend")
 products.append(.library(name: "MetalBackend", targets: ["MetalBackend"]))
+products.append(.library(name: "RemoteMetalClient", targets: ["RemoteMetalClient"]))
 targets.append(contentsOf: [
+  .testTarget(name: "RemoteMetalClientTests", dependencies: ["RemoteMetalClient", "Chroma", "RemoteProtocol"]),
   .target(
     name: "MetalBackend",
     dependencies: ["Chroma", "ChromaFont"],
@@ -41,6 +73,15 @@ targets.append(contentsOf: [
     // or not the demo-selection trait is enabled.
     swiftSettings: [.define("METAL_BACKEND")],
     plugins: [.plugin(name: "MetalSourcePlugin")]
+  ),
+  .target(
+    name: "RemoteMetalClient",
+    dependencies: [
+      "Chroma", "MetalBackend", "RemoteProtocol",
+      .product(name: "NIOCore", package: "swift-nio"),
+      .product(name: "NIOPosix", package: "swift-nio"),
+    ],
+    swiftSettings: [.define("METAL_BACKEND")]
   ),
   .executableTarget(name: "MetalSourceGenerator"),
   .plugin(
@@ -133,5 +174,9 @@ let package = Package(
   traits: backendTraits.union([
     .default(enabledTraits: defaultBackendTraits)
   ]),
+  dependencies: [
+    .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
+    .package(url: "https://github.com/apple/swift-nio.git", from: "2.101.0"),
+  ],
   targets: targets
 )

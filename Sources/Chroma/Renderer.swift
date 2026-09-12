@@ -4,6 +4,8 @@ package protocol Renderer: AnyObject {
 
   var content: (any Block)? { get set }
 
+  var frameObserver: FrameObserver? { get set }
+
   var onClose: (() -> Void)? { get set }
 
   var interaction: Interaction { get }

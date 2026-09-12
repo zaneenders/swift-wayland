@@ -4,7 +4,21 @@ import Foundation
 struct WaylandSourceGenerator {
   static func main() throws {
     guard CommandLine.arguments.count == 4 else {
-      throw GeneratorError.usage
+      print(
+        """
+        WaylandSourceGenerator is an internal Chroma build tool and is not a demo.
+
+        Run the remote rendering daemon on Linux:
+          swift run --package-path Example RemoteDemoDaemon
+
+        To accept connections from another machine, specify this host's IP:
+          swift run --package-path Example RemoteDemoDaemon <linux-host-ip>
+
+        Or run a local graphical demo:
+          swift run --package-path Example ChromaDemo
+        """
+      )
+      return
     }
 
     let vertexURL = URL(fileURLWithPath: CommandLine.arguments[1])

@@ -4,43 +4,38 @@ import AppKit
 import Chroma
 import MetalKit
 
-final class ChromaInputView: MTKView {
-  var interaction: Interaction!
-  var keyBindings = KeyBindings()
+public final class ChromaInputView: MTKView {
+  public var onRemoteKey: ((KeyChord?, String?) -> Void)?
+  public var onInputAvailable: (() -> Void)?
   private var pointerPosition = Point(x: -1, y: -1)
   private var pointerPressPosition = Point(x: -1, y: -1)
   private var pointerDown = false
   private var pressedEdge = false
   private var releasedEdge = false
   private var scroll = Point.zero
-  private var pendingCommands: [Command] = []
-  private var pendingTextEvents: [TextEditEvent] = []
 
-  func frameInput() -> InputState {
+  public func frameInput() -> InputState {
     let input = InputState(
       pointerPosition: pointerPosition,
       pointerPressPosition: pointerPressPosition,
       pointerDown: pointerDown,
       pointerPressed: pressedEdge,
       pointerReleased: releasedEdge,
-      scrollDelta: scroll,
-      commands: pendingCommands,
-      textEvents: pendingTextEvents
+      scrollDelta: scroll
     )
     pressedEdge = false
     releasedEdge = false
     pointerPressPosition = Point(x: -1, y: -1)
     scroll = .zero
-    pendingCommands = []
-    pendingTextEvents = []
     return input
   }
 
   private func scheduleRedraw() {
     needsDisplay = true
+    onInputAvailable?()
   }
 
-  override func updateTrackingAreas() {
+  public override func updateTrackingAreas() {
     super.updateTrackingAreas()
     for area in trackingAreas { removeTrackingArea(area) }
     addTrackingArea(
@@ -53,17 +48,17 @@ final class ChromaInputView: MTKView {
     )
   }
 
-  override func mouseMoved(with event: NSEvent) {
+  public override func mouseMoved(with event: NSEvent) {
     updatePointer(with: event)
     scheduleRedraw()
   }
 
-  override func mouseDragged(with event: NSEvent) {
+  public override func mouseDragged(with event: NSEvent) {
     updatePointer(with: event)
     scheduleRedraw()
   }
 
-  override func mouseDown(with event: NSEvent) {
+  public override func mouseDown(with event: NSEvent) {
     window?.makeFirstResponder(self)
     updatePointer(with: event)
     pointerPressPosition = pointerPosition
@@ -72,121 +67,34 @@ final class ChromaInputView: MTKView {
     scheduleRedraw()
   }
 
-  override func mouseUp(with event: NSEvent) {
+  public override func mouseUp(with event: NSEvent) {
     updatePointer(with: event)
     pointerDown = false
     releasedEdge = true
     scheduleRedraw()
   }
 
-  override func mouseExited(with event: NSEvent) {
+  public override func mouseExited(with event: NSEvent) {
     pointerPosition = Point(x: -1, y: -1)
     scheduleRedraw()
   }
 
-  override func scrollWheel(with event: NSEvent) {
+  public override func scrollWheel(with event: NSEvent) {
     scroll.x += Float(event.scrollingDeltaX)
     scroll.y += Float(event.scrollingDeltaY)
     scheduleRedraw()
   }
 
-  override var acceptsFirstResponder: Bool { true }
+  public override var acceptsFirstResponder: Bool { true }
 
-  override func keyDown(with event: NSEvent) {
-    scheduleRedraw()
-    guard let chord = Self.keyChord(for: event) else {
-      if interaction.mode == .editing, let edit = Self.textInsertionEvent(for: event) {
-        pendingTextEvents.append(edit)
-      } else {
-        super.keyDown(with: event)
-      }
+  public override func keyDown(with event: NSEvent) {
+    if let onRemoteKey {
+      let text: String?
+      if case .insert(let value) = Self.textInsertionEvent(for: event) { text = value } else { text = nil }
+      onRemoteKey(Self.keyChord(for: event), text)
       return
     }
-    let resolution = keyBindings.command(for: chord)
-    if interaction.mode == .editing {
-      // Editing commands are explicit. Movement-mode commands on printable keys are ignored
-      // here so bindings such as Space-to-activate and j-to-move still insert text while editing.
-      if case .some(.some(let command)) = resolution,
-        case .editing = command,
-        handlePlatformCommand(command)
-      {
-        return
-      }
-      if case .some(.none) = resolution { return }
-      if let edit = Self.textInsertionEvent(for: event) {
-        pendingTextEvents.append(edit)
-        return
-      }
-    }
-    // A disabled binding is still owned by the keymap and must not fall through.
-    if let resolution {
-      guard let command = resolution else { return }
-      if handlePlatformCommand(command) { return }
-      pendingCommands.append(command)
-    } else {
-      super.keyDown(with: event)
-    }
-  }
-
-  private func handlePlatformCommand(_ command: Command) -> Bool {
-    guard case .editing(let editing) = command else { return false }
-    switch editing {
-    case .insert(let text):
-      guard interaction.mode == .editing else { return true }
-      pendingTextEvents.append(.insert(text))
-    case .copy:
-      guard let text = interaction.copyText(), !text.isEmpty else { return true }
-      NSPasteboard.general.clearContents()
-      NSPasteboard.general.setString(text, forType: .string)
-    case .cut:
-      guard let text = interaction.editableSelectionText(), !text.isEmpty else { return true }
-      NSPasteboard.general.clearContents()
-      NSPasteboard.general.setString(text, forType: .string)
-      pendingTextEvents.append(.deleteForward)
-    case .paste:
-      guard interaction.mode == .editing,
-        let pasted = NSPasteboard.general.string(forType: .string),
-        !pasted.isEmpty
-      else { return true }
-      pendingTextEvents.append(.insert(pasted))
-    case .selectAll:
-      if interaction.mode == .editing {
-        pendingTextEvents.append(.selectAll)
-      } else {
-        interaction.selectAll(at: pointerPosition)
-      }
-    case .backspace:
-      guard interaction.mode == .editing else { return true }
-      pendingTextEvents.append(.backspace)
-    case .deleteForward:
-      guard interaction.mode == .editing else { return true }
-      pendingTextEvents.append(.deleteForward)
-    case .moveCaretLeft:
-      guard interaction.mode == .editing else { return false }
-      pendingTextEvents.append(.moveCaretLeft)
-    case .moveCaretRight:
-      guard interaction.mode == .editing else { return false }
-      pendingTextEvents.append(.moveCaretRight)
-    case .moveCaretUp, .moveCaretDown, .selectCaretUp, .selectCaretDown:
-      guard interaction.mode == .editing else { return false }
-      pendingTextEvents.append(editing)
-    case .moveCaretToStart:
-      guard interaction.mode == .editing else { return false }
-      pendingTextEvents.append(.moveCaretToStart)
-    case .moveCaretToEnd:
-      guard interaction.mode == .editing else { return false }
-      pendingTextEvents.append(.moveCaretToEnd)
-    case .submit:
-      if interaction.mode == .editing {
-        pendingTextEvents.append(.submit)
-      } else {
-        pendingCommands.append(.action(.activate))
-      }
-    case .endEditing:
-      guard interaction.mode == .editing else { return true }
-      pendingTextEvents.append(.endEditing)
-    }
-    return true
+    super.keyDown(with: event)
   }
 
   private static func keyChord(for event: NSEvent) -> KeyChord? {

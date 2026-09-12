@@ -269,7 +269,7 @@ struct ScrollViewTests {
     let interaction = Interaction()
     let controller = ScrollViewController()
     let counter = DrawCounter()
-    let rows = (0..<10).map { index in
+    let rows = (0..<10_000).map { index in
       LazyVStack.Row(
         id: WidgetID("row-\(index)"),
         content: CountedRow(index: index, height: 10, counter: counter))
@@ -286,7 +286,7 @@ struct ScrollViewTests {
     }
 
     frame()
-    #expect(counter.measured == Array(0..<10))
+    #expect(counter.measured == Array(0..<10_000))
     #expect(counter.drawn == [0, 1, 2])
 
     counter.measured = []
@@ -295,6 +295,110 @@ struct ScrollViewTests {
     frame()
     #expect(counter.measured.isEmpty)
     #expect(counter.drawn == [4, 5, 6, 7])
+
+    counter.drawn = []
+    controller.scrollToBottom()
+    frame()
+    #expect(counter.measured.isEmpty)
+    #expect(counter.drawn == [9_997, 9_998, 9_999])
+
+    counter.drawn = []
+    controller.scrollToTop()
+    frame()
+    #expect(counter.measured.isEmpty)
+    #expect(counter.drawn == [0, 1, 2])
+  }
+
+  @Test func dataDrivenLazyStackBuildsOnlyVisibleRows() {
+    let interaction = Interaction()
+    let controller = ScrollViewController()
+    let counter = DrawCounter()
+    var built: [Int] = []
+    func row(_ index: Int) -> CountedRow {
+      built.append(index)
+      return CountedRow(index: index, height: 10, counter: counter)
+    }
+    func frame(_ data: ArraySlice<Int>, width: Float = 100, spacing: Float = 0) {
+      built = []
+      counter.drawn = []
+      interaction.beginFrame(input: InputState())
+      var list = DrawList()
+      let stack = LazyVStack(
+        id: scrollID, data: data, rowHeight: 10, spacing: spacing,
+        controller: controller
+      ) { index in row(index) }
+      #expect(built.isEmpty)
+      BlockEngine.draw(
+        stack, into: &list, in: Rect(x: 0, y: 0, width: width, height: 20),
+        context: RenderContext(interaction: interaction))
+      interaction.endFrame()
+      #expect(counter.measured.isEmpty)
+      #expect(built == counter.drawn)
+      #expect(built.count <= 4)
+    }
+
+    // Nonzero collection startIndex must work too.
+    let data = Array(0..<10_001).dropFirst()
+    frame(data)
+    #expect(built == [1, 2, 3])
+    controller.scrollToBottom()
+    frame(data)
+    #expect(built == [9_998, 9_999, 10_000])
+    controller.scrollToTop()
+    frame(data, width: 200)
+    #expect(built == [1, 2, 3])
+
+    // Fresh content for same positions, without manual invalidation.
+    frame(Array(20_001..<30_001)[...])
+    #expect(built == [20_001, 20_002, 20_003])
+    controller.scroll(to: 12)
+    frame(data, spacing: 5)
+    #expect(built == [2, 3])
+    controller.scrollToBottom()
+    frame([42][...])
+    #expect(built == [42])
+    #expect(interaction.scrollLimit(for: scrollID) == 0)
+    frame([][...])
+    #expect(built.isEmpty)
+  }
+
+  @Test func lazyStackCacheTracksReorderingReplacementAndWidth() {
+    let interaction = Interaction()
+    let controller = ScrollViewController()
+    let counter = DrawCounter()
+
+    func frame(_ indices: [Int], width: Float = 100) {
+      interaction.beginFrame(input: InputState())
+      var list = DrawList()
+      let rows = indices.map { index in
+        LazyVStack.Row(
+          id: WidgetID("row-\(index)"),
+          content: CountedRow(index: index, height: 10, counter: counter))
+      }
+      BlockEngine.draw(
+        LazyVStack(id: scrollID, controller: controller, rows: rows),
+        into: &list, in: Rect(x: 0, y: 0, width: width, height: 100),
+        context: RenderContext(interaction: interaction))
+      interaction.endFrame()
+    }
+
+    frame([0, 1, 2])
+    counter.measured = []
+    counter.drawn = []
+    frame([2, 1, 0])
+    #expect(counter.measured.isEmpty)
+    #expect(counter.drawn == [2, 1, 0])
+
+    frame([2, 3, 0])
+    #expect(counter.measured == [3])
+    counter.measured = []
+    frame([2, 3, 0], width: 200)
+    #expect(counter.measured == [2, 3, 0])
+
+    counter.measured = []
+    frame([])
+    frame([4])
+    #expect(counter.measured == [4])
   }
 
   @Test func clippedLeafCannotBeHitOutsideViewport() {

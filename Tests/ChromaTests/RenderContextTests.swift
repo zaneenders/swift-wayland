@@ -121,6 +121,7 @@ private struct ContextRecordingBlock: PrimitiveBlock {
 private final class FakeRenderer: Renderer {
   let name = "Fake"
   var content: (any Block)?
+  var frameObserver: FrameObserver?
   var onClose: (() -> Void)?
   let interaction = Interaction()
   func run(title: String) {}

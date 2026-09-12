@@ -1,3 +1,9 @@
+# Generated demo captures
+Example/scene-*.chromacapture
+
+# Local rendering benchmark artifacts
+Benchmarks/results/
+
 # Build artifacts
 .build/
 # Annoying Mac File

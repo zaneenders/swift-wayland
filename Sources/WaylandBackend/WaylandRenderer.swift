@@ -13,12 +13,13 @@ import Glibc
 
 /// A Wayland window backed by EGL and OpenGL ES 3.
 ///
-/// Like `MetalRenderer`, this type owns the platform surface and consumes only
+/// This type owns the platform surface and consumes only
 /// backend-neutral `DrawList` commands produced by `BlockEngine`.
 @MainActor
 public final class WaylandRenderer: Renderer {
   public let name = "Wayland"
   public var content: (any Block)?
+  public var frameObserver: FrameObserver?
   public var onClose: (() -> Void)?
 
   package let interaction = Interaction()
@@ -1018,6 +1019,9 @@ public final class WaylandRenderer: Renderer {
       )
     }
     interaction.endFrame()
+    frameObserver?(
+      FrameObservation(
+        drawList: drawList, viewport: viewport, rasterScale: Point(x: Float(bufferScale), y: Float(bufferScale))))
     _ = interaction.consumeRedrawRequest()
     render(drawList, viewport: viewport)
     _ = unsafe eglSwapBuffers(eglDisplay, eglSurface)

@@ -15,6 +15,13 @@ public struct LazyVStack: PrimitiveBlock {
   public var sticksToBottom: Bool
   public var controller: ScrollViewController
   public var rows: [Row]
+  private var uniformRows: UniformRows?
+
+  private struct UniformRows {
+    let count: Int
+    let height: Float
+    let content: @MainActor (Int) -> any Block
+  }
 
   public init(
     id: WidgetID,
@@ -32,6 +39,38 @@ public struct LazyVStack: PrimitiveBlock {
     self.rows = rows
   }
 
+  /// A virtualized stack with an explicit, uniform row height in logical points.
+  ///
+  /// Unlike the measured `rows:` initializer, this initializer neither constructs
+  /// nor measures offscreen content. Data must support random access; only rows
+  /// intersecting the viewport are built, including on the first frame and after
+  /// jumping to the bottom. The builder is evaluated afresh so data and theme
+  /// changes do not require an application-owned content cache.
+  ///
+  /// The height is a layout contract, not an estimate. Include padding in it.
+  /// Use stable widget IDs in interactive row content to preserve interaction
+  /// identity when items move. This stack owns its scroll viewport and should
+  /// not be wrapped in a ScrollView.
+  @MainActor public init<Data: RandomAccessCollection, Content: Block>(
+    id: WidgetID,
+    data: Data,
+    rowHeight: Float,
+    spacing: Float = 0,
+    showsIndicator: Bool = true,
+    sticksToBottom: Bool = false,
+    controller: ScrollViewController,
+    @BlockBuilder content: @escaping @MainActor (Data.Element) -> Content
+  ) {
+    precondition(rowHeight.isFinite && rowHeight > 0, "rowHeight must be finite and positive")
+    precondition(spacing.isFinite && spacing >= 0, "spacing must be finite and nonnegative")
+    self.init(
+      id: id, spacing: spacing, showsIndicator: showsIndicator,
+      sticksToBottom: sticksToBottom, controller: controller, rows: [])
+    uniformRows = UniformRows(count: data.count, height: rowHeight) { offset in
+      content(data[data.index(data.startIndex, offsetBy: offset)])
+    }
+  }
+
   @MainActor public var expandsHorizontally: Bool { true }
   @MainActor public var expandsVertically: Bool { true }
   @MainActor public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { proposal }
@@ -39,10 +78,17 @@ public struct LazyVStack: PrimitiveBlock {
   @MainActor public func draw(into drawList: inout DrawList, in rect: Rect, context: RenderContext) {
     let interaction = context.interaction
     interaction.registerScrollViewport(rect)
-    updateCache(width: rect.size.width, context: context)
-
-    var contentHeight = controller.lazyStackCache.rowSizes.reduce(0) { $0 + $1.height }
-    contentHeight += spacing * Float(max(0, rows.count - 1))
+    let contentHeight: Float
+    if let uniformRows {
+      contentHeight =
+        Float(uniformRows.count) * uniformRows.height
+        + spacing * Float(max(0, uniformRows.count - 1))
+    } else {
+      updateCache(width: rect.size.width, context: context)
+      contentHeight =
+        controller.lazyStackCache.rowSizes.reduce(0) { $0 + $1.height }
+        + spacing * Float(max(0, rows.count - 1))
+    }
     let maximumOffset = max(0, contentHeight - rect.size.height)
     let previousLimit = interaction.scrollLimit(for: id)
     var offset = min(interaction.scrollOffset(for: id), maximumOffset)
@@ -87,19 +133,45 @@ public struct LazyVStack: PrimitiveBlock {
     interaction.beginGroup(.vertical, rect: rect)
     let visibleTop = offset
     let visibleBottom = offset + rect.size.height
-    var y: Float = 0
-    for index in rows.indices {
-      let height = controller.lazyStackCache.rowSizes[index].height
-      let bottom = y + height
-      if bottom >= visibleTop && y <= visibleBottom {
-        BlockEngine.draw(
-          rows[index].content,
-          into: &drawList,
-          in: Rect(
-            x: rect.minX, y: rect.minY + y - offset,
-            width: rect.size.width, height: height), context: context)
+    if let uniformRows {
+      let stride = uniformRows.height + spacing
+      // Clamp in floating point before converting to Int, including empty data.
+      let first = Int(
+        min(
+          Float(uniformRows.count),
+          max(
+            0,
+            ((visibleTop - uniformRows.height) / stride).rounded(.up))))
+      let end = Int(
+        min(
+          Float(uniformRows.count),
+          max(
+            0,
+            (visibleBottom / stride).rounded(.down) + 1)))
+      if rect.size.height > 0 && first < end {
+        for index in first..<end {
+          BlockEngine.draw(
+            uniformRows.content(index), into: &drawList,
+            in: Rect(
+              x: rect.minX, y: rect.minY + Float(index) * stride - offset,
+              width: rect.size.width, height: uniformRows.height), context: context)
+        }
       }
-      y = bottom + spacing
+    } else {
+      var y: Float = 0
+      for index in rows.indices {
+        let height = controller.lazyStackCache.rowSizes[index].height
+        let bottom = y + height
+        if bottom >= visibleTop && y <= visibleBottom {
+          BlockEngine.draw(
+            rows[index].content,
+            into: &drawList,
+            in: Rect(
+              x: rect.minX, y: rect.minY + y - offset,
+              width: rect.size.width, height: height), context: context)
+        }
+        y = bottom + spacing
+      }
     }
     interaction.endGroup()
     interaction.popClip()
@@ -119,6 +191,13 @@ public struct LazyVStack: PrimitiveBlock {
 
   @MainActor private func updateCache(width: Float, context: RenderContext) {
     let cache = controller.lazyStackCache
+    // Stable rows already have measured sizes. Avoid rebuilding a dictionary
+    // and two arrays on every animation or input frame.
+    if cache.width == width && cache.rowIDs.count == rows.count
+      && zip(cache.rowIDs, rows).allSatisfy({ $0.0 == $0.1.id })
+    {
+      return
+    }
     var oldSizes: [WidgetID: Size] = [:]
     if cache.width == width {
       for (id, size) in zip(cache.rowIDs, cache.rowSizes) {

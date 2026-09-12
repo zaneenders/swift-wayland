@@ -1,155 +1,45 @@
 #if METAL_BACKEND
 
-import AppKit
 import Chroma
-import MetalKit
+import Metal
 
+/// Translates backend-independent Chroma draw commands into Metal commands.
+///
+/// This object owns GPU pipelines, batching buffers, the bundled font atlas,
+/// and the image texture cache. It deliberately does not own a window, input
+/// state, or a Chroma block graph, so local and remote windows can share it.
 @MainActor
-public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, Renderer {
+public final class MetalDisplayListRenderer {
   private let device: MTLDevice
-  private let queue: MTLCommandQueue
   private let shapePipeline: MTLRenderPipelineState
   private let textPipeline: MTLRenderPipelineState
   private let imagePipeline: MTLRenderPipelineState
   private let fontAtlas: FontAtlas
-  private let mtkView: ChromaInputView
 
-  public let name = "Metal"
-
-  package let interaction = Interaction()
-
-  public var content: (any Block)?
-  public var onClose: (() -> Void)?
-  private var keyBindings = KeyBindings() {
-    didSet { mtkView.keyBindings = keyBindings }
-  }
-  private var minimumRefreshRate: Double = 0
-  private var refreshTimer: Timer?
-
-  package func setKeyBindings(_ bindings: KeyBindings) {
-    keyBindings = bindings
-  }
-
-  package func setMinimumRefreshRate(_ refreshRate: Double) {
-    minimumRefreshRate = refreshRate.isFinite ? max(0, refreshRate) : 0
-    updateRefreshTimer()
-  }
-
-  public var contentView: NSView { mtkView }
-
-  public init(frame: CGRect) throws {
-    guard let device = MTLCreateSystemDefaultDevice() else {
-      throw BackendError.unavailable(
-        backend: "Metal",
-        reason: "no compatible GPU was found"
-      )
-    }
-    guard let queue = device.makeCommandQueue() else {
-      throw BackendError.initializationFailed(
-        backend: "Metal",
-        stage: "command queue",
-        reason: "the device could not create a command queue"
-      )
-    }
+  public init(device: MTLDevice, pixelFormat: MTLPixelFormat) throws {
     self.device = device
-    self.queue = queue
     self.fontAtlas = try FontAtlas(device: device)
-
-    let mtkView = ChromaInputView(frame: frame, device: device)
-    mtkView.clearColor = MTLClearColor(red: 0.1, green: 0.1, blue: 0.2, alpha: 1.0)
-    mtkView.isPaused = true
-    mtkView.enableSetNeedsDisplay = true
-    self.mtkView = mtkView
 
     let library: MTLLibrary
     do {
       library = try device.makeLibrary(source: metalSource, options: nil)
     } catch {
       throw BackendError.initializationFailed(
-        backend: "Metal",
-        stage: "shader library",
-        reason: String(describing: error)
-      )
+        backend: "Metal", stage: "shader library", reason: String(describing: error))
     }
-
-    let shapePipeline = try Self.makePipeline(
-      device: device,
-      pixelFormat: mtkView.colorPixelFormat,
-      library: library,
-      vertex: "shape_vertex",
-      fragment: "shape_fragment"
-    )
-    let textPipeline = try Self.makePipeline(
-      device: device,
-      pixelFormat: mtkView.colorPixelFormat,
-      library: library,
-      vertex: "text_vertex",
-      fragment: "text_fragment"
-    )
-    let imagePipeline = try Self.makePipeline(
-      device: device,
-      pixelFormat: mtkView.colorPixelFormat,
-      library: library,
-      vertex: "text_vertex",
-      fragment: "image_fragment"
-    )
-    self.shapePipeline = shapePipeline
-    self.textPipeline = textPipeline
-    self.imagePipeline = imagePipeline
-
-    super.init()
-    mtkView.delegate = self
-    mtkView.interaction = interaction
-    mtkView.keyBindings = keyBindings
-    interaction.onRedrawRequested = { [weak mtkView] in
-      mtkView?.needsDisplay = true
-    }
+    self.shapePipeline = try Self.makePipeline(
+      device: device, pixelFormat: pixelFormat, library: library,
+      vertex: "shape_vertex", fragment: "shape_fragment")
+    self.textPipeline = try Self.makePipeline(
+      device: device, pixelFormat: pixelFormat, library: library,
+      vertex: "text_vertex", fragment: "text_fragment")
+    self.imagePipeline = try Self.makePipeline(
+      device: device, pixelFormat: pixelFormat, library: library,
+      vertex: "text_vertex", fragment: "image_fragment")
   }
 
-  public convenience init(size: Size) throws {
-    try self.init(frame: CGRect(x: 0, y: 0, width: CGFloat(size.width), height: CGFloat(size.height)))
-  }
-
-  private func updateRefreshTimer() {
-    refreshTimer?.invalidate()
-    refreshTimer = nil
-    guard minimumRefreshRate > 0 else { return }
-
-    let timer = Timer(timeInterval: 1 / minimumRefreshRate, repeats: true) { [weak mtkView] _ in
-      MainActor.assumeIsolated {
-        mtkView?.needsDisplay = true
-      }
-    }
-    RunLoop.main.add(timer, forMode: .common)
-    refreshTimer = timer
-  }
-
-  public func run(title: String) {
-    let app = NSApplication.shared
-    app.setActivationPolicy(.regular)
-
-    let window = NSWindow(
-      contentRect: mtkView.frame,
-      styleMask: [.titled, .closable, .miniaturizable, .resizable],
-      backing: .buffered,
-      defer: false
-    )
-    window.collectionBehavior.insert(.fullScreenPrimary)
-    window.title = title
-    window.contentView = mtkView
-    window.delegate = self
-    window.center()
-    window.makeKeyAndOrderFront(nil)
-    mtkView.needsDisplay = true
-    window.makeFirstResponder(mtkView)
-
-    app.activate(ignoringOtherApps: true)
-    app.run()
-  }
-
-  public func windowWillClose(_ notification: Notification) {
-    onClose?()
-    NSApplication.shared.terminate(nil)
+  public func finishFrame() {
+    poolBufferIndex = (poolBufferIndex + 1) % poolBufferCount
   }
 
   private static func makePipeline(
@@ -194,15 +84,41 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
     }
   }
 
-  private var lastFrameTime: Double = 0
-  private var smoothedFrameRate: Double = 0
-
   private var shapePool: [MTLBuffer] = []
   private var textPool: [MTLBuffer] = []
   private var poolBufferIndex = 0
   private let poolBufferCount = 3
   private var shapeInstances: [ShapeInstance] = []
   private var textInstances: [TextInstance] = []
+  public private(set) var lastDrawCallCount = 0
+  public private(set) var lastInstanceCount = 0
+  private struct TextKey: Hashable {
+    let text: String
+    let face: UInt8
+  }
+  private var glyphRuns: [TextKey: [SIMD4<Float>]] = [:]
+  private var glyphRunOrder: [TextKey] = []
+  private var cachedGlyphCount = 0
+
+  private func glyphRun(_ text: String, face: FontFace) -> [SIMD4<Float>] {
+    let key = TextKey(text: text, face: face.rawValue)
+    if let cached = glyphRuns[key] { return cached }
+    let run = text.map { character in
+      let (u0, v0, u1, v1) = fontAtlas.glyphUV(character, readable: face == .readable)
+      return SIMD4<Float>(u0, v0, u1, v1)
+    }
+    // Bound both entry overhead and glyph storage. Oversized runs are transient.
+    if run.count <= 65_536, text.utf8.count <= 65_536 {
+      while !glyphRunOrder.isEmpty && (glyphRunOrder.count >= 1024 || cachedGlyphCount + run.count > 65_536) {
+        let oldest = glyphRunOrder.removeFirst()
+        cachedGlyphCount -= glyphRuns.removeValue(forKey: oldest)!.count
+      }
+      glyphRuns[key] = run
+      glyphRunOrder.append(key)
+      cachedGlyphCount += run.count
+    }
+    return run
+  }
 
   private struct CachedImageTexture {
     var generation: UInt64
@@ -218,62 +134,6 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
   private let maximumImageTextureCount = 128
   private let maximumImageTextureBytes = 256 * 1024 * 1024
 
-  public func draw(in mtkView: MTKView) {
-    guard
-      let drawable = mtkView.currentDrawable,
-      let rpd = mtkView.currentRenderPassDescriptor,
-      let cmd = queue.makeCommandBuffer(),
-      let enc = cmd.makeRenderCommandEncoder(descriptor: rpd)
-    else {
-      // The drawable may not be ready yet (e.g. before the view is attached to
-      // a window). Retry next cycle so we don't stall on a blank view.
-      mtkView.needsDisplay = true
-      return
-    }
-
-    updateFrameRate()
-    interaction.beginFrame(input: self.mtkView.frameInput())
-
-    let viewport = Size(width: Float(mtkView.bounds.width), height: Float(mtkView.bounds.height))
-    var drawList = DrawList()
-    if let content {
-      BlockEngine.draw(content, into: &drawList, in: Rect(origin: .zero, size: viewport), context: context)
-    }
-    interaction.endFrame()
-    let redrawRequested = interaction.consumeRedrawRequest()
-    render(
-      drawList,
-      viewport: viewport,
-      rasterScale: Point(
-        x: Float(drawable.texture.width) / max(1, viewport.width),
-        y: Float(drawable.texture.height) / max(1, viewport.height)),
-      into: enc)
-
-    enc.endEncoding()
-    cmd.present(drawable)
-    cmd.commit()
-
-    if redrawRequested {
-      mtkView.needsDisplay = true
-    }
-    poolBufferIndex = (poolBufferIndex + 1) % poolBufferCount
-  }
-
-  public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-    mtkView.needsDisplay = true
-  }
-
-  private func updateFrameRate() {
-    let now = ProcessInfo.processInfo.systemUptime
-    defer { lastFrameTime = now }
-    guard lastFrameTime > 0 else { return }
-    let delta = now - lastFrameTime
-    guard delta > 0 else { return }
-    let instant = 1 / delta
-    smoothedFrameRate = smoothedFrameRate == 0 ? instant : smoothedFrameRate * 0.9 + instant * 0.1
-    interaction.frameRate = smoothedFrameRate
-  }
-
   private enum Batch {
     case shape(instanceOffset: Int, instanceCount: Int)
     case text(instanceOffset: Int, instanceCount: Int, face: FontFace)
@@ -282,12 +142,14 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
     case popClip
   }
 
-  private func render(
+  public func encode(
     _ drawList: DrawList,
     viewport: Size,
     rasterScale: Point,
     into enc: MTLRenderCommandEncoder
   ) {
+    lastDrawCallCount = 0
+    lastInstanceCount = 0
     let metrics = FontMetrics()
     let pxToNDC = SIMD2<Float>(2 / viewport.width, 2 / viewport.height)
     func ndc(_ x: Float, _ y: Float) -> SIMD2<Float> {
@@ -341,7 +203,7 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
     }
 
     var clipStack: [Rect] = []
-    for command in drawList.commands {
+    for command in drawList.culled(to: viewport).commands {
       switch command {
       case .fillRect(let rect, let color):
         closeText()
@@ -365,19 +227,18 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
         let advance =
           (face == .readable ? metrics.cellAdvance : metrics.displayCellAdvance) * scale
         var pen = SIMD2<Float>(position.x, position.y)
-        for character in text {
+        for uv in glyphRun(text, face: face) {
           if textFace != nil, textFace != face { closeText() }
           if textStart == nil {
             textStart = textInstances.count
             textFace = face
           }
-          let (u0, v0, u1, v1) = fontAtlas.glyphUV(character, readable: face == .readable)
           textInstances.append(
             TextInstance(
               dst_p0: ndc(pen.x, pen.y),
               dst_p1: ndc(pen.x + glyphSize.x, pen.y + glyphSize.y),
-              tex_tl: [u0, v0],
-              tex_br: [u1, v1],
+              tex_tl: [uv.x, uv.y],
+              tex_br: [uv.z, uv.w],
               color: [color.r, color.g, color.b, color.a]))
           pen.x += advance
         }
@@ -410,6 +271,7 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
     closeText()
     evictImageTexturesIfNeeded()
 
+    lastInstanceCount = shapeInstances.count + textInstances.count
     guard !batches.isEmpty else { return }
     let shapeBuffer = pooledBuffer(
       pool: &shapePool,
@@ -438,6 +300,7 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
           shapeBuffer,
           offset: instanceOffset * MemoryLayout<ShapeInstance>.stride,
           index: 0)
+        lastDrawCallCount += 1
         enc.drawPrimitives(
           type: .triangleStrip,
           vertexStart: 0,
@@ -451,6 +314,7 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
           textBuffer,
           offset: instanceOffset * MemoryLayout<TextInstance>.stride,
           index: 0)
+        lastDrawCallCount += 1
         enc.drawPrimitives(
           type: .triangleStrip,
           vertexStart: 0,
@@ -465,6 +329,7 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
         enc.setRenderPipelineState(imagePipeline)
         enc.setFragmentTexture(texture, index: 0)
         enc.setVertexBytes(&instance, length: MemoryLayout<TextInstance>.stride, index: 0)
+        lastDrawCallCount += 1
         enc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         enc.setScissorRect((scissorStack.last ?? viewportRect).asMtlScissor(scale: rasterScale))
       case .pushClip(let rect):
@@ -541,24 +406,6 @@ public final class MetalRenderer: NSObject, MTKViewDelegate, NSWindowDelegate, R
     pool[poolBufferIndex] = buffer
     return buffer
   }
-
 }
 
-#elseif METAL_TRAIT
-#error("The Metal backend requires macOS.")
-#endif
-
-#if METAL_BACKEND
-import Metal
-
-extension Rect {
-  func asMtlScissor(scale: Point) -> MTLScissorRect {
-    MTLScissorRect(
-      x: Int((minX * scale.x).rounded(.down)),
-      y: Int((minY * scale.y).rounded(.down)),
-      width: Int((size.width * scale.x).rounded(.up)),
-      height: Int((size.height * scale.y).rounded(.up))
-    )
-  }
-}
 #endif
