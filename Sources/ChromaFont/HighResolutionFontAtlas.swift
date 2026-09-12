@@ -10,7 +10,9 @@ public struct FontAtlasMipLevel: Sendable {
 
 public struct HighResolutionFontAtlas: Sendable {
   public static let scale = 3
-  public static let columns = 16
+  // Keep both atlas dimensions within the 4096-pixel minimum texture limit
+  // guaranteed by OpenGL ES 3, including the compositions for both faces.
+  public static let columns = 32
   public static let sourceGlyphWidth = 20
   public static let sourceGlyphHeight = 28
   public static let padding = scale
@@ -21,6 +23,8 @@ public struct HighResolutionFontAtlas: Sendable {
   public let width: Int
   public let height: Int
   private let readableStartIndex: Int
+  private let compositionIndices: [Character: Int]
+  private let readableCompositionStartIndex: Int
 
   public var glyphWidth: Int { Self.sourceGlyphWidth * Self.scale }
   public var glyphHeight: Int { Self.sourceGlyphHeight * Self.scale }
@@ -36,7 +40,10 @@ public struct HighResolutionFontAtlas: Sendable {
     let displayRows = (characters.count + Self.columns - 1) / Self.columns
     let readableCount = Int(BedsteadReadableFont.lastScalar - BedsteadReadableFont.firstScalar + 1)
     let readableStartIndex = displayRows * Self.columns
-    let rows = displayRows + (readableCount + Self.columns - 1) / Self.columns
+    let compositionStartIndex = readableStartIndex + readableCount
+    let readableCompositionStartIndex = compositionStartIndex + LatinCompositions.entries.count
+    let count = readableCompositionStartIndex + LatinCompositions.entries.count
+    let rows = (count + Self.columns - 1) / Self.columns
     let cellWidth = Self.sourceGlyphWidth * Self.scale + 2 * Self.padding
     let cellHeight = Self.sourceGlyphHeight * Self.scale + 2 * Self.padding
     let width = Self.columns * cellWidth
@@ -76,6 +83,28 @@ public struct HighResolutionFontAtlas: Sendable {
             sourceRow..<(sourceRow + BedsteadReadableFont.glyphWidth)])
       }
     }
+
+    // Precompose our bounded accent repertoire for both faces. Character keys
+    // compare canonically, so composed and decomposed input share exactly the
+    // same bitmap without normalizing or otherwise mutating stored text.
+    var compositionIndices: [Character: Int] = [:]
+    for (offset, entry) in LatinCompositions.entries.enumerated() {
+      let character = Character(String(UnicodeScalar(entry.scalar)!))
+      compositionIndices[character] = offset
+      for readable in [false, true] {
+        let baseIndex =
+          readable
+          ? readableStartIndex + Int(entry.base - BedsteadReadableFont.firstScalar)
+          : indices[entry.base]!
+        let destinationIndex = (readable ? readableCompositionStartIndex : compositionStartIndex) + offset
+        Self.composeAccent(
+          pixels: &pixels, width: width, cellWidth: cellWidth, cellHeight: cellHeight,
+          baseIndex: baseIndex, destinationIndex: destinationIndex,
+          base: entry.base, mark: entry.mark)
+      }
+    }
+    self.compositionIndices = compositionIndices
+    self.readableCompositionStartIndex = readableCompositionStartIndex
 
     self.characters = characters
     characterIndices = indices
@@ -132,7 +161,13 @@ public struct HighResolutionFontAtlas: Sendable {
       ? character.unicodeScalars.first!.value : UInt32(0xFFFD)
     let readableRange = BedsteadReadableFont.firstScalar...BedsteadReadableFont.lastScalar
     let index: Int
-    if readable, readableRange.contains(scalar) {
+    if let composition = compositionIndices[character] {
+      index =
+        (readable
+          ? readableCompositionStartIndex
+          : readableStartIndex + Int(BedsteadReadableFont.lastScalar - BedsteadReadableFont.firstScalar + 1))
+        + composition
+    } else if readable, readableRange.contains(scalar) {
       index = readableStartIndex + Int(scalar - BedsteadReadableFont.firstScalar)
     } else {
       let fallback = characterIndices[0xFFFD] ?? characterIndices[0x3F] ?? 0

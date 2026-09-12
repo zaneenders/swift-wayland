@@ -224,3 +224,12 @@ or environment variables; Chroma defines no environment-variable policy.
 `SceneCapture.encode/decode` lives in `RemoteProtocol`, separate from the core
 Chroma hook, and uses a versioned header plus a self-contained wire frame. Capture
 and protocol versions must match; no migration support exists yet.
+
+## Font display
+
+Open the **Font** tab in ChromaDemo (or the remote demo) to inspect the bundled
+monospace font. Switch between Readable and Display, edit the live preview, and
+adjust its size from 50% to 150%. Click a glyph in the responsive character grid
+to inspect it at 8x magnification with canvas and advance guides. The scrolling
+sample pane also includes canonical accent comparisons, contiguous terminal
+cells, and explicit unsupported sequences. No external font libraries are used.

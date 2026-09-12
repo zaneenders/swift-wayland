@@ -1,5 +1,7 @@
-import ChromaFont
+import Chroma
 import Testing
+
+@testable import ChromaFont
 
 @Suite("Backend-neutral font glyphs")
 struct FontGlyphTests {
@@ -79,6 +81,58 @@ struct FontGlyphTests {
     #expect(a != b)
     #expect(atlas.glyphUV("🙂") == fallback)
     #expect(a.0 >= 0 && a.1 >= 0 && a.2 <= 1 && a.3 <= 1)
+  }
+
+  @Test func atlasFitsGuaranteedGLES3TextureDimensions() {
+    let atlas = HighResolutionFontAtlas()
+    // OpenGL ES 3 guarantees GL_MAX_TEXTURE_SIZE is at least 4096.
+    // Both faces and all compositions must fit in the single shared texture.
+    let guaranteedMaximumTextureSize = 4096
+    #expect(atlas.width > 0 && atlas.width <= guaranteedMaximumTextureSize)
+    #expect(atlas.height > 0 && atlas.height <= guaranteedMaximumTextureSize)
+  }
+
+  @Test func latinAccentsShareCellsAcrossCanonicalSpellingsAndFaces() {
+    let atlas = HighResolutionFontAtlas()
+    for entry in LatinCompositions.entries {
+      let composed = Character(String(UnicodeScalar(entry.scalar)!))
+      let decomposed = Character(
+        String(UnicodeScalar(entry.base)!) + String(UnicodeScalar(entry.mark)!))
+      let base = Character(String(UnicodeScalar(entry.base)!))
+      for readable in [false, true] {
+        let uv = atlas.glyphUV(composed, readable: readable)
+        #expect(uv == atlas.glyphUV(decomposed, readable: readable))
+        #expect(uv != atlas.glyphUV("�", readable: readable))
+        #expect(uv != atlas.glyphUV(base, readable: readable))
+        #expect(uv.0 >= 0 && uv.1 >= 0 && uv.2 <= 1 && uv.3 <= 1)
+        let x = Int((uv.0 * Float(atlas.width)).rounded())
+        let y = Int((uv.1 * Float(atlas.height)).rounded())
+        let ink = (0..<atlas.glyphHeight).reduce(0) { total, row in
+          total
+            + atlas.pixels[((y + row) * atlas.width + x)..<((y + row) * atlas.width + x + atlas.glyphWidth)]
+            .filter { $0 != 0 }.count
+        }
+        #expect(ink > 0)
+      }
+    }
+  }
+
+  @Test func unsupportedClustersAreNotSilentlyStripped() {
+    let atlas = HighResolutionFontAtlas()
+    for readable in [false, true] {
+      let fallback = atlas.glyphUV("�", readable: readable)
+      for character: Character in ["e\u{0301}\u{0308}", "e\u{0338}", "\u{0301}", "👩‍💻", "🇺🇸"] {
+        #expect(atlas.glyphUV(character, readable: readable) == fallback)
+      }
+    }
+  }
+
+  @Test func accentedTextKeepsMonospaceMeasurement() {
+    let metrics = FontMetrics()
+    for face: FontFace in [.readable, .display] {
+      #expect(metrics.measure("café", face: face) == metrics.measure("cafe", face: face))
+      #expect(metrics.measure("cafe\u{0301}", face: face) == metrics.measure("café", face: face))
+    }
   }
 
   @Test func atlasMipmapsPreserveCoverageWhileReducingForGPUOutput() {
