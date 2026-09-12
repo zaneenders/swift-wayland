@@ -68,6 +68,29 @@ struct ObservationTests {
     #expect(redraws == 2)
   }
 
+  @Test func nonObservableConditionRefreshesDependenciesWithoutModelMutation() async {
+    let model = Model()
+    let renderer = HeadlessRenderer()
+    var primary = true
+    renderer.content = DeferredBlock {
+      if primary { model.first } else { model.second }
+    }
+    var redraws = 0
+    renderer.onRedrawRequested = { redraws += 1 }
+    renderer.render()
+    primary = false
+    renderer.render()
+    await drainChanges()
+    #expect(redraws == 0)
+
+    model.first = .black
+    await drainChanges()
+    #expect(redraws == 0)
+    model.second = .white
+    await drainChanges()
+    #expect(redraws == 1)
+  }
+
   @Test func newerFrameAndContentReplacementDiscardQueuedCallbacks() async {
     let model = Model()
     let renderer = HeadlessRenderer()
