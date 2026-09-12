@@ -974,6 +974,12 @@ public final class WaylandRenderer: Renderer {
     var texture: GLuint = 0
     unsafe glGenTextures(1, &texture)
     glBindTexture(GLenum(GL_TEXTURE_2D), texture)
+    // Single-byte mip rows are tightly packed, even when their widths are not multiples of four.
+    var unpackAlignment: GLint = 0
+    unsafe glGetIntegerv(GLenum(GL_UNPACK_ALIGNMENT), &unpackAlignment)
+    glPixelStorei(GLenum(GL_UNPACK_ALIGNMENT), 1)
+    defer { glPixelStorei(GLenum(GL_UNPACK_ALIGNMENT), unpackAlignment) }
+
     for (level, mip) in atlas.mipLevels.enumerated() {
       mip.pixels.withUnsafeBytes {
         unsafe glTexImage2D(
